@@ -6,7 +6,7 @@
  * Licensed under GPL v2.
  */
 
-#ifndef __MACOS9__
+#ifndef __MACTYPES__
 #include <stdbool.h>
 #endif
 #include <stdint.h>

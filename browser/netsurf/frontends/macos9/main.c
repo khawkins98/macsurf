@@ -11,7 +11,7 @@
  * responsive), macos9_get_next_delay() otherwise.
  */
 
-#ifndef __MACOS9__
+#ifndef __MACTYPES__
 #include <stdbool.h>
 #endif
 #include <stdlib.h>
