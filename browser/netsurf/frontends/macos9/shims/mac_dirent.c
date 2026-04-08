@@ -12,7 +12,7 @@
 
 #ifdef __MACOS9__
 #include <Files.h>
-#include <UnicodeConverter.h>
+#include <TextEncodingConverter.h>
 #endif
 
 struct mac_dir {

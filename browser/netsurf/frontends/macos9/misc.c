@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -57,11 +59,13 @@ macos9_present_cookies(const char *search_term)
 	return NSERROR_NOT_IMPLEMENTED;
 }
 
+/* Field order: schedule, quit, launch_url, login, pdf_password,
+ * present_cookies (see include/netsurf/misc.h) */
 struct gui_misc_table macos9_misc_table = {
-	.schedule = macos9_schedule,
-	.quit = macos9_quit,
-	.launch_url = macos9_launch_url,
-	.login = macos9_login,
-	.pdf_password = macos9_pdf_password,
-	.present_cookies = macos9_present_cookies,
+	macos9_schedule,
+	macos9_quit,
+	macos9_launch_url,
+	macos9_login,
+	macos9_pdf_password,
+	macos9_present_cookies
 };

@@ -74,19 +74,19 @@ typedef uint32_t socklen_t;
 
 #else
 
-static inline uint16_t htons(uint16_t x) {
+static uint16_t htons(uint16_t x) {
 	return (uint16_t)((x >> 8) | (x << 8));
 }
-static inline uint16_t ntohs(uint16_t x) {
+static uint16_t ntohs(uint16_t x) {
 	return (uint16_t)((x >> 8) | (x << 8));
 }
-static inline uint32_t htonl(uint32_t x) {
+static uint32_t htonl(uint32_t x) {
 	return ((x >> 24) & 0x000000FF) |
 	       ((x >>  8) & 0x0000FF00) |
 	       ((x <<  8) & 0x00FF0000) |
 	       ((x << 24) & 0xFF000000);
 }
-static inline uint32_t ntohl(uint32_t x) {
+static uint32_t ntohl(uint32_t x) {
 	return htonl(x);
 }
 
@@ -114,7 +114,7 @@ typedef struct {
  * an Open Transport implementation, so this default is never called.
  * Exists only so gui_factory.c's gui_default_socket_open() compiles.
  */
-static inline int socket(int domain, int type, int protocol)
+static int socket(int domain, int type, int protocol)
 {
 	(void)domain; (void)type; (void)protocol;
 	return -1;

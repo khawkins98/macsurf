@@ -18,6 +18,13 @@ typedef long long	off_t;
 typedef long		ssize_t;
 typedef unsigned short	mode_t;
 typedef long		time_t;
+
+/* FSIORefNum — provided by Files.h in Carbon, but we may be parsed
+ * before Files.h is included.  Use short (== SInt16 on PPC). */
+#ifndef __FILES__
+typedef short		FSIORefNum;
+#endif
+
 #else
 #include <sys/types.h>
 #include <sys/stat.h>

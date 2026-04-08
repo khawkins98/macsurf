@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 
 #include "utils/errors.h"
@@ -104,18 +106,21 @@ macos9_plot_text(const struct redraw_context *ctx,
 	return NSERROR_OK;
 }
 
+/* Field order: clip, arc, disc, line, rectangle, polygon, path,
+ * bitmap, text, group_start, group_end, flush, option_knockout
+ * (see include/netsurf/plotters.h) */
 const struct plotter_table macos9_plotters = {
-	.clip = macos9_plot_clip,
-	.arc = macos9_plot_arc,
-	.disc = macos9_plot_disc,
-	.line = macos9_plot_line,
-	.rectangle = macos9_plot_rectangle,
-	.polygon = macos9_plot_polygon,
-	.path = macos9_plot_path,
-	.bitmap = macos9_plot_bitmap,
-	.text = macos9_plot_text,
-	.group_start = NULL,
-	.group_end = NULL,
-	.flush = NULL,
-	.option_knockout = true,
+	macos9_plot_clip,
+	macos9_plot_arc,
+	macos9_plot_disc,
+	macos9_plot_line,
+	macos9_plot_rectangle,
+	macos9_plot_polygon,
+	macos9_plot_path,
+	macos9_plot_bitmap,
+	macos9_plot_text,
+	NULL,				/* group_start */
+	NULL,				/* group_end */
+	NULL,				/* flush */
+	true				/* option_knockout */
 };
