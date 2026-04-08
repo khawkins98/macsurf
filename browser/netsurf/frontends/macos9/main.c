@@ -1,0 +1,666 @@
+/*
+ * MacSurf — Mac OS 9 frontend for NetSurf
+ * main.c — Entry point, WaitNextEvent loop, event dispatch
+ *
+ * This file is part of MacSurf, built on the NetSurf engine.
+ * Licensed under GPL v2.
+ *
+ * The event loop follows the pattern from RISC OS and AmigaOS frontends:
+ * WaitNextEvent → dispatch Mac events → schedule_run → loop.
+ * WaitNextEvent sleep is 1 tick when fetches are active (keep network
+ * responsive), macos9_get_next_delay() otherwise.
+ */
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "utils/utils.h"
+#include "utils/nsoption.h"
+#include "utils/log.h"
+#include "utils/messages.h"
+#include "netsurf/netsurf.h"
+#include "netsurf/bitmap.h"
+#include "netsurf/browser_window.h"
+
+#include "macos9/macos9.h"
+
+#ifdef __MACOS9__
+#include <Events.h>
+#include <MacWindows.h>
+#include <MacMemory.h>
+#include <Menus.h>
+#include <Fonts.h>
+#include <TextEdit.h>
+#include <Dialogs.h>
+#include <Quickdraw.h>
+#include <Devices.h>
+#include <DiskInit.h>
+#include <ToolUtils.h>
+#include <Controls.h>
+#else
+/*
+ * Linux build stubs for syntax checking.
+ * These mirror the Mac Toolbox types/constants enough for compilation.
+ * WindowRef and ControlRef are provided by macos9.h.
+ */
+typedef unsigned short EventKind;
+typedef unsigned long UInt32;
+typedef short SInt16;
+
+typedef struct {
+	SInt16 v;
+	SInt16 h;
+} Point;
+
+typedef struct {
+	EventKind what;
+	UInt32 message;
+	UInt32 when;
+	Point where;
+	unsigned short modifiers;
+} EventRecord;
+
+enum {
+	everyEvent    = ~0,
+	nullEvent     = 0,
+	mouseDown     = 1,
+	mouseUp       = 2,
+	keyDown       = 3,
+	keyUp         = 4,
+	autoKey       = 5,
+	updateEvt     = 6,
+	diskEvt       = 7,
+	activateEvt   = 8,
+	osEvt         = 15
+};
+
+/* Menu Manager stubs */
+enum {
+	cmdKey = 0x0100
+};
+
+enum {
+	inMenuBar  = 1,
+	inContent  = 3,
+	inDrag     = 4,
+	inGrow     = 5,
+	inGoAway   = 6
+};
+
+typedef int Boolean;
+typedef void *MenuHandle;
+
+typedef struct { short top, left, bottom, right; } Rect;
+typedef void *GrafPtr;
+static struct { void *thePort; Rect screenBits_bounds; } qd;
+
+static void MaxApplZone(void) {}
+static void MoreMasters(void) {}
+static void InitGraf(void *p) { (void)p; }
+static void InitFonts(void) {}
+static void InitWindows(void) {}
+static void InitMenus(void) {}
+static void TEInit(void) {}
+static void InitDialogs(void *p) { (void)p; }
+static void InitCursor(void) {}
+static void FlushEvents(unsigned short m, unsigned short s)
+{
+	(void)m; (void)s;
+}
+
+static MenuHandle NewMenu(short id, const unsigned char *title)
+{
+	(void)id; (void)title;
+	return NULL;
+}
+static void AppendMenu(MenuHandle m, const unsigned char *data)
+{
+	(void)m; (void)data;
+}
+static void AppendResMenu(MenuHandle m, unsigned long type)
+{
+	(void)m; (void)type;
+}
+static void InsertMenu(MenuHandle m, short before)
+{
+	(void)m; (void)before;
+}
+static void DrawMenuBar(void) {}
+static long MenuSelect(Point p)
+{
+	(void)p;
+	return 0;
+}
+static long MenuKey(short ch)
+{
+	(void)ch;
+	return 0;
+}
+static void HiliteMenu(short id) { (void)id; }
+
+static short FindWindow(Point p, WindowRef *win)
+{
+	(void)p;
+	*win = NULL;
+	return 0;
+}
+
+/*
+ * Pascal string stub — on CodeWarrior, \p"..." produces a real Pascal
+ * string. On Linux we just need something that compiles; the stubs
+ * ignore the pointer anyway.
+ */
+#define PSTR(s) ((const unsigned char *)(s))
+
+static Boolean WaitNextEvent(unsigned short mask, EventRecord *event,
+			     UInt32 sleep, void *mouseRgn)
+{
+	(void)mask; (void)sleep; (void)mouseRgn;
+	event->what = nullEvent;
+	event->message = 0;
+	event->when = 0;
+	event->where.v = 0;
+	event->where.h = 0;
+	event->modifiers = 0;
+	return 0;
+}
+
+/* Window management stubs */
+static void BeginUpdate(WindowRef win) { (void)win; }
+static void EndUpdate(WindowRef win) { (void)win; }
+static void EraseRect(const Rect *r) { (void)r; }
+static GrafPtr GetWindowPort(WindowRef win) { (void)win; return NULL; }
+static void GetPortBounds(GrafPtr port, Rect *r)
+{
+	(void)port;
+	r->top = 0; r->left = 0; r->bottom = 480; r->right = 640;
+}
+static void DragWindow(WindowRef win, Point pt, const Rect *bounds)
+{
+	(void)win; (void)pt; (void)bounds;
+}
+static Boolean ResizeWindow(WindowRef win, Point pt,
+			     const Rect *limits, Rect *outRect)
+{
+	(void)win; (void)pt; (void)limits; (void)outRect;
+	return 0;
+}
+static Boolean TrackGoAway(WindowRef win, Point pt)
+{
+	(void)win; (void)pt;
+	return 0;
+}
+static void SelectWindow(WindowRef win) { (void)win; }
+static WindowRef FrontWindow(void) { return NULL; }
+
+/* Control management stubs */
+static void ActivateControl(ControlRef ctrl) { (void)ctrl; }
+static void DeactivateControl(ControlRef ctrl) { (void)ctrl; }
+#endif
+
+bool macos9_done = false;
+bool macos9_fetching = false;
+
+/* Forward declarations for tables defined in other files */
+extern struct gui_window_table *macos9_window_table;
+extern struct gui_bitmap_table *macos9_bitmap_table;
+extern struct gui_layout_table *macos9_layout_table;
+extern struct gui_fetch_table macos9_fetch_table;
+extern struct gui_misc_table macos9_misc_table;
+extern struct gui_clipboard_table *macos9_clipboard_table;
+extern struct gui_utf8_table *macos9_utf8_table;
+extern struct gui_download_table *macos9_download_table;
+
+/* Declared in plotters.c */
+extern const struct plotter_table macos9_plotters;
+
+/* ---- Menu bar ---- */
+
+/**
+ * Handle a menu selection by menu ID and item number.
+ */
+static void
+macos9_handle_menu(short menu_id, short item)
+{
+	switch (menu_id) {
+	case MENU_APPLE:
+		if (item == 1) {
+			/* About MacSurf — show about dialog (stub) */
+			NSLOG(netsurf, INFO, "About MacSurf");
+		}
+		/* Items > 1 are desk accessories */
+		break;
+
+	case MENU_FILE:
+		switch (item) {
+		case ITEM_FILE_NEW:
+			NSLOG(netsurf, INFO, "File > New Window");
+			break;
+		case ITEM_FILE_LOCATION:
+			NSLOG(netsurf, INFO, "File > Open Location");
+			break;
+		case ITEM_FILE_CLOSE:
+			NSLOG(netsurf, INFO, "File > Close");
+			break;
+		case ITEM_FILE_QUIT:
+			macos9_done = true;
+			break;
+		}
+		break;
+
+	case MENU_EDIT:
+		switch (item) {
+		case 1:
+			NSLOG(netsurf, INFO, "Edit > Undo");
+			break;
+		case 3:
+			NSLOG(netsurf, INFO, "Edit > Cut");
+			break;
+		case 4:
+			NSLOG(netsurf, INFO, "Edit > Copy");
+			break;
+		case 5:
+			NSLOG(netsurf, INFO, "Edit > Paste");
+			break;
+		case 6:
+			NSLOG(netsurf, INFO, "Edit > Select All");
+			break;
+		}
+		break;
+
+	case MENU_GO:
+		switch (item) {
+		case ITEM_GO_BACK:
+			NSLOG(netsurf, INFO, "Go > Back");
+			break;
+		case ITEM_GO_FORWARD:
+			NSLOG(netsurf, INFO, "Go > Forward");
+			break;
+		case ITEM_GO_STOP:
+			NSLOG(netsurf, INFO, "Go > Stop");
+			break;
+		case ITEM_GO_RELOAD:
+			NSLOG(netsurf, INFO, "Go > Reload");
+			break;
+		case ITEM_GO_HOME:
+			NSLOG(netsurf, INFO, "Go > Home");
+			break;
+		}
+		break;
+
+	case MENU_HELP:
+		if (item == 1) {
+			NSLOG(netsurf, INFO, "MacSurf Help");
+		}
+		break;
+	}
+}
+
+/**
+ * Create the application menu bar.
+ *
+ * Apple menu, File, Edit, Go, Help — all using NewMenu/AppendMenu.
+ * Menu item layout matches Inside Macintosh conventions.
+ */
+static void
+macos9_init_menus(void)
+{
+	MenuHandle apple_menu, file_menu, edit_menu, go_menu, help_menu;
+
+#ifdef __MACOS9__
+	/* CodeWarrior \p prefix creates Pascal strings natively */
+	apple_menu = NewMenu(MENU_APPLE, "\p\024");
+	AppendMenu(apple_menu, "\pAbout MacSurf...");
+	AppendMenu(apple_menu, "\p(-");
+	AppendResMenu(apple_menu, 'DRVR');
+	InsertMenu(apple_menu, 0);
+
+	file_menu = NewMenu(MENU_FILE, "\pFile");
+	AppendMenu(file_menu, "\pNew Window/N");
+	AppendMenu(file_menu, "\pOpen Location.../L");
+	AppendMenu(file_menu, "\pClose/W");
+	AppendMenu(file_menu, "\p(-");
+	AppendMenu(file_menu, "\pQuit/Q");
+	InsertMenu(file_menu, 0);
+
+	edit_menu = NewMenu(MENU_EDIT, "\pEdit");
+	AppendMenu(edit_menu, "\pUndo/Z");
+	AppendMenu(edit_menu, "\p(-");
+	AppendMenu(edit_menu, "\pCut/X");
+	AppendMenu(edit_menu, "\pCopy/C");
+	AppendMenu(edit_menu, "\pPaste/V");
+	AppendMenu(edit_menu, "\pSelect All/A");
+	InsertMenu(edit_menu, 0);
+
+	go_menu = NewMenu(MENU_GO, "\pGo");
+	AppendMenu(go_menu, "\pBack/[");
+	AppendMenu(go_menu, "\pForward/]");
+	AppendMenu(go_menu, "\pStop/.");
+	AppendMenu(go_menu, "\pReload/R");
+	AppendMenu(go_menu, "\p(-");
+	AppendMenu(go_menu, "\pHome");
+	InsertMenu(go_menu, 0);
+
+	help_menu = NewMenu(MENU_HELP, "\pHelp");
+	AppendMenu(help_menu, "\pMacSurf Help");
+	InsertMenu(help_menu, 0);
+#else
+	/* Linux stubs — PSTR() casts C strings for compilation */
+	apple_menu = NewMenu(MENU_APPLE, PSTR("\024"));
+	AppendMenu(apple_menu, PSTR("About MacSurf..."));
+	AppendMenu(apple_menu, PSTR("(-"));
+	AppendResMenu(apple_menu, 0x44525652UL); /* 'DRVR' */
+	InsertMenu(apple_menu, 0);
+
+	file_menu = NewMenu(MENU_FILE, PSTR("File"));
+	AppendMenu(file_menu, PSTR("New Window/N"));
+	AppendMenu(file_menu, PSTR("Open Location.../L"));
+	AppendMenu(file_menu, PSTR("Close/W"));
+	AppendMenu(file_menu, PSTR("(-"));
+	AppendMenu(file_menu, PSTR("Quit/Q"));
+	InsertMenu(file_menu, 0);
+
+	edit_menu = NewMenu(MENU_EDIT, PSTR("Edit"));
+	AppendMenu(edit_menu, PSTR("Undo/Z"));
+	AppendMenu(edit_menu, PSTR("(-"));
+	AppendMenu(edit_menu, PSTR("Cut/X"));
+	AppendMenu(edit_menu, PSTR("Copy/C"));
+	AppendMenu(edit_menu, PSTR("Paste/V"));
+	AppendMenu(edit_menu, PSTR("Select All/A"));
+	InsertMenu(edit_menu, 0);
+
+	go_menu = NewMenu(MENU_GO, PSTR("Go"));
+	AppendMenu(go_menu, PSTR("Back/["));
+	AppendMenu(go_menu, PSTR("Forward/]"));
+	AppendMenu(go_menu, PSTR("Stop/."));
+	AppendMenu(go_menu, PSTR("Reload/R"));
+	AppendMenu(go_menu, PSTR("(-"));
+	AppendMenu(go_menu, PSTR("Home"));
+	InsertMenu(go_menu, 0);
+
+	help_menu = NewMenu(MENU_HELP, PSTR("Help"));
+	AppendMenu(help_menu, PSTR("MacSurf Help"));
+	InsertMenu(help_menu, 0);
+#endif
+
+	DrawMenuBar();
+}
+
+/* ---- Event handlers ---- */
+
+static void
+macos9_handle_null_event(const EventRecord *event)
+{
+	(void)event;
+	/* Idle processing — mouse tracking, throbber animation, etc. */
+}
+
+static void
+macos9_handle_mouse_down(const EventRecord *event)
+{
+	WindowRef win;
+	short part;
+	long menu_choice;
+
+	part = FindWindow(event->where, &win);
+
+	switch (part) {
+	case inMenuBar:
+		menu_choice = MenuSelect(event->where);
+		if (menu_choice != 0) {
+			macos9_handle_menu((short)(menu_choice >> 16),
+					   (short)(menu_choice & 0xFFFF));
+		}
+		HiliteMenu(0);
+		break;
+	case inContent:
+		if (win != FrontWindow())
+			SelectWindow(win);
+		/* TODO: route to browser_window content handler */
+		break;
+	case inDrag:
+		DragWindow(win, event->where, &qd.screenBits_bounds);
+		break;
+	case inGrow:
+		ResizeWindow(win, event->where, NULL, NULL);
+		/* TODO: recalculate content dimensions, reflow */
+		break;
+	case inGoAway:
+		if (TrackGoAway(win, event->where)) {
+			struct gui_window *gw = macos9_find_window(win);
+			if (gw != NULL) {
+				if (gw->bw != NULL) {
+					browser_window_destroy(gw->bw);
+				} else {
+					macos9_window_destroy(gw);
+				}
+			}
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static void
+macos9_handle_mouse_up(const EventRecord *event)
+{
+	NSLOG(netsurf, INFO, "mouseUp at (%d,%d)",
+	      event->where.h, event->where.v);
+}
+
+static void
+macos9_handle_key_down(const EventRecord *event)
+{
+	char ch = (char)(event->message & 0xFF);
+
+	if (event->modifiers & cmdKey) {
+		long menu_choice = MenuKey(ch);
+		if (menu_choice != 0) {
+			macos9_handle_menu((short)(menu_choice >> 16),
+					   (short)(menu_choice & 0xFFFF));
+			HiliteMenu(0);
+			return;
+		}
+	}
+
+	NSLOG(netsurf, INFO, "keyDown char=0x%02x modifiers=0x%04x",
+	      (unsigned)ch, event->modifiers);
+	/* TODO: route to browser_window key handler */
+}
+
+static void
+macos9_handle_update(const EventRecord *event)
+{
+	WindowRef win = (WindowRef)(uintptr_t)event->message;
+	Rect portRect;
+
+	BeginUpdate(win);
+
+	/* Erase to white — content drawing via plotters not yet wired */
+	GetPortBounds(GetWindowPort(win), &portRect);
+	EraseRect(&portRect);
+
+	EndUpdate(win);
+}
+
+static void
+macos9_handle_activate(const EventRecord *event)
+{
+	WindowRef win = (WindowRef)(uintptr_t)event->message;
+	bool active = (event->modifiers & 0x0001) != 0;
+	struct gui_window *gw = macos9_find_window(win);
+
+	if (gw == NULL)
+		return;
+
+	if (active) {
+		if (gw->scroll_v != NULL)
+			ActivateControl(gw->scroll_v);
+		if (gw->scroll_h != NULL)
+			ActivateControl(gw->scroll_h);
+	} else {
+		if (gw->scroll_v != NULL)
+			DeactivateControl(gw->scroll_v);
+		if (gw->scroll_h != NULL)
+			DeactivateControl(gw->scroll_h);
+	}
+}
+
+static void
+macos9_handle_os_event(const EventRecord *event)
+{
+	unsigned char os_msg = (unsigned char)((event->message >> 24) & 0xFF);
+	NSLOG(netsurf, INFO, "osEvt subtype=%u", (unsigned)os_msg);
+	/* Subtypes: suspend/resume (0xFA/0x01), mouse-moved, etc. */
+}
+
+static void
+macos9_handle_disk(const EventRecord *event)
+{
+	NSLOG(netsurf, INFO, "diskEvt message=0x%08lx",
+	      (unsigned long)event->message);
+}
+
+/**
+ * Dispatch a Mac event to the appropriate handler.
+ */
+static void
+macos9_dispatch_event(const EventRecord *event)
+{
+	switch (event->what) {
+	case nullEvent:
+		macos9_handle_null_event(event);
+		break;
+	case mouseDown:
+		macos9_handle_mouse_down(event);
+		break;
+	case mouseUp:
+		macos9_handle_mouse_up(event);
+		break;
+	case keyDown:
+	case autoKey:
+		macos9_handle_key_down(event);
+		break;
+	case updateEvt:
+		macos9_handle_update(event);
+		break;
+	case activateEvt:
+		macos9_handle_activate(event);
+		break;
+	case osEvt:
+		macos9_handle_os_event(event);
+		break;
+	case diskEvt:
+		macos9_handle_disk(event);
+		break;
+	default:
+		NSLOG(netsurf, INFO, "unhandled event type %d",
+		      event->what);
+		break;
+	}
+}
+
+/**
+ * Main event loop.
+ *
+ * Called once per iteration from the main while loop.
+ * Mirrors the RISC OS riscos_poll() pattern:
+ *   1. Determine sleep time
+ *   2. WaitNextEvent (yields CPU to other apps)
+ *   3. Dispatch the event
+ *   4. Run scheduled callbacks
+ */
+static void
+macos9_poll(void)
+{
+	EventRecord event;
+	UInt32 sleep_ticks;
+
+	/*
+	 * When fetches are active, sleep only 1 tick so we return quickly
+	 * to process OT notifier results and keep network responsive.
+	 * Otherwise, sleep until the next scheduled callback is due.
+	 */
+	if (macos9_fetching) {
+		sleep_ticks = 1;
+	} else {
+		sleep_ticks = (UInt32)macos9_get_next_delay();
+	}
+
+	WaitNextEvent(everyEvent, &event, sleep_ticks, NULL);
+
+	macos9_dispatch_event(&event);
+
+	/*
+	 * Always run scheduled callbacks after WaitNextEvent returns.
+	 * Callbacks may trigger further NetSurf core work (reflow,
+	 * fetch polling, etc.) which is why this must happen at the
+	 * top level of the event loop — never from inside a handler.
+	 */
+	macos9_schedule_run();
+}
+
+int main(int argc, char **argv)
+{
+	nserror ret;
+	struct netsurf_table macos9_table = {
+		.misc = &macos9_misc_table,
+		.window = macos9_window_table,
+		.corewindow = NULL,
+		.download = macos9_download_table,
+		.clipboard = macos9_clipboard_table,
+		.fetch = &macos9_fetch_table,
+		.file = NULL,
+		.utf8 = macos9_utf8_table,
+		.search = NULL,
+		.search_web = NULL,
+		.llcache = NULL,
+		.bitmap = macos9_bitmap_table,
+		.layout = macos9_layout_table,
+	};
+
+	(void)argc;
+	(void)argv;
+
+	/* Mac Toolbox initialization — must happen before anything else */
+	MaxApplZone();
+	MoreMasters();
+	InitGraf(&qd.thePort);
+	InitFonts();
+	InitWindows();
+	InitMenus();
+	TEInit();
+	InitDialogs(NULL);
+	InitCursor();
+	FlushEvents(everyEvent, 0);
+
+	macos9_init_menus();
+
+	ret = netsurf_register(&macos9_table);
+	if (ret != NSERROR_OK) {
+		return 1;
+	}
+
+	/* TODO: nsoption_init, nsoption_read, messages_add_from_file */
+
+	ret = netsurf_init(NULL);
+	if (ret != NSERROR_OK) {
+		return 1;
+	}
+
+	/* TODO: bitmap_set_format for PPC big-endian ARGB */
+
+	macos9_create_initial_window();
+
+	NSLOG(netsurf, INFO, "MacSurf entering event loop");
+
+	while (!macos9_done) {
+		macos9_poll();
+	}
+
+	netsurf_exit();
+
+	return 0;
+}

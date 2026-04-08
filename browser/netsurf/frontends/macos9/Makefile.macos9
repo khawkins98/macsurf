@@ -1,0 +1,48 @@
+#
+# Makefile for NetSurf Mac OS 9 target (MacSurf)
+#
+# This file is part of MacSurf, built on the NetSurf engine.
+# Modeled on frontends/riscos/Makefile
+#
+
+# ----------------------------------------------------------------------------
+# Mac OS 9 target setup
+# ----------------------------------------------------------------------------
+
+# Carbon API, targeting Mac OS 9 PPC
+# For cross-compilation from Linux: powerpc-apple-macos-gcc
+# For on-machine: CodeWarrior 8
+
+CFLAGS += -std=c99 -D__MACOS9__
+CFLAGS += -DWITHOUT_DUKTAPE
+
+# Disable features not available on Mac OS 9
+CFLAGS += -DNO_IPV6
+
+# Image format support (provided by NetSurf bundled decoders)
+# No cURL, no OpenSSL — all fetching via proxy over plain HTTP
+
+# ----------------------------------------------------------------------------
+# Source file setup
+# ----------------------------------------------------------------------------
+
+S_FRONTEND :=		\
+	main.c		\
+	window.c	\
+	bitmap.c	\
+	plotters.c	\
+	font.c		\
+	fetch.c		\
+	clipboard.c	\
+	utf8.c		\
+	download.c	\
+	misc.c		\
+	schedule.c
+
+# Final source build list
+SOURCES = $(S_COMMON) $(S_IMAGE) $(S_BROWSER) $(S_FRONTEND)
+
+EXETARGET := MacSurf
+
+# Messages filter — no platform-specific message filtering yet
+MESSAGES_FILTER=any

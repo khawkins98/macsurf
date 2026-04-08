@@ -1,0 +1,753 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE PROJECT [
+  <!ELEMENT PROJECT (TARGETLIST, TARGETORDER, GROUPLIST, DESIGNLIST?)>
+  <!ELEMENT TARGETLIST (TARGET+)>
+  <!ELEMENT TARGET (NAME, SETTINGLIST, FILELIST?, LINKORDER?)>
+  <!ELEMENT NAME (#PCDATA)>
+  <!ELEMENT SETTINGLIST (SETTING+)>
+  <!ELEMENT SETTING (NAME, VALUE?)>
+  <!ELEMENT VALUE (#PCDATA)>
+  <!ELEMENT FILELIST (FILE+)>
+  <!ELEMENT FILE (PATHTYPE, PATHROOT?, PATH, FILEKIND?, FILEFLAGS?)>
+  <!ELEMENT PATHTYPE (#PCDATA)>
+  <!ELEMENT PATHROOT (#PCDATA)>
+  <!ELEMENT PATH (#PCDATA)>
+  <!ELEMENT FILEKIND (#PCDATA)>
+  <!ELEMENT FILEFLAGS (#PCDATA)>
+  <!ELEMENT LINKORDER (FILEREF+)>
+  <!ELEMENT FILEREF (PATH)>
+  <!ELEMENT TARGETORDER (ORDEREDTARGET+)>
+  <!ELEMENT ORDEREDTARGET (NAME)>
+  <!ELEMENT GROUPLIST (GROUP+)>
+  <!ELEMENT GROUP (NAME, (FILEREF | GROUP)*)>
+  <!ELEMENT DESIGNLIST EMPTY>
+]>
+
+<!--
+    MacSurf.mcp — CodeWarrior 8 project file (XML export format)
+
+    Target: MacSurf — Mac OS 9 Carbon application
+    CPU: PowerPC
+    Compiler: MWC PPC C, C99 mode
+    Linker: MW PPC Carbon Linker
+
+    Import into CodeWarrior 8 via File > Import Project...
+    Or place alongside source and open directly (CW8 reads XML .mcp).
+-->
+
+<PROJECT>
+
+<!-- ================================================================== -->
+<!--  TARGET DEFINITIONS                                                 -->
+<!-- ================================================================== -->
+
+<TARGETLIST>
+<TARGET>
+<NAME>MacSurf</NAME>
+
+<SETTINGLIST>
+
+    <!-- ============================================================== -->
+    <!--  Target Settings                                                -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>Linker</NAME>
+        <VALUE>MacOS PPC Linker</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>PreLinker</NAME>
+        <VALUE></VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>PostLinker</NAME>
+        <VALUE>MacOS PPC Linker</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>Targetname</NAME>
+        <VALUE>MacSurf</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>OutputDirectory</NAME>
+        <VALUE>:</VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Target Type — Application                                      -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>MWProject_PPC_type</NAME>
+        <VALUE>Application</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_filecreator</NAME>
+        <VALUE>MSrf</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_filetype</NAME>
+        <VALUE>APPL</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_outfile</NAME>
+        <VALUE>MacSurf</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_size</NAME>
+        <VALUE>4096</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_minsize</NAME>
+        <VALUE>2048</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWProject_PPC_stacksize</NAME>
+        <VALUE>256</VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Processor — PowerPC                                            -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>MWFrontEnd_C_cplusplus</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWFrontEnd_C_c99</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWFrontEnd_C_prefix_file</NAME>
+        <VALUE></VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Preprocessor Defines                                           -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>C_CPP_Preprocessor_PrefixText</NAME>
+        <VALUE>
+#define __MACOS9__               1
+#define WITHOUT_DUKTAPE          1
+#define NO_IPV6                  1
+#define TARGET_API_MAC_CARBON    1
+        </VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Access Paths (Include Paths)                                   -->
+    <!-- ============================================================== -->
+    <!--
+        Order matters. CodeWarrior searches in listed order.
+        {Project} = directory containing this .mcp file
+        {Compiler} = CodeWarrior installation root
+    -->
+
+    <!-- 1. Frontend-local includes (macos9.h, shim headers) -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/include</VALUE>
+    </SETTING>
+
+    <!-- 2. NetSurf top-level include/ (libwapcaplet, libcss, etc.) -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/../../../include</VALUE>
+    </SETTING>
+
+    <!-- 3. NetSurf source root (for "utils/config.h", "content/...", etc.) -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/../../../</VALUE>
+    </SETTING>
+
+    <!-- 4. POSIX shim headers (mac_types.h, mac_inet.h, etc.) -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/shims</VALUE>
+    </SETTING>
+
+    <!-- 5. Mac OS Universal Headers -->
+    <SETTING>
+        <NAME>SystemSearchPath</NAME>
+        <VALUE>{Compiler}/MacOS Support/Headers/Universal Headers</VALUE>
+    </SETTING>
+
+    <!-- 6. MSL shared support (runtime headers) -->
+    <SETTING>
+        <NAME>SystemSearchPath</NAME>
+        <VALUE>{Compiler}/MacOS Support/Libraries/Runtime/Shared Support</VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Code Generation — PowerPC                                      -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>MWCodeGen_PPC_structalignment</NAME>
+        <VALUE>PPC</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWCodeGen_PPC_tracealiasing</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWCodeGen_PPC_processor</NAME>
+        <VALUE>750</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWCodeGen_PPC_readonlystrings</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWCodeGen_PPC_profiler</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Warnings                                                       -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_illpragma</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_emptydecl</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_unusedvar</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_unusedarg</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_extracomma</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_warn_implicitconv</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWWarning_C_pedantic</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+    <!-- ============================================================== -->
+    <!--  Linker Settings — Carbon                                       -->
+    <!-- ============================================================== -->
+
+    <SETTING>
+        <NAME>MWLinker_PPC_linksym</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWLinker_PPC_linkdead</NAME>
+        <VALUE>1</VALUE>
+    </SETTING>
+
+    <SETTING>
+        <NAME>MWLinker_PPC_generateMap</NAME>
+        <VALUE>0</VALUE>
+    </SETTING>
+
+</SETTINGLIST>
+
+<!-- ================================================================== -->
+<!--  FILE LIST                                                          -->
+<!-- ================================================================== -->
+
+<FILELIST>
+
+    <!-- ============================================================== -->
+    <!--  NetSurf Core Utils                                             -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/utils.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/file.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/filepath.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/log.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/time.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/nsurl.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/url.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/utf8.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/messages.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/nsoption.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <!-- ============================================================== -->
+    <!--  NetSurf Content                                                -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/llcache.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/fetch.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/fs_backing_store.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/content.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/hlcache.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/mimesniff.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/urldb.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <!-- ============================================================== -->
+    <!--  NetSurf Desktop                                                -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/browser.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/browser_window.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/netsurf.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/gui_factory.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/plot_style.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <!-- ============================================================== -->
+    <!--  MacSurf Frontend                                               -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>main.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>window.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>bitmap.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>plotters.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>font.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>fetch.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>clipboard.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>utf8.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>download.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>misc.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>schedule.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <!-- ============================================================== -->
+    <!--  POSIX Shims                                                    -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>shims/mac_iconv.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>shims/mac_file_io.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>shims/mac_stat.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>shims/mac_dirent.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>shims/mac_time.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <!-- ============================================================== -->
+    <!--  Libraries                                                      -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Compiler</PATHTYPE>
+        <PATH>MacOS Support/Libraries/Runtime/Shared Support/MSL C.Carbon.Lib</PATH>
+        <FILEKIND>Library</FILEKIND>
+        <FILEFLAGS>link</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Compiler</PATHTYPE>
+        <PATH>MacOS Support/Libraries/MSL/MSL_C/MSL_Common/Lib/MSL C.Carbon.Lib</PATH>
+        <FILEKIND>Library</FILEKIND>
+        <FILEFLAGS>link</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>System</PATHTYPE>
+        <PATH>CarbonLib</PATH>
+        <FILEKIND>Library</FILEKIND>
+        <FILEFLAGS>link</FILEFLAGS>
+    </FILE>
+
+</FILELIST>
+
+<!-- ================================================================== -->
+<!--  LINK ORDER                                                         -->
+<!-- ================================================================== -->
+<!--
+    Link order: shims first (they provide POSIX symbols), then core
+    layers bottom-up, then frontend, then libraries.
+-->
+
+<LINKORDER>
+    <!-- POSIX Shims -->
+    <FILEREF><PATH>shims/mac_iconv.c</PATH></FILEREF>
+    <FILEREF><PATH>shims/mac_file_io.c</PATH></FILEREF>
+    <FILEREF><PATH>shims/mac_stat.c</PATH></FILEREF>
+    <FILEREF><PATH>shims/mac_dirent.c</PATH></FILEREF>
+    <FILEREF><PATH>shims/mac_time.c</PATH></FILEREF>
+
+    <!-- NetSurf Core Utils -->
+    <FILEREF><PATH>../../../utils/utils.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/file.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/filepath.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/log.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/time.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/nsurl.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/url.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/utf8.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/messages.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/nsoption.c</PATH></FILEREF>
+
+    <!-- NetSurf Content -->
+    <FILEREF><PATH>../../../content/llcache.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/fetch.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/fs_backing_store.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/content.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/hlcache.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/mimesniff.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/urldb.c</PATH></FILEREF>
+
+    <!-- NetSurf Desktop -->
+    <FILEREF><PATH>../../../desktop/browser.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/browser_window.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/netsurf.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/gui_factory.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/plot_style.c</PATH></FILEREF>
+
+    <!-- MacSurf Frontend -->
+    <FILEREF><PATH>main.c</PATH></FILEREF>
+    <FILEREF><PATH>window.c</PATH></FILEREF>
+    <FILEREF><PATH>bitmap.c</PATH></FILEREF>
+    <FILEREF><PATH>plotters.c</PATH></FILEREF>
+    <FILEREF><PATH>font.c</PATH></FILEREF>
+    <FILEREF><PATH>fetch.c</PATH></FILEREF>
+    <FILEREF><PATH>clipboard.c</PATH></FILEREF>
+    <FILEREF><PATH>utf8.c</PATH></FILEREF>
+    <FILEREF><PATH>download.c</PATH></FILEREF>
+    <FILEREF><PATH>misc.c</PATH></FILEREF>
+    <FILEREF><PATH>schedule.c</PATH></FILEREF>
+
+    <!-- Libraries -->
+    <FILEREF><PATH>MacOS Support/Libraries/Runtime/Shared Support/MSL C.Carbon.Lib</PATH></FILEREF>
+    <FILEREF><PATH>MacOS Support/Libraries/MSL/MSL_C/MSL_Common/Lib/MSL C.Carbon.Lib</PATH></FILEREF>
+    <FILEREF><PATH>CarbonLib</PATH></FILEREF>
+</LINKORDER>
+
+</TARGET>
+</TARGETLIST>
+
+<!-- ================================================================== -->
+<!--  TARGET ORDER                                                       -->
+<!-- ================================================================== -->
+
+<TARGETORDER>
+    <ORDEREDTARGET>
+        <NAME>MacSurf</NAME>
+    </ORDEREDTARGET>
+</TARGETORDER>
+
+<!-- ================================================================== -->
+<!--  SOURCE GROUPS (IDE project tree)                                   -->
+<!-- ================================================================== -->
+
+<GROUPLIST>
+
+    <GROUP>
+        <NAME>NetSurf Core Utils</NAME>
+        <FILEREF><PATH>../../../utils/utils.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/file.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/filepath.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/log.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/time.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/nsurl.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/url.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/utf8.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/messages.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/nsoption.c</PATH></FILEREF>
+    </GROUP>
+
+    <GROUP>
+        <NAME>NetSurf Content</NAME>
+        <FILEREF><PATH>../../../content/llcache.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/fetch.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/fs_backing_store.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/content.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/hlcache.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/mimesniff.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/urldb.c</PATH></FILEREF>
+    </GROUP>
+
+    <GROUP>
+        <NAME>NetSurf Desktop</NAME>
+        <FILEREF><PATH>../../../desktop/browser.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/browser_window.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/netsurf.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/gui_factory.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/plot_style.c</PATH></FILEREF>
+    </GROUP>
+
+    <GROUP>
+        <NAME>MacSurf Frontend</NAME>
+        <FILEREF><PATH>main.c</PATH></FILEREF>
+        <FILEREF><PATH>window.c</PATH></FILEREF>
+        <FILEREF><PATH>bitmap.c</PATH></FILEREF>
+        <FILEREF><PATH>plotters.c</PATH></FILEREF>
+        <FILEREF><PATH>font.c</PATH></FILEREF>
+        <FILEREF><PATH>fetch.c</PATH></FILEREF>
+        <FILEREF><PATH>clipboard.c</PATH></FILEREF>
+        <FILEREF><PATH>utf8.c</PATH></FILEREF>
+        <FILEREF><PATH>download.c</PATH></FILEREF>
+        <FILEREF><PATH>misc.c</PATH></FILEREF>
+        <FILEREF><PATH>schedule.c</PATH></FILEREF>
+    </GROUP>
+
+    <GROUP>
+        <NAME>POSIX Shims</NAME>
+        <FILEREF><PATH>shims/mac_iconv.c</PATH></FILEREF>
+        <FILEREF><PATH>shims/mac_file_io.c</PATH></FILEREF>
+        <FILEREF><PATH>shims/mac_stat.c</PATH></FILEREF>
+        <FILEREF><PATH>shims/mac_dirent.c</PATH></FILEREF>
+        <FILEREF><PATH>shims/mac_time.c</PATH></FILEREF>
+    </GROUP>
+
+    <GROUP>
+        <NAME>Libraries</NAME>
+        <FILEREF><PATH>MacOS Support/Libraries/Runtime/Shared Support/MSL C.Carbon.Lib</PATH></FILEREF>
+        <FILEREF><PATH>MacOS Support/Libraries/MSL/MSL_C/MSL_Common/Lib/MSL C.Carbon.Lib</PATH></FILEREF>
+        <FILEREF><PATH>CarbonLib</PATH></FILEREF>
+    </GROUP>
+
+</GROUPLIST>
+
+</PROJECT>
