@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -55,11 +57,12 @@ macos9_download_done(struct gui_download_window *dw)
 	free(dw);
 }
 
+/* Field order: create, data, error, done (see include/netsurf/download.h) */
 static struct gui_download_table download_table = {
-	.create = macos9_download_create,
-	.data = macos9_download_data,
-	.error = macos9_download_error,
-	.done = macos9_download_done,
+	macos9_download_create,
+	macos9_download_data,
+	macos9_download_error,
+	macos9_download_done
 };
 
 struct gui_download_table *macos9_download_table = &download_table;

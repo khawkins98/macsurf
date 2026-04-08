@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,9 +33,10 @@ macos9_clipboard_set(const char *buffer, size_t length,
 	/* TODO: ZeroScrap() + PutScrap() with 'TEXT' type */
 }
 
+/* Field order: get, set (see include/netsurf/clipboard.h) */
 static struct gui_clipboard_table clipboard_table = {
-	.get = macos9_clipboard_get,
-	.set = macos9_clipboard_set,
+	macos9_clipboard_get,
+	macos9_clipboard_set
 };
 
 struct gui_clipboard_table *macos9_clipboard_table = &clipboard_table;

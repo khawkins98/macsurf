@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -88,10 +90,11 @@ macos9_font_split(const struct plot_font_style *fstyle,
 	return NSERROR_OK;
 }
 
+/* Field order: width, position, split (see include/netsurf/layout.h) */
 static struct gui_layout_table layout_table = {
-	.width = macos9_font_width,
-	.position = macos9_font_position,
-	.split = macos9_font_split,
+	macos9_font_width,
+	macos9_font_position,
+	macos9_font_split
 };
 
 struct gui_layout_table *macos9_layout_table = &layout_table;

@@ -11,7 +11,9 @@
  * responsive), macos9_get_next_delay() otherwise.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -605,21 +607,17 @@ macos9_poll(void)
 int main(int argc, char **argv)
 {
 	nserror ret;
-	struct netsurf_table macos9_table = {
-		.misc = &macos9_misc_table,
-		.window = macos9_window_table,
-		.corewindow = NULL,
-		.download = macos9_download_table,
-		.clipboard = macos9_clipboard_table,
-		.fetch = &macos9_fetch_table,
-		.file = NULL,
-		.utf8 = macos9_utf8_table,
-		.search = NULL,
-		.search_web = NULL,
-		.llcache = NULL,
-		.bitmap = macos9_bitmap_table,
-		.layout = macos9_layout_table,
-	};
+	struct netsurf_table macos9_table;
+
+	memset(&macos9_table, 0, sizeof(macos9_table));
+	macos9_table.misc = &macos9_misc_table;
+	macos9_table.window = macos9_window_table;
+	macos9_table.download = macos9_download_table;
+	macos9_table.clipboard = macos9_clipboard_table;
+	macos9_table.fetch = &macos9_fetch_table;
+	macos9_table.utf8 = macos9_utf8_table;
+	macos9_table.bitmap = macos9_bitmap_table;
+	macos9_table.layout = macos9_layout_table;
 
 	(void)argc;
 	(void)argv;

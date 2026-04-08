@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +17,30 @@
 #include "netsurf/utf8.h"
 
 #include "macos9/macos9.h"
+
+/*
+ * strndup is POSIX.1-2008, not available in CW8 C89.
+ * Provide a local implementation for the Mac build.
+ */
+#ifdef __MACOS9__
+static char *
+macos9_strndup(const char *s, size_t n)
+{
+	size_t len;
+	char *copy;
+
+	for (len = 0; len < n && s[len] != '\0'; len++)
+		;
+
+	copy = malloc(len + 1);
+	if (copy != NULL) {
+		memcpy(copy, s, len);
+		copy[len] = '\0';
+	}
+	return copy;
+}
+#define strndup macos9_strndup
+#endif
 
 static nserror
 macos9_utf8_to_local(const char *string, size_t len, char **result)
@@ -48,9 +74,10 @@ macos9_local_to_utf8(const char *string, size_t len, char **result)
 	return NSERROR_OK;
 }
 
+/* Field order: utf8_to_local, local_to_utf8 (see include/netsurf/utf8.h) */
 static struct gui_utf8_table utf8_table = {
-	.utf8_to_local = macos9_utf8_to_local,
-	.local_to_utf8 = macos9_local_to_utf8,
+	macos9_utf8_to_local,
+	macos9_local_to_utf8
 };
 
 struct gui_utf8_table *macos9_utf8_table = &utf8_table;

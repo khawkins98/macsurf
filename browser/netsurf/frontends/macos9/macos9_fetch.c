@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,8 +92,15 @@ macos9_fetch_mimetype(const char *ro_path)
 	return strdup(type);
 }
 
+/* Field order: filetype, get_resource_url, get_resource_data,
+ * release_resource_data, mimetype, socket_open, socket_close
+ * (see include/netsurf/fetch.h) */
 struct gui_fetch_table macos9_fetch_table = {
-	.filetype = macos9_fetch_filetype,
-	.get_resource_url = macos9_fetch_get_resource_url,
-	.mimetype = macos9_fetch_mimetype,
+	macos9_fetch_filetype,
+	macos9_fetch_get_resource_url,
+	NULL,				/* get_resource_data */
+	NULL,				/* release_resource_data */
+	macos9_fetch_mimetype,
+	NULL,				/* socket_open */
+	NULL				/* socket_close */
 };

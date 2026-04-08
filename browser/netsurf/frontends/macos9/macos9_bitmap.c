@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -136,17 +138,20 @@ macos9_bitmap_render(struct bitmap *bitmap, struct hlcache_handle *content)
 	return NSERROR_OK;
 }
 
+/* Field order: create, destroy, set_opaque, get_opaque, get_buffer,
+ * get_rowstride, get_width, get_height, modified, render
+ * (see include/netsurf/bitmap.h) */
 static struct gui_bitmap_table bitmap_table = {
-	.create = macos9_bitmap_create,
-	.destroy = macos9_bitmap_destroy,
-	.set_opaque = macos9_bitmap_set_opaque,
-	.get_opaque = macos9_bitmap_get_opaque,
-	.get_buffer = macos9_bitmap_get_buffer,
-	.get_rowstride = macos9_bitmap_get_rowstride,
-	.get_width = macos9_bitmap_get_width,
-	.get_height = macos9_bitmap_get_height,
-	.modified = macos9_bitmap_modified,
-	.render = macos9_bitmap_render,
+	macos9_bitmap_create,
+	macos9_bitmap_destroy,
+	macos9_bitmap_set_opaque,
+	macos9_bitmap_get_opaque,
+	macos9_bitmap_get_buffer,
+	macos9_bitmap_get_rowstride,
+	macos9_bitmap_get_width,
+	macos9_bitmap_get_height,
+	macos9_bitmap_modified,
+	macos9_bitmap_render
 };
 
 struct gui_bitmap_table *macos9_bitmap_table = &bitmap_table;

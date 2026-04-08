@@ -150,6 +150,81 @@ Verified with `gcc -fsyntax-only -std=c99` from the NetSurf root.
 
 ---
 
+## CW8 C89 Compatibility Sweep
+
+Audit and fix pass across all frontend .c files and shim headers for CodeWarrior 8 C89 compliance.
+
+### bool / MacTypes include ordering (11 files)
+
+**Problem:** `#include <stdbool.h>` appeared before `#include "macos9/macos9.h"` in every frontend .c file. On CW8, `stdbool.h` would `#define true 1` / `#define false 0` before `MacTypes.h` (pulled in via `<MacWindows.h>` inside `macos9.h`) could declare its `enum { false, true }`, producing illegal C.
+
+**Fix:** Wrapped `#include <stdbool.h>` with `#ifndef __MACOS9__` / `#endif` in all 11 files: `main.c`, `window.c`, `schedule.c`, `misc.c`, `plotters.c`, `font.c`, `clipboard.c`, `macos9_bitmap.c`, `macos9_download.c`, `macos9_fetch.c`, `macos9_utf8.c`. On the Mac build path, `macos9.h` → `mac_types.h` provides bool/true/false after Mac headers.
+
+### FSIORefNum undefined (mac_types.h)
+
+**Problem:** `FSIORefNum` (used in `mac_file_io.c` struct) is provided by `<Files.h>`, but `mac_types.h` may be parsed before `<Files.h>` is included (e.g. via `mac_file_io.h`).
+
+**Fix:** Added `typedef short FSIORefNum;` inside `#ifdef __MACOS9__`, guarded by `#ifndef __FILES__` to avoid redefinition when Carbon's `Files.h` is also included.
+
+### TEC header in mac_dirent.c
+
+**Problem:** `mac_dirent.c` included `<UnicodeConverter.h>` instead of `<TextEncodingConverter.h>`. The TEC types (`TECObjectRef`, `TECCreateConverter`, etc.) used in `uni_to_utf8()` are declared in `TextEncodingConverter.h`.
+
+**Fix:** Changed include to `<TextEncodingConverter.h>`.
+
+### inline keyword (mac_inet.h)
+
+**Problem:** `mac_inet.h` used `static inline` on 5 functions (`htons`, `ntohs`, `htonl`, `ntohl`, `socket`). CW8 C89 mode rejects `inline`.
+
+**Fix:** Changed all `static inline` to `static`. These are in a header, so `static` provides the same effect (each TU gets its own copy; linker deduplicates).
+
+### C99 designated initializers (10 tables across 9 files)
+
+**Problem:** Every `gui_*_table` and `plotter_table` initialization used C99 designated initializers (`.field = value`). Not supported in C89.
+
+**Fix:** Converted all tables to positional (C89) initializers with field-order comments referencing the header. Tables converted:
+
+| File | Table |
+|---|---|
+| `main.c` | `struct netsurf_table` (converted to memset + field assignment) |
+| `window.c` | `gui_window_table` (20 fields) |
+| `plotters.c` | `plotter_table` (13 fields) |
+| `misc.c` | `gui_misc_table` (6 fields) |
+| `macos9_fetch.c` | `gui_fetch_table` (7 fields, 4 NULL) |
+| `clipboard.c` | `gui_clipboard_table` (2 fields) |
+| `font.c` | `gui_layout_table` (3 fields) |
+| `macos9_bitmap.c` | `gui_bitmap_table` (10 fields) |
+| `macos9_download.c` | `gui_download_table` (4 fields) |
+| `macos9_utf8.c` | `gui_utf8_table` (2 fields) |
+
+### strndup unavailable (macos9_utf8.c)
+
+**Problem:** `strndup()` is POSIX.1-2008, not available in CW8's C89 runtime. Used in `macos9_utf8_to_local()` and `macos9_local_to_utf8()`.
+
+**Fix:** Added `macos9_strndup()` static implementation in `macos9_utf8.c`, `#define strndup macos9_strndup` under `__MACOS9__`. Linux build continues to use libc `strndup`.
+
+### No issues found
+
+- **`macos9/macos9.h` path:** All files use `#include "macos9/macos9.h"` and the file exists at the expected location. No issues.
+- **`for(int i=...)` C99 declarations:** None found in frontend code.
+- **Compound literals `(struct foo){...}`:** None found in frontend code.
+- **`strndup` in shim files:** Not used in any shim file — only in `macos9_utf8.c`.
+
+---
+
+### Compilation Results (post-fix)
+
+```
+=== All frontend .c files ===  ✓ clean (0 errors, 0 warnings from our code)
+=== All shim .c files ===      ✓ clean (0 errors, 0 warnings)
+=== mac_types.h ===            ✓ clean
+=== mac_inet.h ===             ✓ clean
+```
+
+Verified with `gcc -fsyntax-only -std=c89 -pedantic` from the NetSurf root (Linux build path).
+
+---
+
 ## What's Not Here Yet
 
 - `mac_mmap.c` — NewPtr-based mmap shim (Phase 1)

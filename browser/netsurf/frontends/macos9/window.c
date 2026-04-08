@@ -6,7 +6,9 @@
  * Licensed under GPL v2.
  */
 
+#ifndef __MACOS9__
 #include <stdbool.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -443,28 +445,32 @@ macos9_create_initial_window(void)
 
 /* ---- Table ---- */
 
+/* Field order: create, destroy, invalidate, get_scroll, set_scroll,
+ * get_dimensions, event, set_title, set_url, set_icon, set_status,
+ * set_pointer, place_caret, drag_start, save_link,
+ * create_form_select_menu, file_gadget_open, drag_save_object,
+ * drag_save_selection, console_log (see include/netsurf/window.h) */
 static struct gui_window_table window_table = {
-	.create = macos9_window_create,
-	.destroy = macos9_window_destroy,
-	.invalidate = macos9_window_invalidate,
-	.get_scroll = macos9_window_get_scroll,
-	.set_scroll = macos9_window_set_scroll,
-	.get_dimensions = macos9_window_get_dimensions,
-	.event = macos9_window_event,
-
-	.set_title = macos9_window_set_title,
-	.set_url = macos9_window_set_url,
-	.set_icon = macos9_window_set_icon,
-	.set_status = macos9_window_set_status,
-	.set_pointer = macos9_window_set_pointer,
-	.place_caret = macos9_window_place_caret,
-	.drag_start = macos9_window_drag_start,
-	.save_link = macos9_window_save_link,
-	.create_form_select_menu = macos9_window_create_form_select_menu,
-	.file_gadget_open = macos9_window_file_gadget_open,
-	.drag_save_object = macos9_window_drag_save_object,
-	.drag_save_selection = macos9_window_drag_save_selection,
-	.console_log = macos9_window_console_log,
+	macos9_window_create,
+	macos9_window_destroy,
+	macos9_window_invalidate,
+	macos9_window_get_scroll,
+	macos9_window_set_scroll,
+	macos9_window_get_dimensions,
+	macos9_window_event,
+	macos9_window_set_title,
+	macos9_window_set_url,
+	macos9_window_set_icon,
+	macos9_window_set_status,
+	macos9_window_set_pointer,
+	macos9_window_place_caret,
+	macos9_window_drag_start,
+	macos9_window_save_link,
+	macos9_window_create_form_select_menu,
+	macos9_window_file_gadget_open,
+	macos9_window_drag_save_object,
+	macos9_window_drag_save_selection,
+	macos9_window_console_log
 };
 
 struct gui_window_table *macos9_window_table = &window_table;
