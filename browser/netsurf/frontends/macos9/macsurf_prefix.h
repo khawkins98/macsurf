@@ -9,6 +9,8 @@
 #ifndef MACSURF_PREFIX_H
 #define MACSURF_PREFIX_H
 
+#include <MacTypes.h>
+
 /* Globally block MSL's C++ inttypes from ruining the C build */
 #define _STDINT_H
 #define _CSTDINT
