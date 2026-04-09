@@ -630,7 +630,9 @@ int main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 
-	/* Mac Toolbox initialization — must happen before anything else */
+	/* Mac Toolbox initialization — must happen before anything else.
+	 * Under Carbon these are not needed — Carbon initializes automatically. */
+#ifndef TARGET_API_MAC_CARBON
 	MaxApplZone();
 	MoreMasters();
 	InitGraf(&qd.thePort);
@@ -639,6 +641,7 @@ int main(int argc, char **argv)
 	InitMenus();
 	TEInit();
 	InitDialogs(NULL);
+#endif
 	InitCursor();
 	FlushEvents(everyEvent, 0);
 
