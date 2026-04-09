@@ -75,6 +75,12 @@ extern void nslog_log(const char *file, const char *func,
 		} \
 	} while(0)
 
+/*
+ * nslog_ensure_t — defined in log.h which we block above.
+ * log.c needs this typedef for nslog_init().
+ */
+typedef unsigned char (nslog_ensure_t)(FILE *fptr);
+
 /* --- Additional build defines --- */
 
 #ifndef __MACOS9__
