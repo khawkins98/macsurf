@@ -27,6 +27,8 @@
 #ifndef NETSURF_TYPES_H
 #define NETSURF_TYPES_H
 
+#include <string.h>
+#include <stdlib.h>
 #include <stdint.h>
 
 /**

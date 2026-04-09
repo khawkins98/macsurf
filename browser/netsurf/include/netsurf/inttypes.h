@@ -50,14 +50,20 @@
 #else
 
 /** c99 standard printf formatting for size_t type */
+#ifndef PRIsizet
 #define PRIsizet "zu"
+#endif
 
 #if defined(__riscos__)
 /** riscos/unixlib defines ssize_t as a long int */
+#ifndef PRIssizet
 #define PRIssizet "ld"
+#endif
 #else
 /** c99 standard printf formatting for ssize_t type */
+#ifndef PRIssizet
 #define PRIssizet "zd"
+#endif
 #endif
 
 #endif
