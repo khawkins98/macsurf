@@ -1,6 +1,14 @@
 #ifndef MACSURF_SHIMS_STAT_H
 #define MACSURF_SHIMS_STAT_H
 
+/*
+ * Block MSL's stat.h from ever being included after us.
+ * MSL uses one of these guards depending on version.
+ */
+#define _MSL_STAT_H
+#define __stat_h
+#define _STAT_H
+
 typedef unsigned long dev_t;
 typedef unsigned long ino_t;
 typedef short nlink_t;
@@ -24,17 +32,38 @@ struct stat {
     long st_blocks;
 };
 
-#define S_IFMT   0170000
-#define S_IFDIR  0040000
-#define S_IFCHR  0020000
-#define S_IFBLK  0060000
-#define S_IFREG  0100000
-#define S_IFIFO  0010000
-#define S_IFLNK  0120000
-#define S_IFSOCK 0140000
+/* Use MSL's hex values to match exactly if MSL somehow loads */
+#ifndef S_IFMT
+#define S_IFMT   0xF000
+#endif
+#ifndef S_IFDIR
+#define S_IFDIR  0x4000
+#endif
+#ifndef S_IFCHR
+#define S_IFCHR  0x2000
+#endif
+#ifndef S_IFBLK
+#define S_IFBLK  0x6000
+#endif
+#ifndef S_IFREG
+#define S_IFREG  0x8000
+#endif
+#ifndef S_IFIFO
+#define S_IFIFO  0x1000
+#endif
+#ifndef S_IFLNK
+#define S_IFLNK  0xA000
+#endif
+#ifndef S_IFSOCK
+#define S_IFSOCK 0xE000
+#endif
 
-#define S_ISDIR(m)      (((m) & S_IFMT) == S_IFDIR)
-#define S_ISREG(m)      (((m) & S_IFMT) == S_IFREG)
+#ifndef S_ISDIR
+#define S_ISDIR(m)  (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m)  (((m) & S_IFMT) == S_IFREG)
+#endif
 
 int stat(const char *path, struct stat *buf);
 int mkdir(const char *path, unsigned long mode);

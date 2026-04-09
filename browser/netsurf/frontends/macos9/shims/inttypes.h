@@ -5,6 +5,12 @@
  * MSL's stdint.h pulls in C++ cstdint which breaks the C89 build. */
 
 /* printf format macros — guarded to avoid redefinition */
+#ifndef PRId16
+#define PRId16 "d"
+#endif
+#ifndef PRIu16
+#define PRIu16 "u"
+#endif
 #ifndef PRId32
 #define PRId32 "ld"
 #endif
@@ -13,6 +19,9 @@
 #endif
 #ifndef PRIx32
 #define PRIx32 "lx"
+#endif
+#ifndef PRIX32
+#define PRIX32 "lX"
 #endif
 #ifndef PRId64
 #define PRId64 "lld"
@@ -23,11 +32,16 @@
 #ifndef PRIx64
 #define PRIx64 "llx"
 #endif
+#ifndef PRIxPTR
+#define PRIxPTR "lx"
+#endif
+
+/* size_t/ssize_t format macros — CW8 PPC uses unsigned long for size_t */
 #ifndef PRIsizet
-#define PRIsizet "zu"
+#define PRIsizet "lu"
 #endif
 #ifndef PRIssizet
-#define PRIssizet "zd"
+#define PRIssizet "ld"
 #endif
 
 /* scanf format macros (needed by nsoption.c) */
