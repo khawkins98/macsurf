@@ -508,7 +508,7 @@ bool content_saw_insecure_objects(struct hlcache_handle *h)
 	struct content *c = hlcache_handle_get_content(h);
 	struct nsurl *url = hlcache_handle_get_url(h);
 	lwc_string *scheme = nsurl_get_component(url, NSURL_SCHEME);
-	bool match;
+	unsigned char match;
 
 	/* Is this an internal scheme? If so, we trust here and stop */
 	if ((lwc_string_isequal(scheme, corestring_lwc_about,
@@ -971,7 +971,7 @@ content_find_rfc5988_link(hlcache_handle *h, lwc_string *rel)
 {
 	struct content *c = hlcache_handle_get_content(h);
 	struct content_rfc5988_link *link = c->links;
-	bool rel_match = false;
+	unsigned char rel_match = 0;
 
 	while (link != NULL) {
 		if (lwc_string_caseless_isequal(link->rel, rel,

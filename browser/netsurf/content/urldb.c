@@ -1305,7 +1305,7 @@ urldb_match_path(const struct path_data *parent,
 {
 	const struct path_data *p;
 	const char *slash;
-	bool match;
+	unsigned char match;
 
 	assert(parent != NULL);
 	assert(parent->segment == NULL);
@@ -1364,7 +1364,7 @@ static struct path_data *urldb_find_url(nsurl *url)
 	lwc_string *scheme, *host, *port;
 	size_t len = 0;
 	unsigned int port_int;
-	bool match;
+	unsigned char match;
 
 	assert(url);
 
@@ -2091,7 +2091,7 @@ urldb_add_path(lwc_string *scheme,
 	struct path_data *d, *e;
 	char *buf = path_query;
 	char *segment, *slash;
-	bool match;
+	unsigned char match;
 
 	assert(scheme && host && url);
 
@@ -3318,7 +3318,7 @@ bool urldb_add_url(nsurl *url)
 	const char *host_str;
 	char *path_query = NULL;
 	size_t len;
-	bool match;
+	unsigned char match;
 	unsigned int port_int;
 
 	assert(url);
@@ -3514,7 +3514,7 @@ void urldb_set_auth_details(nsurl *url, const char *realm, const char *auth)
 	struct host_part *h;
 	struct prot_space_data *space, *space_alloc;
 	char *realm_alloc, *auth_alloc;
-	bool match;
+	unsigned char match;
 
 	assert(url && realm && auth);
 
@@ -3599,7 +3599,7 @@ const char *urldb_get_auth_details(nsurl *url, const char *realm)
 	if (realm != NULL) {
 		const struct host_part *h = (const struct host_part *)p_top;
 		const struct prot_space_data *space;
-		bool match;
+		unsigned char match;
 
 		/* Search for a possible matching protection space. */
 		for (space = h->prot_space; space != NULL;
@@ -3905,7 +3905,7 @@ bool urldb_set_cookie(const char *header, nsurl *url, nsurl *referer)
 	const char *cur = header, *end;
 	lwc_string *path, *host, *scheme;
 	nsurl *urlt;
-	bool match;
+	unsigned char match;
 
 	assert(url && header);
 
@@ -4175,7 +4175,7 @@ char *urldb_get_cookie(nsurl *url, bool include_http_only)
 	char *ret;
 	lwc_string *scheme;
 	time_t now;
-	bool match;
+	unsigned char match;
 
 	assert(url != NULL);
 

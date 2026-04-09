@@ -118,7 +118,7 @@ static nserror posix_nsurl_to_path(struct nsurl *url, char **path_out)
 {
 	lwc_string *urlpath;
 	char *path;
-	bool match;
+	unsigned char match;
 	lwc_string *scheme;
 	nserror res;
 

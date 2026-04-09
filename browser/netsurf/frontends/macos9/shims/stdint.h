@@ -12,6 +12,15 @@
 #ifndef MACOS9_SHIMS_STDINT_H
 #define MACOS9_SHIMS_STDINT_H
 
+/*
+ * Block MSL's stdint.h from being included after us.
+ * MSL's version pulls in <cstdint> (C++) causing name overloading errors.
+ */
+#define _MSL_STDINT_H
+#define _STDINT_H
+#define __STDINT_H__
+#define _STDINT
+
 /* Exact-width signed integer types */
 #ifndef _INT8_T
 #define _INT8_T
