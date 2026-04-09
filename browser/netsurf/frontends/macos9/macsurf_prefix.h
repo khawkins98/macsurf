@@ -9,12 +9,22 @@
 #ifndef MACSURF_PREFIX_H
 #define MACSURF_PREFIX_H
 
-/* MSL core types — load before anything else so time_t, size_t,
- * struct stat, and mode_t are defined cleanly from MSL. */
+/* MSL core types — stddef.h and string.h are safe */
 #include <stddef.h>
 #include <string.h>
-#include <time.h>
-#include <stat.h>
+
+/* Bulletproof POSIX type foundation (bypassing MSL/local shadowing).
+ * <time.h> cannot be used here — CW8 finds NetSurf's utils/time.h.
+ * <stat.h> cannot be used here — MSL doesn't provide a standalone one. */
+#ifndef _TIME_T
+#define _TIME_T
+typedef long time_t;
+#endif
+
+#ifndef _MODE_T
+#define _MODE_T
+typedef unsigned long mode_t;
+#endif
 
 #include <MacTypes.h>
 
