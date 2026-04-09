@@ -9,6 +9,13 @@
 #ifndef MACSURF_PREFIX_H
 #define MACSURF_PREFIX_H
 
+/* MSL core types — load before anything else so time_t, size_t,
+ * struct stat, and mode_t are defined cleanly from MSL. */
+#include <stddef.h>
+#include <string.h>
+#include <time.h>
+#include <stat.h>
+
 #include <MacTypes.h>
 
 /* Globally block MSL's C++ inttypes from ruining the C build */

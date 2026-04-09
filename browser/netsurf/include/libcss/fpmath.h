@@ -31,9 +31,13 @@ css_add_fixed(const css_fixed x, const css_fixed y) {
 	/* Calculate overflowed result. (Don't change the sign bit of ux) */
 	ux = (ux >> 31) + INT_MAX;
 
-	/* Force compiler to use cmovns instruction */
-	if ((int32_t) ((ux ^ uy) | ~(uy ^ res)) >= 0) {
-		res = ux;
+	/* Force compiler to use cmovns instruction.
+	 * Split to avoid CW8 internal compiler error on complex expression. */
+	{
+		int32_t temp_ice = (ux ^ uy) | ~(uy ^ res);
+		if (temp_ice >= 0) {
+			res = ux;
+		}
 	}
 
 	return res;
@@ -47,9 +51,12 @@ css_subtract_fixed(const css_fixed x, const css_fixed y) {
 
 	ux = (ux >> 31) + INT_MAX;
 
-	/* Force compiler to use cmovns instruction */
-	if ((int32_t)((ux ^ uy) & (ux ^ res)) < 0) {
-		res = ux;
+	/* Split to avoid CW8 internal compiler error. */
+	{
+		int32_t temp_ice = (ux ^ uy) & (ux ^ res);
+		if (temp_ice < 0) {
+			res = ux;
+		}
 	}
 
 	return res;
