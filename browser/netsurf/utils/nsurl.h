@@ -23,6 +23,7 @@
 #ifndef _NETSURF_UTILS_NSURL_H_
 #define _NETSURF_UTILS_NSURL_H_
 
+#include <stdbool.h>
 #include <libwapcaplet/libwapcaplet.h>
 #include "utils/errors.h"
 
