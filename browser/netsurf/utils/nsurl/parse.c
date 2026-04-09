@@ -463,29 +463,19 @@ static void nsurl__get_string_markers(const char * const url_s,
 			marker.fragment = marker.end;
 	}
 
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.start: %"PRIsizet, marker.start);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.scheme_end: %"PRIsizet, marker.scheme_end);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.authority: %"PRIsizet, marker.authority);
+	nslog_log(__FILE__, "", __LINE__, "marker.start: %"PRIsizet, marker.start);
+	nslog_log(__FILE__, "", __LINE__, "marker.scheme_end: %"PRIsizet, marker.scheme_end);
+	nslog_log(__FILE__, "", __LINE__, "marker.authority: %"PRIsizet, marker.authority);
 
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.colon_first: %"PRIsizet, marker.colon_first);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.at: %"PRIsizet, marker.at);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.colon_last: %"PRIsizet, marker.colon_last);
+	nslog_log(__FILE__, "", __LINE__, "marker.colon_first: %"PRIsizet, marker.colon_first);
+	nslog_log(__FILE__, "", __LINE__, "marker.at: %"PRIsizet, marker.at);
+	nslog_log(__FILE__, "", __LINE__, "marker.colon_last: %"PRIsizet, marker.colon_last);
 
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.path: %"PRIsizet, marker.path);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.query: %"PRIsizet, marker.query);
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.fragment: %"PRIsizet, marker.fragment);
+	nslog_log(__FILE__, "", __LINE__, "marker.path: %"PRIsizet, marker.path);
+	nslog_log(__FILE__, "", __LINE__, "marker.query: %"PRIsizet, marker.query);
+	nslog_log(__FILE__, "", __LINE__, "marker.fragment: %"PRIsizet, marker.fragment);
 
-	NSLOG(netsurf, DEEPDEBUG,
-	      "marker.end: %"PRIsizet, marker.end);
+	nslog_log(__FILE__, "", __LINE__, "marker.end: %"PRIsizet, marker.end);
 
 	/* Got all the URL components pegged out now */
 	*markers = marker;
@@ -505,9 +495,8 @@ static size_t nsurl__remove_dot_segments(char *path, char *output)
 	char *output_pos = output;
 
 	while (*path_pos != '\0') {
-		NSLOG(netsurf, DEEPDEBUG, " in:%s", path_pos);
-		NSLOG(netsurf, DEEPDEBUG, "out:%.*s",
-				(int)(output_pos - output), output);
+		nslog_log(__FILE__, "", __LINE__, " in:%s", path_pos);
+		nslog_log(__FILE__, "", __LINE__, "out:%.*s", (int)(output_pos - output), output);
 
 		if (*path_pos == '.') {
 			if (*(path_pos + 1) == '.' &&
@@ -1403,8 +1392,7 @@ nserror nsurl_join(const nsurl *base, const char *rel, nsurl **joined)
 	assert(base != NULL);
 	assert(rel != NULL);
 
-	NSLOG(netsurf, DEEPDEBUG, "base: \"%s\", rel: \"%s\"",
-			nsurl_access(base), rel);
+	nslog_log(__FILE__, "", __LINE__, "base: \"%s\", rel: \"%s\"", nsurl_access(base), rel);
 
 	/* Peg out the URL sections */
 	nsurl__get_string_markers(rel, &m, true);

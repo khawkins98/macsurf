@@ -128,8 +128,7 @@ process_line(struct hash_table *hash, uint8_t *ln, int lnlen)
 
 	res = hash_add(hash, (char *)key, (char *)value);
 	if (res != NSERROR_OK) {
-		NSLOG(netsurf, INFO,
-		      "Unable to add %s:%s to hash table", ln, value);
+		nslog_log(__FILE__, "", __LINE__, "Unable to add %s:%s to hash table", ln, value);
 	}
 	return res;
 }
@@ -196,7 +195,7 @@ hash_add_inline_gzip(struct hash_table *ht, const uint8_t *data, size_t size)
 
 	ret = inflateInit2(&strm, 32 + MAX_WBITS);
 	if (ret != Z_OK) {
-		NSLOG(netsurf, INFO, "inflateInit returned %d", ret);
+		nslog_log(__FILE__, "", __LINE__, "inflateInit returned %d", ret);
 		return NSERROR_INVALID;
 	}
 
@@ -243,7 +242,7 @@ hash_add_inline_gzip(struct hash_table *ht, const uint8_t *data, size_t size)
 	inflateEnd(&strm);
 
 	if (ret != Z_STREAM_END) {
-		NSLOG(netsurf, INFO, "inflate returned %d", ret);
+		nslog_log(__FILE__, "", __LINE__, "inflate returned %d", ret);
 		return NSERROR_INVALID;
 	}
 	return NSERROR_OK;
@@ -265,8 +264,9 @@ struct hash_table *hash_create(unsigned int chains)
 	r->chain = calloc(chains, sizeof(struct hash_entry *));
 
 	if (r->chain == NULL) {
-		NSLOG(netsurf, INFO,
-		      "Not enough memory for %d hash table chains.", chains);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Not enough memory for %d hash table chains.",
+			      chains);
 		free(r);
 		return NULL;
 	}
@@ -373,9 +373,10 @@ nserror hash_add_file(struct hash_table *ht, const char *path)
 
 	fp = gzopen(path, "r");
 	if (!fp) {
-		NSLOG(netsurf, INFO,
-		      "Unable to open file \"%.100s\": %s", path,
-		      strerror(errno));
+		nslog_log(__FILE__, "", __LINE__,
+			      "Unable to open file \"%.100s\": %s",
+			      path,
+			      strerror(errno));
 
 		return NSERROR_NOT_FOUND;
 	}
