@@ -38,17 +38,9 @@ typedef long		off_t;
 typedef long		ssize_t;
 #endif
 
-#if !defined(_MAC_MODE_T) && !defined(_MODE_T_DEFINED) && !defined(_MODE_T)
-#define _MAC_MODE_T
-#define _MODE_T
-typedef unsigned long	mode_t;
-#endif
-
-#if !defined(_MAC_TIME_T) && !defined(_TIME_T_DEFINED) && !defined(_TIME_T)
-#define _MAC_TIME_T
-#define _TIME_T
-typedef long		time_t;
-#endif
+/* mode_t and time_t are provided by MSL's <stat.h> and <time.h>
+ * which are included globally via the prefix file.
+ * Do NOT redefine them here — causes "illegal name overloading". */
 
 /* FSIORefNum — provided by Files.h in Carbon, but we may be parsed
  * before Files.h is included.  Use short (== SInt16 on PPC). */

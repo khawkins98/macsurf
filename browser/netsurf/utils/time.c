@@ -128,9 +128,10 @@ static const char * const months[NSC_TIME_MONTH__COUNT] = {
 /* exported interface documented in utils/time.h */
 const char *rfc1123_date(time_t t)
 {
+	struct tm *tm;
 	static char ret[31];
 
-	struct tm *tm = gmtime(&t);
+	tm = gmtime(&t);
 
 	snprintf(ret, sizeof ret, "%s, %02d %s %d %02d:%02d:%02d GMT",
 			weekdays_short[tm->tm_wday], tm->tm_mday,
@@ -947,16 +948,9 @@ static nserror time__ctx_to_time_t(
 static nserror time__get_date(const char *str, time_t *time)
 {
 	enum nsc_date_component_flags flags = NSC_COMPONENT_FLAGS_NONE;
-	struct nsc_date_parse_ctx ctx = {
-		.prev  = '\0',
-		.secs  = 0,
-		.mins  = 0,
-		.hours = 0,
-		.day   = 0,
-		.month = 0,
-		.years = 0,
-		.timezone_offset_mins = 0
-	};
+	struct nsc_date_parse_ctx ctx;
+
+	memset(&ctx, 0, sizeof(ctx));
 
 	if (str == NULL || time == NULL) {
 		return NSERROR_BAD_PARAMETER;
