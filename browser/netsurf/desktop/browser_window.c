@@ -342,12 +342,11 @@ browser_window_download(struct browser_window *bw,
 		/* no internal handler for this type, call out to frontend */
 		error = guit->misc->launch_url(url);
 	} else if (error != NSERROR_OK) {
-		NSLOG(netsurf, INFO, "Failed to fetch download: %d", error);
+		nslog_log(__FILE__, "", __LINE__, "Failed to fetch download: %d", error);
 	} else {
 		error = download_context_create(l, root->window);
 		if (error != NSERROR_OK) {
-			NSLOG(netsurf, INFO,
-			      "Failed creating download context: %d", error);
+			nslog_log(__FILE__, "", __LINE__, "Failed creating download context: %d", error);
 			llcache_handle_abort(l);
 			llcache_handle_release(l);
 		}
@@ -583,14 +582,14 @@ browser_window_update_favicon(hlcache_handle *c,
 	}
 
 	if (link == NULL) {
-		NSLOG(netsurf, INFO,
-		      "fetching general favicon from '%s'",
-		      nsurl_access(nsurl));
+		nslog_log(__FILE__, "", __LINE__,
+			      "fetching general favicon from '%s'",
+			      nsurl_access(nsurl));
 	} else {
-		NSLOG(netsurf, INFO,
-		      "fetching favicon rel:%s '%s'",
-		      lwc_string_data(link->rel),
-		      nsurl_access(nsurl));
+		nslog_log(__FILE__, "", __LINE__,
+			      "fetching favicon rel:%s '%s'",
+			      lwc_string_data(link->rel),
+			      nsurl_access(nsurl));
 	}
 
 	res = hlcache_handle_retrieve(nsurl,
@@ -950,9 +949,10 @@ browser_window_content_done(struct browser_window *bw)
 		rect.x0 = rect.x1 = scrollx;
 		rect.y0 = rect.y1 = scrolly;
 		if (browser_window_set_scroll(bw, &rect) != NSERROR_OK) {
-			NSLOG(netsurf, WARNING,
-			      "Unable to set browser scroll offsets to %d by %d",
-			      scrollx, scrolly);
+			nslog_log(__FILE__, "", __LINE__,
+				      "Unable to set browser scroll offsets to %d by %d",
+				      scrollx,
+				      scrolly);
 		}
 	}
 
@@ -1847,8 +1847,9 @@ nserror browser_window_destroy_internal(struct browser_window *bw)
 
 	/* clear any pending callbacks */
 	guit->misc->schedule(-1, browser_window_refresh, bw);
-	NSLOG(netsurf, INFO,
-	      "Clearing reformat schedule for browser window %p", bw);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Clearing reformat schedule for browser window %p",
+		      bw);
 	guit->misc->schedule(-1, scheduled_reformat, bw);
 
 	/* If this brower window is not the root window, and has focus, unset
@@ -1919,8 +1920,10 @@ nserror browser_window_destroy_internal(struct browser_window *bw)
 	bw->status.text = NULL;
 	browser_window__free_fetch_parameters(&bw->current_parameters);
 	browser_window__free_fetch_parameters(&bw->loading_parameters);
-	NSLOG(netsurf, INFO, "Status text cache match:miss %d:%d",
-	      bw->status.match, bw->status.miss);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Status text cache match:miss %d:%d",
+		      bw->status.match,
+		      bw->status.miss);
 
 	return NSERROR_OK;
 }
@@ -3308,7 +3311,7 @@ browser_window_navigate(struct browser_window *bw,
 	assert(bw);
 	assert(url);
 
-	NSLOG(netsurf, INFO, "bw %p, url %s", bw, nsurl_access(url));
+	nslog_log(__FILE__, "", __LINE__, "bw %p, url %s", bw, nsurl_access(url));
 
 	/*
 	 * determine if navigation is internal url, if so, we do not
@@ -3512,7 +3515,7 @@ navigate_internal_real(struct browser_window *bw,
 	nserror res;
 	hlcache_handle *c;
 
-	NSLOG(netsurf, INFO, "Loading '%s'", nsurl_access(params->url));
+	nslog_log(__FILE__, "", __LINE__, "Loading '%s'", nsurl_access(params->url));
 
 	fetch_is_post = (params->post_urlenc != NULL || params->post_multipart != NULL);
 
@@ -3715,7 +3718,7 @@ navigate_internal_query_timeout(struct browser_window *bw,
 {
 	bool is_retry = false, is_back = false;
 
-	NSLOG(netsurf, INFO, "bw:%p params:%p", bw, params);
+	nslog_log(__FILE__, "", __LINE__, "bw:%p params:%p", bw, params);
 
 	assert(params->post_multipart != NULL);
 
@@ -3751,7 +3754,7 @@ navigate_internal_query_fetcherror(struct browser_window *bw,
 {
 	bool is_retry = false, is_back = false;
 
-	NSLOG(netsurf, INFO, "bw:%p params:%p", bw, params);
+	nslog_log(__FILE__, "", __LINE__, "bw:%p params:%p", bw, params);
 
 	assert(params->post_multipart != NULL);
 
@@ -4581,28 +4584,29 @@ browser_window_console_log(struct browser_window *bw,
 
 	/* bw is the target of the log, but root is where we log it */
 
-	NSLOG(netsurf, DEEPDEBUG, "Logging message in %p targetted at %p", root, bw);
-	NSLOG(netsurf, DEEPDEBUG, "Log came from %s",
-	      ((src == BW_CS_INPUT) ? "user input" :
+	nslog_log(__FILE__, "", __LINE__, "Logging message in %p targetted at %p", root, bw);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Log came from %s",
+		      ((src == BW_CS_INPUT) ? "user input" :
 	       (src == BW_CS_SCRIPT_ERROR) ? "script error" :
 	       (src == BW_CS_SCRIPT_CONSOLE) ? "script console" :
 	       "unknown input location"));
 
 	switch (log_level) {
 	case BW_CS_FLAG_LEVEL_DEBUG:
-		NSLOG(netsurf, DEBUG, "%.*s", (int)msglen, msg);
+		nslog_log(__FILE__, "", __LINE__, "%.*s", (int)msglen, msg);
 		break;
 	case BW_CS_FLAG_LEVEL_LOG:
-		NSLOG(netsurf, VERBOSE, "%.*s", (int)msglen, msg);
+		nslog_log(__FILE__, "", __LINE__, "%.*s", (int)msglen, msg);
 		break;
 	case BW_CS_FLAG_LEVEL_INFO:
-		NSLOG(netsurf, INFO, "%.*s", (int)msglen, msg);
+		nslog_log(__FILE__, "", __LINE__, "%.*s", (int)msglen, msg);
 		break;
 	case BW_CS_FLAG_LEVEL_WARN:
-		NSLOG(netsurf, WARNING, "%.*s", (int)msglen, msg);
+		nslog_log(__FILE__, "", __LINE__, "%.*s", (int)msglen, msg);
 		break;
 	case BW_CS_FLAG_LEVEL_ERROR:
-		NSLOG(netsurf, ERROR, "%.*s", (int)msglen, msg);
+		nslog_log(__FILE__, "", __LINE__, "%.*s", (int)msglen, msg);
 		break;
 	default:
 		/* Unreachable */

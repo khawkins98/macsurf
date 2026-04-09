@@ -75,11 +75,15 @@ extern void lwc_iterate_strings(lwc_iteration_callback_fn cb, void *pw);
 
 /* --- lwc_string_isequal --- */
 #define lwc_string_isequal(str1, str2, ret) \
-    ((*(ret) = ((str1) == (str2))), lwc_error_ok)
+    ((*(ret) = (unsigned char)((str1) == (str2))), lwc_error_ok)
 
-/* --- lwc_string_caseless_isequal --- */
+/* --- lwc_string_caseless_isequal ---
+ * Use unsigned char * instead of bool * to avoid CW8 type
+ * mismatch between MacTypes.h bool and stdbool.h bool.
+ */
 static lwc_error
-lwc_string_caseless_isequal(lwc_string *str1, lwc_string *str2, bool *ret)
+lwc_string_caseless_isequal(lwc_string *str1, lwc_string *str2,
+                            unsigned char *ret)
 {
     lwc_error err = lwc_error_ok;
     if (str1->insensitive == NULL)
@@ -87,7 +91,7 @@ lwc_string_caseless_isequal(lwc_string *str1, lwc_string *str2, bool *ret)
     if (err == lwc_error_ok && str2->insensitive == NULL)
         err = lwc__intern_caseless_string(str2);
     if (err == lwc_error_ok)
-        *ret = (str1->insensitive == str2->insensitive);
+        *ret = (unsigned char)(str1->insensitive == str2->insensitive);
     return err;
 }
 

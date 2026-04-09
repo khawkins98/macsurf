@@ -11,6 +11,11 @@
 #include <errno.h>
 #include <string.h>
 
+#ifdef __MACOS9__
+#include <TextEncodingConverter.h>
+#include <TextCommon.h>
+#endif
+
 #define ICONV_CACHE_MAX 16
 
 struct mac_iconv_descriptor {

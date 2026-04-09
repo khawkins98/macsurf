@@ -28,15 +28,19 @@
  * Linux build stubs for syntax checking.
  * These mirror the Carbon types/constants enough for compilation.
  */
+#ifndef __MACTYPES__
 typedef int OSStatus;
 typedef int Boolean;
+#endif
 typedef short SInt16;
 typedef void *CFStringRef;
 typedef unsigned char Str255[256];
 typedef unsigned long WindowClass;
 typedef unsigned long WindowAttributes;
 
+#ifndef __MACTYPES__
 typedef struct { SInt16 top, left, bottom, right; } Rect;
+#endif
 
 enum {
 	kDocumentWindowClass = 6
@@ -220,8 +224,9 @@ macos9_window_create(struct browser_window *bw,
 	gw->next = window_list;
 	window_list = gw;
 
-	NSLOG(netsurf, INFO, "window created: %dx%d content area",
-	      gw->content_width, gw->content_height);
+	nslog_log(__FILE__, "", __LINE__,
+		 "window created: %dx%d content area",
+		 gw->content_width, gw->content_height);
 
 	return gw;
 }

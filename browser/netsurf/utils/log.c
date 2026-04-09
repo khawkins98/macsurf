@@ -28,7 +28,7 @@
 #include "utils/log.h"
 
 /** flag to enable verbose logging */
-bool verbose_log = false;
+unsigned char verbose_log = false;
 
 /** The stream to which logging is sent */
 static FILE *logfile;
@@ -266,18 +266,18 @@ nserror nslog_init(nslog_ensure_t *ensure, int *pargc, char **argv)
 
 	/* sucessfull logging initialisation so log system info */
 	if (ret == NSERROR_OK) {
-		NSLOG(netsurf, INFO, "NetSurf version '%s'", netsurf_version);
+		nslog_log(__FILE__, "", __LINE__, "NetSurf version '%s'", netsurf_version);
 		if (uname(&utsname) < 0) {
 			NSLOG(netsurf, INFO,
 			      "Failed to extract machine information");
 		} else {
-			NSLOG(netsurf, INFO,
-			      "NetSurf on <%s>, node <%s>, release <%s>, version <%s>, machine <%s>",
-			      utsname.sysname,
-			      utsname.nodename,
-			      utsname.release,
-			      utsname.version,
-			      utsname.machine);
+			nslog_log(__FILE__, "", __LINE__,
+				      "NetSurf on <%s>, node <%s>, release <%s>, version <%s>, machine <%s>",
+				      utsname.sysname,
+				      utsname.nodename,
+				      utsname.release,
+				      utsname.version,
+				      utsname.machine);
 		}
 	}
 

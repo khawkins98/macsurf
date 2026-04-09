@@ -33,8 +33,10 @@ nserror browser_set_dpi(int dpi)
 {
 	if (dpi < 72 || dpi > 250) {
 		int bad = dpi;
-		dpi = min(max(dpi, 72), 250);
-		NSLOG(netsurf, INFO, "Clamping invalid DPI %d to %d", bad, dpi);
+		if (dpi < 72) dpi = 72;
+		if (dpi > 250) dpi = 250;
+		nslog_log(__FILE__, "", __LINE__,
+			 "Clamping invalid DPI %d to %d", bad, dpi);
 	}
 	nscss_screen_dpi = INTTOFIX(dpi);
 

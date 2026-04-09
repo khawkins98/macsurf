@@ -126,9 +126,9 @@ static nserror messages_load_ctx(const char *path, struct hash_table **ctx)
 
 	nctx = messages_create_ctx(HASH_SIZE);
 	if (nctx == NULL) {
-		NSLOG(netsurf, INFO,
-		      "Unable to create hash table for messages file %s",
-		      path);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Unable to create hash table for messages file %s",
+			      path);
 		return NSERROR_NOMEM;
 	}
 
@@ -180,7 +180,7 @@ nserror messages_add_from_file(const char *path)
 		return NSERROR_BAD_PARAMETER;
 	}
 
-	NSLOG(netsurf, INFO, "Loading Messages from '%s'", path);
+	nslog_log(__FILE__, "", __LINE__, "Loading Messages from '%s'", path);
 
 	return messages_load_ctx(path, &messages_hash);
 }

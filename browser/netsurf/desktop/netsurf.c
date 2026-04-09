@@ -99,8 +99,11 @@
 
 static void netsurf_lwc_iterator(lwc_string *str, void *pw)
 {
-	NSLOG(netsurf, WARNING, "[%3"PRIu32"] %.*s", str->refcnt,
-	      (int)lwc_string_length(str), lwc_string_data(str));
+	nslog_log(__FILE__, "", __LINE__,
+		      "[%3"PRIu32"] %.*s",
+		      str->refcnt,
+		      (int)lwc_string_length(str),
+		      lwc_string_data(str));
 }
 
 /* exported interface documented in netsurf/netsurf.h */
@@ -146,9 +149,9 @@ nserror netsurf_init(const char *store_path)
 
 	if (hlcache_parameters.llcache.limit < MINIMUM_MEMORY_CACHE_SIZE) {
 		hlcache_parameters.llcache.limit = MINIMUM_MEMORY_CACHE_SIZE;
-		NSLOG(netsurf, INFO,
-		      "Setting minimum memory cache size %"PRIsizet,
-		      hlcache_parameters.llcache.limit);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Setting minimum memory cache size %"PRIsizet,
+			      hlcache_parameters.llcache.limit);
 	} 
 
 	/* Set up the max attempts made to fetch a timing out resource */

@@ -26,9 +26,21 @@
 
 #ifdef __MWERKS__
 #include <MacTypes.h>
+/*
+ * Include MSL's stat.h and fcntl.h early so their definitions of
+ * mode_t, off_t, struct stat, S_IFDIR, O_RDONLY, etc. come first.
+ * Our mac_types.h has #ifndef guards that will skip duplicates.
+ */
+#include <stat.h>
+#include <fcntl.h>
 #endif
 #include "mac_types.h"
 
+/*
+ * CW8 MacTypes.h bool = unsigned char, but log.c may see a
+ * different bool via stdbool.h. Use unsigned char directly
+ * to match both sides.
+ */
 extern unsigned char verbose_log;
 
 enum nslog_level {
@@ -62,5 +74,31 @@ extern void nslog_log(const char *file, const char *func,
 			nslog_log(__FILE__, "", __LINE__, logmsg); \
 		} \
 	} while(0)
+
+/* --- Additional build defines --- */
+
+#ifndef __MACOS9__
+#define __MACOS9__ 1
+#endif
+
+#ifndef WITHOUT_DUKTAPE
+#define WITHOUT_DUKTAPE 1
+#endif
+
+#ifndef NO_IPV6
+#define NO_IPV6 1
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
+
+#ifndef NETSURF_BUILTIN_LOG_FILTER
+#define NETSURF_BUILTIN_LOG_FILTER "level:WARNING"
+#endif
+
+#ifndef NETSURF_BUILTIN_VERBOSE_FILTER
+#define NETSURF_BUILTIN_VERBOSE_FILTER "level:VERBOSE"
+#endif
 
 #endif /* MACSURF_PREFIX_H */
