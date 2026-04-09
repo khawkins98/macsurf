@@ -236,12 +236,12 @@ static nserror gui_default_corewindow_dragstatus(struct core_window *cw, core_wi
 }
 
 static struct core_window_table default_corewindow_table = {
-	.invalidate = gui_default_corewindow_invalidate,
-	.set_extent = gui_default_corewindow_set_extent,
-	.set_scroll = gui_default_corewindow_set_scroll,
-	.get_scroll = gui_default_corewindow_get_scroll,
-	.get_dimensions = gui_default_corewindow_get_dimensions,
-	.drag_status = gui_default_corewindow_dragstatus,
+	gui_default_corewindow_invalidate,
+	gui_default_corewindow_set_extent,
+	gui_default_corewindow_set_scroll,
+	gui_default_corewindow_get_scroll,
+	gui_default_corewindow_get_dimensions,
+	gui_default_corewindow_dragstatus
 };
 
 /** verify corewindow window table is valid */
@@ -297,10 +297,10 @@ static void gui_default_download_done(struct gui_download_window *dw)
 }
 
 static struct gui_download_table default_download_table = {
-	.create = gui_default_download_create,
-	.data = gui_default_download_data,
-	.error = gui_default_download_error,
-	.done = gui_default_download_done,
+	gui_default_download_create,
+	gui_default_download_data,
+	gui_default_download_error,
+	gui_default_download_done
 };
 
 /** verify download window table is valid */
@@ -340,8 +340,8 @@ static void gui_default_set_clipboard(const char *buffer, size_t length,
 }
 
 static struct gui_clipboard_table default_clipboard_table = {
-	.get = gui_default_get_clipboard,
-	.set = gui_default_set_clipboard,
+	gui_default_get_clipboard,
+	gui_default_set_clipboard
 };
 
 /** verify clipboard table is valid */
@@ -388,8 +388,8 @@ static nserror gui_default_utf8(const char *string, size_t len, char **result)
 }
 
 static struct gui_utf8_table default_utf8_table = {
-	.utf8_to_local = gui_default_utf8,
-	.local_to_utf8 = gui_default_utf8,
+	gui_default_utf8,
+	gui_default_utf8
 };
 
 /** verify clipboard table is valid */
@@ -431,11 +431,11 @@ static void gui_default_back_state(bool active, void *p)
 }
 
 static struct gui_search_table default_search_table = {
-	.status = gui_default_status,
-	.hourglass = gui_default_hourglass,
-	.add_recent = gui_default_add_recent,
-	.forward_state = gui_default_forward_state,
-	.back_state = gui_default_back_state,
+	gui_default_status,
+	gui_default_hourglass,
+	gui_default_add_recent,
+	gui_default_forward_state,
+	gui_default_back_state
 };
 
 /** verify search table is valid */
@@ -474,7 +474,7 @@ gui_default_provider_update(const char *provider_name,
 }
 
 static struct gui_search_web_table default_search_web_table = {
-	.provider_update = gui_default_provider_update,
+	gui_default_provider_update
 };
 
 /** verify search table is valid */

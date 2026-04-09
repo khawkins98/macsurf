@@ -18,8 +18,10 @@
 #else
 #include <stdbool.h>
 /* Linux build: stub types for struct gui_window */
+#ifndef __MACTYPES__
 typedef void *WindowRef;
 typedef void *ControlRef;
+#endif
 #endif
 
 extern bool macos9_done;

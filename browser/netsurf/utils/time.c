@@ -601,10 +601,13 @@ static inline bool time__parse_weekday(
 		return false;
 	}
 
-	for (uint32_t i = 0; i < NSC_TIME_WEEKDAY__COUNT; i++) {
-		if (ascii_strings_count_equal_caseless(names[i], str) == len) {
-			*flags |= NSC_COMPONENT_FLAGS_HAVE_WEEKDAY;
-			return true;
+	{
+		uint32_t i;
+		for (i = 0; i < NSC_TIME_WEEKDAY__COUNT; i++) {
+			if (ascii_strings_count_equal_caseless(names[i], str) == len) {
+				*flags |= NSC_COMPONENT_FLAGS_HAVE_WEEKDAY;
+				return true;
+			}
 		}
 	}
 
@@ -634,11 +637,14 @@ static inline bool time__parse_month(
 		return false;
 	}
 
-	for (uint32_t i = 0; i < NSC_TIME_MONTH__COUNT; i++) {
-		if (ascii_strings_count_equal_caseless(months[i], str) == len) {
-			*flags |= NSC_COMPONENT_FLAGS_HAVE_MONTHS;
-			ctx->month = i;
-			return true;
+	{
+		uint32_t i;
+		for (i = 0; i < NSC_TIME_MONTH__COUNT; i++) {
+			if (ascii_strings_count_equal_caseless(months[i], str) == len) {
+				*flags |= NSC_COMPONENT_FLAGS_HAVE_MONTHS;
+				ctx->month = i;
+				return true;
+			}
 		}
 	}
 
@@ -668,12 +674,15 @@ static inline bool time__parse_timezone(
 		return false;
 	}
 
-	for (uint32_t i = 0; i < NSC_TIME_ZONE__COUNT; i++) {
-		if (ascii_strings_count_equal_caseless(
-				timezones[i], str) == len) {
-			*flags |= NSC_COMPONENT_FLAGS_HAVE_TIMEZONE;
-			ctx->timezone_offset_mins = timezone_mins[i];
-			return true;
+	{
+		uint32_t i;
+		for (i = 0; i < NSC_TIME_ZONE__COUNT; i++) {
+			if (ascii_strings_count_equal_caseless(
+					timezones[i], str) == len) {
+				*flags |= NSC_COMPONENT_FLAGS_HAVE_TIMEZONE;
+				ctx->timezone_offset_mins = timezone_mins[i];
+				return true;
+			}
 		}
 	}
 

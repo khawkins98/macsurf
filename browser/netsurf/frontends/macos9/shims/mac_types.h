@@ -17,23 +17,36 @@
  * on a Linux cross-check they shadow the system types harmlessly.
  */
 
-#ifndef _MAC_OFF_T
+/*
+ * Type guards: use both our own and MSL-compatible guards
+ * to prevent redefinition when MSL stat.h or other headers
+ * have already defined these types.
+ */
+/*
+ * Match MSL's types exactly to avoid redeclaration errors.
+ * MSL stat.h defines: mode_t = unsigned long, off_t = long.
+ */
+#if !defined(_MAC_OFF_T) && !defined(_OFF_T_DEFINED) && !defined(_OFF_T)
 #define _MAC_OFF_T
-typedef long long	off_t;
+#define _OFF_T
+typedef long		off_t;
 #endif
 
-#ifndef _MAC_SSIZE_T
+#if !defined(_MAC_SSIZE_T) && !defined(_SSIZE_T_DEFINED) && !defined(_SSIZE_T)
 #define _MAC_SSIZE_T
+#define _SSIZE_T
 typedef long		ssize_t;
 #endif
 
-#ifndef _MAC_MODE_T
+#if !defined(_MAC_MODE_T) && !defined(_MODE_T_DEFINED) && !defined(_MODE_T)
 #define _MAC_MODE_T
-typedef unsigned short	mode_t;
+#define _MODE_T
+typedef unsigned long	mode_t;
 #endif
 
-#ifndef _MAC_TIME_T
+#if !defined(_MAC_TIME_T) && !defined(_TIME_T_DEFINED) && !defined(_TIME_T)
 #define _MAC_TIME_T
+#define _TIME_T
 typedef long		time_t;
 #endif
 
@@ -43,38 +56,12 @@ typedef long		time_t;
 typedef short		FSIORefNum;
 #endif
 
-/* --- fcntl.h constants --- */
-
-#ifndef O_RDONLY
-#define O_RDONLY	0
-#endif
-#ifndef O_WRONLY
-#define O_WRONLY	1
-#endif
-#ifndef O_RDWR
-#define O_RDWR		2
-#endif
-#ifndef O_CREAT
-#define O_CREAT		0x0200
-#endif
-#ifndef O_TRUNC
-#define O_TRUNC		0x0400
-#endif
-
-/* --- sys/stat.h constants --- */
-
-#ifndef S_IFDIR
-#define S_IFDIR		0040000
-#endif
-#ifndef S_IFREG
-#define S_IFREG		0100000
-#endif
-#ifndef S_ISDIR
-#define S_ISDIR(m)	(((m) & 0170000) == S_IFDIR)
-#endif
-#ifndef S_ISREG
-#define S_ISREG(m)	(((m) & 0170000) == S_IFREG)
-#endif
+/*
+ * fcntl.h constants (O_RDONLY, O_WRONLY, etc.) and
+ * sys/stat.h constants (S_IFDIR, S_IFREG, struct stat, etc.)
+ * are intentionally NOT defined here — MSL provides them.
+ * Defining them here conflicts with MSL's fcntl.h and stat.h.
+ */
 
 /* --- errno values --- */
 
@@ -103,15 +90,13 @@ typedef short		FSIORefNum;
 #define X_OK		1
 #endif
 
-/* --- struct stat (minimal) --- */
-
-#ifndef _MAC_STRUCT_STAT
-#define _MAC_STRUCT_STAT
-struct stat {
-	mode_t	st_mode;
-	off_t	st_size;
-	long	st_mtime;
-};
+/*
+ * struct stat is provided by MSL's stat.h — not defined here.
+ * On CW8, #include <stat.h> in the prefix file provides it.
+ * On Linux, pull in the system header so struct stat is visible.
+ */
+#ifndef __MWERKS__
+#include <sys/stat.h>
 #endif
 
 /* --- Forward declarations: mac_file_io.c --- */

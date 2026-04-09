@@ -681,8 +681,7 @@ static bool urldb__host_is_ip_address(const char *host)
 		c[slash - host] = '\0';
 		sane_host = c;
 		host_len = slash - host;
-		NSLOG(netsurf, INFO, "WARNING: called with non-host '%s'",
-		      host);
+		nslog_log(__FILE__, "", __LINE__, "WARNING: called with non-host '%s'", host);
 	}
 
 	if (strspn(sane_host, "0123456789abcdefABCDEF[].:") < host_len)
@@ -1312,7 +1311,7 @@ urldb_match_path(const struct path_data *parent,
 	assert(parent->segment == NULL);
 
 	if (path[0] != '/') {
-		NSLOG(netsurf, INFO, "path is %s", path);
+		nslog_log(__FILE__, "", __LINE__, "path is %s", path);
 	}
 
 	assert(path[0] == '/');
@@ -1442,14 +1441,12 @@ static void urldb_dump_paths(struct path_data *parent)
 
 	do {
 		if (p->segment != NULL) {
-			NSLOG(netsurf, INFO, "\t%s : %u",
-			      lwc_string_data(p->scheme), p->port);
+			nslog_log(__FILE__, "", __LINE__, "\t%s : %u", lwc_string_data(p->scheme), p->port);
 
-			NSLOG(netsurf, INFO, "\t\t'%s'", p->segment);
+			nslog_log(__FILE__, "", __LINE__, "\t\t'%s'", p->segment);
 
 			for (i = 0; i != p->frag_cnt; i++) {
-				NSLOG(netsurf, INFO, "\t\t\t#%s",
-				      p->fragment[i]);
+				nslog_log(__FILE__, "", __LINE__, "\t\t\t#%s", p->fragment[i]);
 			}
 		}
 
@@ -1479,10 +1476,11 @@ static void urldb_dump_hosts(struct host_part *parent)
 	struct host_part *h;
 
 	if (parent->part) {
-		NSLOG(netsurf, INFO, "%s", parent->part);
+		nslog_log(__FILE__, "", __LINE__, "%s", parent->part);
 
-		NSLOG(netsurf, INFO, "\t%s invalid SSL certs",
-		      parent->permit_invalid_certs ? "Permits" : "Denies");
+		nslog_log(__FILE__, "", __LINE__,
+			      "\t%s invalid SSL certs",
+			      parent->permit_invalid_certs ? "Permits" : "Denies");
 	}
 
 	/* Dump path data */
@@ -1537,7 +1535,7 @@ static void urldb_dump_search(struct search_node *parent, int depth)
 	}
 	s[i]= 0;
 
-	NSLOG(netsurf, INFO, "%s", s);
+	nslog_log(__FILE__, "", __LINE__, "%s", s);
 
 	urldb_dump_search(parent->right, depth + 1);
 }
@@ -3065,15 +3063,14 @@ nserror urldb_load(const char *filename)
 
 	assert(filename);
 
-	NSLOG(netsurf, INFO, "Loading URL file %s", filename);
+	nslog_log(__FILE__, "", __LINE__, "Loading URL file %s", filename);
 
 	if (url_bloom == NULL)
 		url_bloom = bloom_create(BLOOM_SIZE);
 
 	fp = fopen(filename, "r");
 	if (!fp) {
-		NSLOG(netsurf, INFO, "Failed to open file '%s' for reading",
-		      filename);
+		nslog_log(__FILE__, "", __LINE__, "Failed to open file '%s' for reading", filename);
 		return NSERROR_NOT_FOUND;
 	}
 
@@ -3127,7 +3124,7 @@ nserror urldb_load(const char *filename)
 
 		h = urldb_add_host(host);
 		if (!h) {
-			NSLOG(netsurf, INFO, "Failed adding host: '%s'", host);
+			nslog_log(__FILE__, "", __LINE__, "Failed adding host: '%s'", host);
 			fclose(fp);
 			return NSERROR_NOMEM;
 		}
@@ -3141,7 +3138,7 @@ nserror urldb_load(const char *filename)
 
 		/* no URLs => try next host */
 		if (urls == 0) {
-			NSLOG(netsurf, INFO, "No URLs for '%s'", host);
+			nslog_log(__FILE__, "", __LINE__, "No URLs for '%s'", host);
 			continue;
 		}
 
@@ -3191,8 +3188,7 @@ nserror urldb_load(const char *filename)
 			 *       Need a nsurl_save too.
 			 */
 			if (nsurl_create(url, &nsurl) != NSERROR_OK) {
-				NSLOG(netsurf, INFO, "Failed inserting '%s'",
-				      url);
+				nslog_log(__FILE__, "", __LINE__, "Failed inserting '%s'", url);
 				fclose(fp);
 				return NSERROR_NOMEM;
 			}
@@ -3205,8 +3201,7 @@ nserror urldb_load(const char *filename)
 			/* Copy and merge path/query strings */
 			if (nsurl_get(nsurl, NSURL_PATH | NSURL_QUERY,
 				      &path_query, &len) != NSERROR_OK) {
-				NSLOG(netsurf, INFO, "Failed inserting '%s'",
-				      url);
+				nslog_log(__FILE__, "", __LINE__, "Failed inserting '%s'", url);
 				fclose(fp);
 				return NSERROR_NOMEM;
 			}
@@ -3217,8 +3212,7 @@ nserror urldb_load(const char *filename)
 			p = urldb_add_path(scheme_lwc, port, h, path_query,
 					   fragment_lwc, nsurl);
 			if (!p) {
-				NSLOG(netsurf, INFO, "Failed inserting '%s'",
-				      url);
+				nslog_log(__FILE__, "", __LINE__, "Failed inserting '%s'", url);
 				fclose(fp);
 				return NSERROR_NOMEM;
 			}
@@ -3277,8 +3271,7 @@ nserror urldb_save(const char *filename)
 
 	fp = fopen(filename, "w");
 	if (!fp) {
-		NSLOG(netsurf, INFO, "Failed to open file '%s' for writing",
-		      filename);
+		nslog_log(__FILE__, "", __LINE__, "Failed to open file '%s' for writing", filename);
 		return NSERROR_SAVE_FAILED;
 	}
 
@@ -4061,8 +4054,7 @@ bool urldb_set_cookie(const char *header, nsurl *url, nsurl *referer)
 		}
 		suffix = nspsl_getpublicsuffix(dot);
 		if (suffix == NULL) {
-			NSLOG(netsurf, INFO,
-			      "domain %s was a public suffix domain", dot);
+			nslog_log(__FILE__, "", __LINE__, "domain %s was a public suffix domain", dot);
 			urldb_free_cookie(c);
 			goto error;
 		}

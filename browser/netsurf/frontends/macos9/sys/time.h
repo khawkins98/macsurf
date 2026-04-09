@@ -11,6 +11,13 @@
 #ifndef MACOS9_SYS_TIME_H
 #define MACOS9_SYS_TIME_H
 
+/*
+ * Pull in MSL's <time.h> for struct tm, gmtime(), mktime(), etc.
+ * NetSurf core files expect these to be available when sys/time.h
+ * is included, but don't always include <time.h> directly.
+ */
+#include <time.h>
+
 struct timeval {
     long tv_sec;
     long tv_usec;

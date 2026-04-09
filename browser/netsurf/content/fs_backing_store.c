@@ -478,7 +478,7 @@ invalidate_entry(struct store_state *state, struct store_entry *bse)
 		return NSERROR_OK;
 	}
 
-	NSLOG(netsurf, VERBOSE, "Removing entry for %s", nsurl_access(bse->url));
+	nslog_log(__FILE__, "", __LINE__, "Removing entry for %s", nsurl_access(bse->url));
 
 	ret = invalidate_element(state, bse, ENTRY_ELEM_META);
 	if (ret != NSERROR_OK) {
@@ -588,10 +588,10 @@ static nserror store_evict(struct store_state *state)
 		return NSERROR_OK;
 	}
 
-	NSLOG(netsurf, INFO,
-	      "Evicting entries to reduce %"PRIu64" by %"PRIsizet,
-	      state->total_alloc,
-	      state->hysteresis);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Evicting entries to reduce %"PRIu64" by %"PRIsizet,
+		      state->total_alloc,
+		      state->hysteresis);
 
 	/* allocate storage for the list */
 	old_count = hashmap_count(state->entries);
@@ -635,9 +635,12 @@ static nserror store_evict(struct store_state *state)
 
 	free(estate.elist);
 
-	NSLOG(netsurf, INFO,
-	      "removed %"PRIsizet" in %"PRIsizet" entries, %"PRIu64" remaining in %"PRIsizet" entries",
-	      removed, ent, state->total_alloc, old_count - ent);
+	nslog_log(__FILE__, "", __LINE__,
+		      "removed %"PRIsizet" in %"PRIsizet" entries, %"PRIu64" remaining in %"PRIsizet" entries",
+		      removed,
+		      ent,
+		      state->total_alloc,
+		      old_count - ent);
 
 	return ret;
 }
@@ -742,7 +745,7 @@ static nserror write_entries(struct store_state *state)
 		return NSERROR_SAVE_FAILED;
 	}
 
-	NSLOG(netsurf, INFO, "Wrote out %"PRIsizet" entries", weistate.written);
+	nslog_log(__FILE__, "", __LINE__, "Wrote out %"PRIsizet" entries", weistate.written);
 
 	return NSERROR_OK;
 }
@@ -791,10 +794,10 @@ static nserror write_blocks(struct store_state *state)
 				   &state->blocks[elem_idx][bfidx].use_map[0],
 				   BLOCK_USE_MAP_SIZE);
 			if (wr != BLOCK_USE_MAP_SIZE) {
-				NSLOG(netsurf, DEBUG,
-				      "writing block file %d use index on file number %d failed",
-				      elem_idx,
-				      bfidx);
+				nslog_log(__FILE__, "", __LINE__,
+					      "writing block file %d use index on file number %d failed",
+					      elem_idx,
+					      bfidx);
 				goto wr_err;
 			}
 			written += wr;
@@ -857,9 +860,7 @@ static nserror set_block_extents(struct store_state *state)
 				/* ensure block file is correct extent */
 				ftr = ftruncate(state->blocks[elem_idx][bfidx].fd, 1U << (log2_block_size[elem_idx] + BLOCK_ENTRY_COUNT));
 				if (ftr == -1) {
-					NSLOG(netsurf, ERROR,
-					      "Truncate failed errno:%d",
-					      errno);
+					nslog_log(__FILE__, "", __LINE__, "Truncate failed errno:%d", errno);
 				}
 			}
 		}
@@ -983,7 +984,7 @@ set_store_entry(struct store_state *state,
 	nserror ret;
 	struct store_entry_element *elem;
 
-	NSLOG(netsurf, DEBUG, "url:%s", nsurl_access(url));
+	nslog_log(__FILE__, "", __LINE__, "url:%s", nsurl_access(url));
 
 	/* evict entries as required and ensure there is at least one
 	 * new entry available.
@@ -1076,14 +1077,13 @@ store_open(struct store_state *state,
 	if (openflags & O_CREAT) {
 		ret = netsurf_mkdir_all(fname);
 		if (ret != NSERROR_OK) {
-			NSLOG(netsurf, WARNING,
-			      "file path \"%s\" could not be created", fname);
+			nslog_log(__FILE__, "", __LINE__, "file path \"%s\" could not be created", fname);
 			free(fname);
 			return -1;
 		}
 	}
 
-	NSLOG(netsurf, DEBUG, "opening %s", fname);
+	nslog_log(__FILE__, "", __LINE__, "opening %s", fname);
 	fd = open(fname, openflags, S_IRUSR | S_IWUSR);
 
 	free(fname);
@@ -1186,7 +1186,9 @@ read_entries(struct store_state *state)
 			}
 			ent->url = nsurl; /* It already owns a ref */
 			nsurl_unref(nsurl);
-			NSLOG(netsurf, DEBUG, "Successfully read entry for %s", nsurl_access(ent->url));
+			nslog_log(__FILE__, "", __LINE__,
+				      "Successfully read entry for %s",
+				      nsurl_access(ent->url));
 			read_entries++;
 			/* Note the size allocation */
 			state->total_alloc += ent->elem[ENTRY_ELEM_DATA].size;
@@ -1199,7 +1201,7 @@ read_entries(struct store_state *state)
 		close(fd);
 	}
 
-	NSLOG(netsurf, INFO, "Read %"PRIsizet" entries from cache", read_entries);
+	nslog_log(__FILE__, "", __LINE__, "Read %"PRIsizet" entries from cache", read_entries);
 
 	free(fname);
 	return NSERROR_OK;
@@ -1227,7 +1229,7 @@ read_blocks(struct store_state *state)
 		return ret;
 	}
 
-	NSLOG(netsurf, INFO, "Initialising block use map from %s", fname);
+	nslog_log(__FILE__, "", __LINE__, "Initialising block use map from %s", fname);
 
 	fd = open(fname, O_RDWR);
 	free(fname);
@@ -1239,10 +1241,10 @@ read_blocks(struct store_state *state)
 					  &state->blocks[elem_idx][bfidx].use_map[0],
 					  BLOCK_USE_MAP_SIZE);
 				if (rd <= 0) {
-					NSLOG(netsurf, ERROR,
-					      "reading block file %d use index on file number %d failed",
-					      elem_idx,
-					      bfidx);
+					nslog_log(__FILE__, "", __LINE__,
+						      "reading block file %d use index on file number %d failed",
+						      elem_idx,
+						      bfidx);
 					goto rd_err;
 				}
 			}
@@ -1321,7 +1323,7 @@ write_control(struct store_state *state)
 		return ret;
 	}
 
-	NSLOG(netsurf, INFO, "writing control file \"%s\"", fname);
+	nslog_log(__FILE__, "", __LINE__, "writing control file \"%s\"", fname);
 
 	ret = netsurf_mkdir_all(fname);
 	if (ret != NSERROR_OK) {
@@ -1364,7 +1366,7 @@ read_control(struct store_state *state)
 		return ret;
 	}
 
-	NSLOG(netsurf, INFO, "opening control file \"%s\"", fname);
+	nslog_log(__FILE__, "", __LINE__, "opening control file \"%s\"", fname);
 
 	fcontrol = fopen(fname, "rb");
 
@@ -1453,17 +1455,21 @@ initialise(const struct llcache_store_parameters *parameters)
 		if (ret == NSERROR_NOT_FOUND) {
 			NSLOG(netsurf, INFO, "cache control file not found, making fresh");
 		} else {
-			NSLOG(netsurf, ERROR, "read control failed %s",
-			      messages_get_errorcode(ret));
+			nslog_log(__FILE__, "", __LINE__,
+				      "read control failed %s",
+				      messages_get_errorcode(ret));
 			ret = netsurf_recursive_rm(newstate->path);
 			if (ret != NSERROR_OK) {
-				NSLOG(netsurf, WARNING, "Error `%s` while removing `%s`",
-				      messages_get_errorcode(ret), newstate->path);
+				nslog_log(__FILE__, "", __LINE__,
+					      "Error `%s` while removing `%s`",
+					      messages_get_errorcode(ret),
+					      newstate->path);
 				NSLOG(netsurf, WARNING, "Unable to clean up partial cache state.");
 				NSLOG(netsurf, WARNING, "Funky behaviour may ensue.");
 			} else {
-				NSLOG(netsurf, INFO, "Successfully removed old cache from `%s`",
-				      newstate->path);
+				nslog_log(__FILE__, "", __LINE__,
+					      "Successfully removed old cache from `%s`",
+					      newstate->path);
 			}
 		}
 		ret = write_control(newstate);
@@ -1502,13 +1508,15 @@ initialise(const struct llcache_store_parameters *parameters)
 
 	NSLOG(netsurf, INFO, "FS backing store init successful");
 
-	NSLOG(netsurf, INFO,
-	      "path:%s limit:%"PRIsizet" hyst:%"PRIsizet,
-	      newstate->path,
-	      newstate->limit,
-	      newstate->hysteresis);
-	NSLOG(netsurf, INFO, "Using %"PRIu64"/%"PRIsizet,
-	      newstate->total_alloc, newstate->limit);
+	nslog_log(__FILE__, "", __LINE__,
+		      "path:%s limit:%"PRIsizet" hyst:%"PRIsizet,
+		      newstate->path,
+		      newstate->limit,
+		      newstate->hysteresis);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Using %"PRIu64"/%"PRIsizet,
+		      newstate->total_alloc,
+		      newstate->limit);
 
 	return NSERROR_OK;
 }
@@ -1547,15 +1555,15 @@ finalise(void)
 
 		/* avoid division by zero */
 		if (op_count > 0) {
-			NSLOG(netsurf, INFO,
-			      "Cache total/hit/miss/fail (counts) %d/%"PRIsizet"/%"PRIsizet"/%d (100%%/%"PRIsizet"%%/%"PRIsizet"%%/%d%%)",
-			      op_count,
-			      storestate->hit_count,
-			      storestate->miss_count,
-			      0,
-			      (storestate->hit_count * 100) / op_count,
-			      (storestate->miss_count * 100) / op_count,
-			      0);
+			nslog_log(__FILE__, "", __LINE__,
+				      "Cache total/hit/miss/fail (counts) %d/%"PRIsizet"/%"PRIsizet"/%d (100%%/%"PRIsizet"%%/%"PRIsizet"%%/%d%%)",
+				      op_count,
+				      storestate->hit_count,
+				      storestate->miss_count,
+				      0,
+				      (storestate->hit_count * 100) / op_count,
+				      (storestate->miss_count * 100) / op_count,
+				      0);
 		}
 
 		hashmap_destroy(storestate->entries);
@@ -1590,7 +1598,7 @@ static nserror store_write_block(struct store_state *state,
 		state->blocks[elem_idx][bf].fd = store_open(state, bf,
 				elem_idx + ENTRY_ELEM_COUNT, O_CREAT | O_RDWR);
 		if (state->blocks[elem_idx][bf].fd == -1) {
-			NSLOG(netsurf, ERROR, "Open failed errno %d", errno);
+			nslog_log(__FILE__, "", __LINE__, "Open failed errno %d", errno);
 			return NSERROR_SAVE_FAILED;
 		}
 
@@ -1605,21 +1613,23 @@ static nserror store_write_block(struct store_state *state,
 			bse->elem[elem_idx].size,
 			offst);
 	if (wr != (ssize_t)bse->elem[elem_idx].size) {
-		NSLOG(netsurf, ERROR,
-		      "Write failed %"PRIssizet" of %"PRId32" bytes from %p at %"PRIsizet" block %"PRIu16" errno %d",
-		      wr,
-		      bse->elem[elem_idx].size,
-		      bse->elem[elem_idx].data,
-		      (size_t)offst,
-		      bse->elem[elem_idx].block,
-		      errno);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Write failed %"PRIssizet" of %"PRId32" bytes from %p at %"PRIsizet" block %"PRIu16" errno %d",
+			      wr,
+			      bse->elem[elem_idx].size,
+			      bse->elem[elem_idx].data,
+			      (size_t)offst,
+			      bse->elem[elem_idx].block,
+			      errno);
 		return NSERROR_SAVE_FAILED;
 	}
 
-	NSLOG(netsurf, INFO,
-	      "Wrote %"PRIssizet" bytes from %p at %"PRIsizet" block %d", wr,
-	      bse->elem[elem_idx].data, (size_t)offst,
-	      bse->elem[elem_idx].block);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Wrote %"PRIssizet" bytes from %p at %"PRIsizet" block %d",
+		      wr,
+		      bse->elem[elem_idx].data,
+		      (size_t)offst,
+		      bse->elem[elem_idx].block);
 
 	return NSERROR_OK;
 }
@@ -1643,7 +1653,7 @@ static nserror store_write_file(struct store_state *state,
 	fd = store_open(state, nsurl_hash(bse->url), elem_idx, O_CREAT | O_WRONLY);
 	if (fd < 0) {
 		perror("");
-		NSLOG(netsurf, ERROR, "Open failed %d errno %d", fd, errno);
+		nslog_log(__FILE__, "", __LINE__, "Open failed %d errno %d", fd, errno);
 		return NSERROR_SAVE_FAILED;
 	}
 
@@ -1652,19 +1662,21 @@ static nserror store_write_file(struct store_state *state,
 
 	close(fd);
 	if (wr != (ssize_t)bse->elem[elem_idx].size) {
-		NSLOG(netsurf, ERROR,
-		      "Write failed %"PRIssizet" of %"PRId32" bytes from %p errno %d",
-		      wr,
-		      bse->elem[elem_idx].size,
-		      bse->elem[elem_idx].data,
-		      err);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Write failed %"PRIssizet" of %"PRId32" bytes from %p errno %d",
+			      wr,
+			      bse->elem[elem_idx].size,
+			      bse->elem[elem_idx].data,
+			      err);
 
 		/** @todo Delete the file? */
 		return NSERROR_SAVE_FAILED;
 	}
 
-	NSLOG(netsurf, VERBOSE, "Wrote %"PRIssizet" bytes from %p", wr,
-	      bse->elem[elem_idx].data);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Wrote %"PRIssizet" bytes from %p",
+		      wr,
+		      bse->elem[elem_idx].data);
 
 	return NSERROR_OK;
 }
@@ -1728,7 +1740,7 @@ static nserror entry_release_alloc(struct store_entry_element *elem)
 	if ((elem->flags & ENTRY_ELEM_FLAG_HEAP) != 0) {
 		elem->ref--;
 		if (elem->ref == 0) {
-			NSLOG(netsurf, DEEPDEBUG, "freeing %p", elem->data);
+			nslog_log(__FILE__, "", __LINE__, "freeing %p", elem->data);
 			free(elem->data);
 			elem->flags &= ~ENTRY_ELEM_FLAG_HEAP;
 		}
@@ -1760,7 +1772,7 @@ static nserror store_read_block(struct store_state *state,
 		state->blocks[elem_idx][bf].fd = store_open(state, bf,
 				elem_idx + ENTRY_ELEM_COUNT, O_CREAT | O_RDWR);
 		if (state->blocks[elem_idx][bf].fd == -1) {
-			NSLOG(netsurf, ERROR, "Open failed errno %d", errno);
+			nslog_log(__FILE__, "", __LINE__, "Open failed errno %d", errno);
 			return NSERROR_SAVE_FAILED;
 		}
 
@@ -1775,21 +1787,23 @@ static nserror store_read_block(struct store_state *state,
 		       bse->elem[elem_idx].size,
 		       offst);
 	if (rd != (ssize_t)bse->elem[elem_idx].size) {
-		NSLOG(netsurf, ERROR,
-		      "Failed reading %"PRIssizet" of %"PRId32" bytes into %p from %"PRIsizet" block %"PRIu16" errno %d",
-		      rd,
-		      bse->elem[elem_idx].size,
-		      bse->elem[elem_idx].data,
-		      (size_t)offst,
-		      bse->elem[elem_idx].block,
-		      errno);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Failed reading %"PRIssizet" of %"PRId32" bytes into %p from %"PRIsizet" block %"PRIu16" errno %d",
+			      rd,
+			      bse->elem[elem_idx].size,
+			      bse->elem[elem_idx].data,
+			      (size_t)offst,
+			      bse->elem[elem_idx].block,
+			      errno);
 		return NSERROR_SAVE_FAILED;
 	}
 
-	NSLOG(netsurf, DEEPDEBUG,
-	      "Read %"PRIssizet" bytes into %p from %"PRIsizet" block %d", rd,
-	      bse->elem[elem_idx].data, (size_t)offst,
-	      bse->elem[elem_idx].block);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Read %"PRIssizet" bytes into %p from %"PRIsizet" block %d",
+		      rd,
+		      bse->elem[elem_idx].data,
+		      (size_t)offst,
+		      bse->elem[elem_idx].block);
 
 	return NSERROR_OK;
 }
@@ -1814,7 +1828,7 @@ static nserror store_read_file(struct store_state *state,
 	/* separate file in backing store */
 	fd = store_open(storestate, nsurl_hash(bse->url), elem_idx, O_RDONLY);
 	if (fd < 0) {
-		NSLOG(netsurf, ERROR, "Open failed %d errno %d", fd, errno);
+		nslog_log(__FILE__, "", __LINE__, "Open failed %d errno %d", fd, errno);
 		/** @todo should this invalidate the entry? */
 		return NSERROR_NOT_FOUND;
 	}
@@ -1824,10 +1838,10 @@ static nserror store_read_file(struct store_state *state,
 			  bse->elem[elem_idx].data + tot,
 			  bse->elem[elem_idx].size - tot);
 		if (rd <= 0) {
-			NSLOG(netsurf, ERROR,
-			      "read error returned %"PRIssizet" errno %d",
-			      rd,
-			      errno);
+			nslog_log(__FILE__, "", __LINE__,
+				      "read error returned %"PRIssizet" errno %d",
+				      rd,
+				      errno);
 			ret = NSERROR_NOT_FOUND;
 			break;
 		}
@@ -1836,8 +1850,10 @@ static nserror store_read_file(struct store_state *state,
 
 	close(fd);
 
-	NSLOG(netsurf, DEEPDEBUG, "Read %"PRIsizet" bytes into %p", tot,
-	      bse->elem[elem_idx].data);
+	nslog_log(__FILE__, "", __LINE__,
+		      "Read %"PRIsizet" bytes into %p",
+		      tot,
+		      bse->elem[elem_idx].data);
 
 	return ret;
 }
@@ -1870,14 +1886,13 @@ fetch(nsurl *url,
 	/* fetch store entry */
 	ret = get_store_entry(storestate, url, &bse);
 	if (ret != NSERROR_OK) {
-		NSLOG(netsurf, DEBUG, "Entry for %s not found", nsurl_access(url));
+		nslog_log(__FILE__, "", __LINE__, "Entry for %s not found", nsurl_access(url));
 		storestate->miss_count++;
 		return ret;
 	}
 	storestate->hit_count++;
 
-	NSLOG(netsurf, DEBUG, "retrieving cache data for url:%s",
-	      nsurl_access(url));
+	nslog_log(__FILE__, "", __LINE__, "retrieving cache data for url:%s", nsurl_access(url));
 
 	/* calculate the entry element index */
 	if ((bsflags & BACKING_STORE_META) != 0) {
@@ -1892,9 +1907,11 @@ fetch(nsurl *url,
 		/* use the existing allocation and bump the ref count. */
 		elem->ref++;
 
-		NSLOG(netsurf, DEEPDEBUG,
-		      "Using existing entry (%p) allocation %p refs:%d", bse,
-		      elem->data, elem->ref);
+		nslog_log(__FILE__, "", __LINE__,
+			      "Using existing entry (%p) allocation %p refs:%d",
+			      bse,
+			      elem->data,
+			      elem->ref);
 
 	} else {
 		/* allocate from the heap */
@@ -1904,8 +1921,7 @@ fetch(nsurl *url,
 			      "Failed to create new heap allocation");
 			return NSERROR_NOMEM;
 		}
-		NSLOG(netsurf, DEEPDEBUG, "Created new heap allocation %p",
-		      elem->data);
+		nslog_log(__FILE__, "", __LINE__, "Created new heap allocation %p", elem->data);
 
 		/* mark the entry as having a valid heap allocation */
 		elem->flags |= ENTRY_ELEM_FLAG_HEAP;

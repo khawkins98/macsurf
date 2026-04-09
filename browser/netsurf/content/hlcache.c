@@ -205,7 +205,7 @@ static void hlcache_content_callback(struct content *c, content_msg msg,
 		error = handle->cb(handle, &event, handle->pw);
 
 	if (error != NSERROR_OK)
-		NSLOG(netsurf, INFO, "Error in callback: %d", error);
+		nslog_log(__FILE__, "", __LINE__, "Error in callback: %d", error);
 }
 
 /**
@@ -589,8 +589,9 @@ void hlcache_finalise(void)
 		num_contents++;
 	}
 
-	NSLOG(netsurf, INFO, "%"PRIu32" contents remain before cache drain",
-	      num_contents);
+	nslog_log(__FILE__, "", __LINE__,
+		      "%"PRIu32" contents remain before cache drain",
+		      num_contents);
 
 	/* Drain cache */
 	do {
@@ -604,8 +605,9 @@ void hlcache_finalise(void)
 		}
 	} while (num_contents > 0 && num_contents != prev_contents);
 
-	NSLOG(netsurf, INFO, "%"PRIu32" contents remaining after being polite",
-			num_contents);
+	nslog_log(__FILE__, "", __LINE__,
+		      "%"PRIu32" contents remaining after being polite",
+		      num_contents);
 
 	/* Drain cache again, forcing the matter */
 	do {
@@ -619,17 +621,18 @@ void hlcache_finalise(void)
 		}
 	} while (num_contents > 0 && num_contents != prev_contents);
 
-	NSLOG(netsurf, INFO, "%"PRIu32" contents remaining:", num_contents);
+	nslog_log(__FILE__, "", __LINE__, "%"PRIu32" contents remaining:", num_contents);
 	for (entry = hlcache->content_list; entry != NULL; entry = entry->next) {
 		hlcache_handle entry_handle = { entry, NULL, NULL };
 
 		if (entry->content != NULL) {
-			NSLOG(netsurf, INFO, "	%p : %s (%"PRIu32" users)",
-			      entry,
-			      nsurl_access(hlcache_handle_get_url(&entry_handle)),
-			      content_count_users(entry->content));
+			nslog_log(__FILE__, "", __LINE__,
+				      "	%p : %s (%"PRIu32" users)",
+				      entry,
+				      nsurl_access(hlcache_handle_get_url(&entry_handle)),
+				      content_count_users(entry->content));
 		} else {
-			NSLOG(netsurf, INFO, "	%p", entry);
+			nslog_log(__FILE__, "", __LINE__, "	%p", entry);
 		}
 	}
 
@@ -657,8 +660,10 @@ void hlcache_finalise(void)
 		hlcache->retrieval_ctx_ring = NULL;
 	}
 
-	NSLOG(netsurf, INFO, "hit/miss %d/%d", hlcache->hit_count,
-	      hlcache->miss_count);
+	nslog_log(__FILE__, "", __LINE__,
+		      "hit/miss %d/%d",
+		      hlcache->hit_count,
+		      hlcache->miss_count);
 
 	/* De-schedule ourselves */
 	guit->misc->schedule(-1, hlcache_clean, NULL);

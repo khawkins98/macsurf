@@ -47,10 +47,12 @@ typedef unsigned short EventKind;
 typedef unsigned long UInt32;
 typedef short SInt16;
 
+#ifndef __MACTYPES__
 typedef struct {
 	SInt16 v;
 	SInt16 h;
 } Point;
+#endif
 
 typedef struct {
 	EventKind what;
@@ -87,10 +89,14 @@ enum {
 	inGoAway   = 6
 };
 
+#ifndef __MACTYPES__
 typedef int Boolean;
+#endif
 typedef void *MenuHandle;
 
+#ifndef __MACTYPES__
 typedef struct { short top, left, bottom, right; } Rect;
+#endif
 typedef void *GrafPtr;
 static struct { void *thePort; struct { Rect bounds; } screenBits; } qd;
 
@@ -445,8 +451,9 @@ macos9_handle_mouse_down(const EventRecord *event)
 static void
 macos9_handle_mouse_up(const EventRecord *event)
 {
-	NSLOG(netsurf, INFO, "mouseUp at (%d,%d)",
-	      event->where.h, event->where.v);
+	nslog_log(__FILE__, "", __LINE__,
+		 "mouseUp at (%d,%d)",
+		 event->where.h, event->where.v);
 }
 
 static void
@@ -464,8 +471,9 @@ macos9_handle_key_down(const EventRecord *event)
 		}
 	}
 
-	NSLOG(netsurf, INFO, "keyDown char=0x%02x modifiers=0x%04x",
-	      (unsigned)ch, event->modifiers);
+	nslog_log(__FILE__, "", __LINE__,
+		 "keyDown char=0x%02x modifiers=0x%04x",
+		 (unsigned)ch, event->modifiers);
 	/* TODO: route to browser_window key handler */
 }
 
@@ -511,15 +519,17 @@ static void
 macos9_handle_os_event(const EventRecord *event)
 {
 	unsigned char os_msg = (unsigned char)((event->message >> 24) & 0xFF);
-	NSLOG(netsurf, INFO, "osEvt subtype=%u", (unsigned)os_msg);
+	nslog_log(__FILE__, "", __LINE__,
+		 "osEvt subtype=%u", (unsigned)os_msg);
 	/* Subtypes: suspend/resume (0xFA/0x01), mouse-moved, etc. */
 }
 
 static void
 macos9_handle_disk(const EventRecord *event)
 {
-	NSLOG(netsurf, INFO, "diskEvt message=0x%08lx",
-	      (unsigned long)event->message);
+	nslog_log(__FILE__, "", __LINE__,
+		 "diskEvt message=0x%08lx",
+		 (unsigned long)event->message);
 }
 
 /**
@@ -555,8 +565,9 @@ macos9_dispatch_event(const EventRecord *event)
 		macos9_handle_disk(event);
 		break;
 	default:
-		NSLOG(netsurf, INFO, "unhandled event type %d",
-		      event->what);
+		nslog_log(__FILE__, "", __LINE__,
+			 "unhandled event type %d",
+			 event->what);
 		break;
 	}
 }
