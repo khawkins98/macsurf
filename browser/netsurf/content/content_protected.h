@@ -626,4 +626,5 @@ struct content *content_clone(struct content *c);
  */
 nserror content_abort(struct content *c);
 
-#endif
+#endif /* NETSURF_CONTENT_CONTENT_PROTECTED_H_ */
+

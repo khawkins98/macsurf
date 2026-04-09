@@ -9,9 +9,10 @@
 #ifndef MACSURF_PREFIX_H
 #define MACSURF_PREFIX_H
 
-/* MSL core types — stddef.h and string.h are safe */
+/* MSL core types — stddef.h, string.h, stdlib.h are safe */
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 
 /* Bulletproof POSIX type foundation (bypassing MSL/local shadowing).
  * <time.h> cannot be used here — CW8 finds NetSurf's utils/time.h.
