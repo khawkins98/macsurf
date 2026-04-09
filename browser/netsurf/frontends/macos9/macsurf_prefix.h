@@ -70,12 +70,14 @@ typedef long intptr_t;
 #ifdef __MWERKS__
 #include <MacTypes.h>
 /*
- * Include MSL's stat.h and fcntl.h early so their definitions of
- * mode_t, off_t, struct stat, S_IFDIR, O_RDONLY, etc. come first.
- * Our mac_types.h has #ifndef guards that will skip duplicates.
+ * Force MSL's string.h — the non-MWERKS #include <string.h> above
+ * may find NetSurf's utils/string.h instead of MSL's on CW8.
+ * Also include stat.h, fcntl.h, and mac_dirent.h for POSIX types.
  */
+#include <string.h>
 #include <stat.h>
 #include <fcntl.h>
+#include "mac_dirent.h"
 #endif
 #include "mac_types.h"
 
