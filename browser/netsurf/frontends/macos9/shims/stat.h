@@ -65,6 +65,20 @@ struct stat {
 #define S_ISREG(m)  (((m) & S_IFMT) == S_IFREG)
 #endif
 
+/* User permission bits — MSL doesn't provide these */
+#ifndef S_IRUSR
+#define S_IRUSR  0x0100
+#endif
+#ifndef S_IWUSR
+#define S_IWUSR  0x0080
+#endif
+#ifndef S_IXUSR
+#define S_IXUSR  0x0040
+#endif
+#ifndef S_IRWXU
+#define S_IRWXU  (S_IRUSR | S_IWUSR | S_IXUSR)
+#endif
+
 int stat(const char *path, struct stat *buf);
 int mkdir(const char *path, unsigned long mode);
 

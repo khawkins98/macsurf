@@ -74,13 +74,14 @@ static nserror release(nsurl *url, enum backing_store_flags flags)
 	return NSERROR_NOT_FOUND;
 }
 
+/* Field order: initialise, finalise, store, fetch, release, invalidate */
 static struct gui_llcache_table llcache_table = {
 	initialise,
 	finalise,
 	store,
 	fetch,
-	invalidate,
-	release
+	release,
+	invalidate
 };
 
 struct gui_llcache_table *null_llcache_table = &llcache_table;
