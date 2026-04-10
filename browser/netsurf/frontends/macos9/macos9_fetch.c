@@ -89,6 +89,18 @@ macos9_fetch_mimetype(const char *ro_path)
 	return strdup(type);
 }
 
+/*
+ * Initiate a fetch to a URL via the MacSurf proxy.
+ * Currently a stub — logs the URL and returns.
+ * TODO: Open Transport TCP connection to proxy, send HTTP request.
+ */
+void
+macos9_fetch_url(const char *url)
+{
+	nslog_log("macos9_fetch.c", "", 0,
+		 "macos9_fetch_url: %s", url);
+}
+
 /* Field order: filetype, get_resource_url, get_resource_data,
  * release_resource_data, mimetype, socket_open, socket_close
  * (see include/netsurf/fetch.h) */

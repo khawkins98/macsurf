@@ -162,12 +162,12 @@ macos9_window_create(struct browser_window *bw,
 
 	gw->bw = bw;
 
-	/* Initial window position and size */
+	/* Window position and size: top=40, left=60, bottom=440, right=700 */
 #ifdef __MACOS9__
-	SetRect(&bounds, 10, 40, 650, 520);
+	SetRect(&bounds, 60, 40, 700, 440);
 #else
-	bounds.left = 10; bounds.top = 40;
-	bounds.right = 650; bounds.bottom = 520;
+	bounds.left = 60; bounds.top = 40;
+	bounds.right = 700; bounds.bottom = 440;
 #endif
 
 	err = CreateNewWindow(kDocumentWindowClass,
@@ -180,9 +180,9 @@ macos9_window_create(struct browser_window *bw,
 	}
 
 #ifdef __MACOS9__
-	SetWTitle(gw->window, "\pMacSurf");
+	SetWTitle(gw->window, "\pMacSurf \x97 frogfind.com");
 #else
-	SetWTitle(gw->window, PSTR("MacSurf"));
+	SetWTitle(gw->window, PSTR("MacSurf - frogfind.com"));
 #endif
 
 	/* Get actual content area dimensions */
@@ -227,6 +227,9 @@ macos9_window_create(struct browser_window *bw,
 	nslog_log(__FILE__, "", __LINE__,
 		 "window created: %dx%d content area",
 		 gw->content_width, gw->content_height);
+
+	/* Initiate fetch to frogfind.com for new windows */
+	macos9_fetch_url("http://frogfind.com/");
 
 	return gw;
 }

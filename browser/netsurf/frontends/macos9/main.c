@@ -240,7 +240,7 @@ macos9_handle_menu(short menu_id, short item)
 	case MENU_FILE:
 		switch (item) {
 		case ITEM_FILE_NEW:
-			NSLOG(netsurf, INFO, "File > New Window");
+			macos9_window_create(NULL, NULL, 0);
 			break;
 		case ITEM_FILE_LOCATION:
 			NSLOG(netsurf, INFO, "File > Open Location");
@@ -483,12 +483,24 @@ macos9_handle_update(const EventRecord *event)
 {
 	WindowRef win = (WindowRef)(uintptr_t)event->message;
 	Rect portRect;
+#ifdef __MACOS9__
+	Rect textRect;
+#endif
 
 	BeginUpdate(win);
 
-	/* Erase to white — content drawing via plotters not yet wired */
 	GetPortBounds(GetWindowPort(win), &portRect);
 	EraseRect(&portRect);
+
+#ifdef __MACOS9__
+	/* Draw placeholder text in the content area */
+	SetRect(&textRect, 20, 30, portRect.right - 20, portRect.bottom - 20);
+	TextFont(1); /* Application font (Geneva) */
+	TextSize(12);
+	TextFace(0); /* Plain */
+	MoveTo(20, 50);
+	DrawString("\pLoading frogfind.com...");
+#endif
 
 	EndUpdate(win);
 }

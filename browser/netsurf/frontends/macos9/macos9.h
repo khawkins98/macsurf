@@ -78,6 +78,9 @@ nserror macos9_schedule(int t, void (*callback)(void *p), void *p);
 bool macos9_schedule_run(void);
 int macos9_get_next_delay(void);
 
+/* macos9_fetch.c — fetch subsystem */
+void macos9_fetch_url(const char *url);
+
 /* window.c — public window functions */
 struct gui_window *macos9_create_initial_window(void);
 void macos9_window_destroy(struct gui_window *gw);
