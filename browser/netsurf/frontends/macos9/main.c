@@ -249,6 +249,7 @@ macos9_handle_menu(short menu_id, short item)
 			NSLOG(netsurf, INFO, "File > Close");
 			break;
 		case ITEM_FILE_QUIT:
+			SysBeep(30); /* quit menu selected */
 			macos9_done = true;
 			break;
 		}
@@ -533,6 +534,28 @@ macos9_handle_disk(const EventRecord *event)
 }
 
 /**
+ * Handle high-level (Apple) events.
+ *
+ * Under Carbon, the system sends kAEQuitApplication as a high-level
+ * event. If we don't handle it, the app may auto-terminate.
+ * We explicitly ignore the quit AE here — quit only via File > Quit.
+ */
+static void
+macos9_handle_high_level_event(const EventRecord *event)
+{
+#ifdef __MACOS9__
+	/* AEProcessAppleEvent would handle it but we haven't installed
+	 * any AE handlers.  Just ignore high-level events for now. */
+	nslog_log(__FILE__, "", __LINE__,
+		 "kHighLevelEvent ignored (class=0x%08lx id=0x%08lx)",
+		 (unsigned long)event->message,
+		 (unsigned long)(*(unsigned long *)&event->where));
+#else
+	(void)event;
+#endif
+}
+
+/**
  * Dispatch a Mac event to the appropriate handler.
  */
 static void
@@ -563,6 +586,9 @@ macos9_dispatch_event(const EventRecord *event)
 		break;
 	case diskEvt:
 		macos9_handle_disk(event);
+		break;
+	case 23: /* kHighLevelEvent */
+		macos9_handle_high_level_event(event);
 		break;
 	default:
 		nslog_log(__FILE__, "", __LINE__,
@@ -679,6 +705,12 @@ int main(int argc, char **argv)
 	while (!macos9_done) {
 		macos9_poll();
 	}
+
+	/* If we get here, macos9_done was set to true */
+	SysBeep(30); /* exit beep 1 — loop ended normally */
+	SysBeep(30);
+	SysBeep(30);
+	SysBeep(30); /* 4 rapid beeps = clean exit via macos9_done */
 
 	netsurf_exit();
 
