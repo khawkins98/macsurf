@@ -630,6 +630,8 @@ int main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 
+	SysBeep(30); /* checkpoint 1 — main() entered */
+
 	/* Mac Toolbox initialization — must happen before anything else.
 	 * Under Carbon these are not needed — Carbon initializes automatically. */
 #ifndef TARGET_API_MAC_CARBON
@@ -649,21 +651,30 @@ int main(int argc, char **argv)
 
 	ret = netsurf_register(&macos9_table);
 	if (ret != NSERROR_OK) {
-		return 1;
+		nslog_log(__FILE__, "", __LINE__,
+			 "netsurf_register failed: %d", ret);
+		/* Continue anyway — don't exit */
 	}
 
 	/* TODO: nsoption_init, nsoption_read, messages_add_from_file */
 
 	ret = netsurf_init(NULL);
 	if (ret != NSERROR_OK) {
-		return 1;
+		nslog_log(__FILE__, "", __LINE__,
+			 "netsurf_init failed: %d", ret);
+		/* Continue anyway — don't exit */
 	}
+
+	SysBeep(30); /* checkpoint 2 — after netsurf_init */
+	SysBeep(30);
 
 	/* TODO: bitmap_set_format for PPC big-endian ARGB */
 
 	macos9_create_initial_window();
 
-	NSLOG(netsurf, INFO, "MacSurf entering event loop");
+	SysBeep(30); /* checkpoint 3 — entering event loop */
+	SysBeep(30);
+	SysBeep(30);
 
 	while (!macos9_done) {
 		macos9_poll();
