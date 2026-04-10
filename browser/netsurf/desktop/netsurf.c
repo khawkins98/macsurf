@@ -110,19 +110,19 @@ static void netsurf_lwc_iterator(lwc_string *str, void *pw)
 nserror netsurf_init(const char *store_path)
 {
 	nserror ret;
-	struct hlcache_parameters hlcache_parameters = {
-		.bg_clean_time = HL_CACHE_CLEAN_TIME,
-		.llcache = {
-			.minimum_lifetime = LLCACHE_STORE_MIN_LIFETIME,
-			.minimum_bandwidth = LLCACHE_STORE_MIN_BANDWIDTH,
-			.maximum_bandwidth = LLCACHE_STORE_MAX_BANDWIDTH,
-			.time_quantum = LLCACHE_STORE_TIME_QUANTUM,
-		}
-	}; 
-	struct image_cache_parameters image_cache_parameters = {
-		.bg_clean_time = IMAGE_CACHE_CLEAN_TIME,
-		.speculative_small = SPECULATE_SMALL
-	};
+	struct hlcache_parameters hlcache_parameters;
+	struct image_cache_parameters image_cache_parameters;
+
+	memset(&hlcache_parameters, 0, sizeof(hlcache_parameters));
+	hlcache_parameters.bg_clean_time = HL_CACHE_CLEAN_TIME;
+	hlcache_parameters.llcache.minimum_lifetime = LLCACHE_STORE_MIN_LIFETIME;
+	hlcache_parameters.llcache.minimum_bandwidth = LLCACHE_STORE_MIN_BANDWIDTH;
+	hlcache_parameters.llcache.maximum_bandwidth = LLCACHE_STORE_MAX_BANDWIDTH;
+	hlcache_parameters.llcache.time_quantum = LLCACHE_STORE_TIME_QUANTUM;
+
+	memset(&image_cache_parameters, 0, sizeof(image_cache_parameters));
+	image_cache_parameters.bg_clean_time = IMAGE_CACHE_CLEAN_TIME;
+	image_cache_parameters.speculative_small = SPECULATE_SMALL;
 	
 #ifdef HAVE_SIGPIPE
 	/* Ignore SIGPIPE - this is necessary as OpenSSL can generate these
