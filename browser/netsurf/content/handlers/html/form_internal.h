@@ -41,7 +41,9 @@ struct fetch_multipart_data;
 struct redraw_context;
 struct browser_window;
 
-enum browser_mouse_state;
+/* MacSurf: forward enum decls are illegal in C89; pull in the real
+ * definition from netsurf/mouse.h instead. */
+#include "netsurf/mouse.h"
 
 /** Type of a struct form_control. */
 typedef enum {

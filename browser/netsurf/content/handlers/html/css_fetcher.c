@@ -285,16 +285,19 @@ static void html_css_fetcher_poll(lwc_string *scheme)
 /* exported interface documented in html_internal.h */
 nserror html_css_fetcher_register(void)
 {
-	const struct fetcher_operation_table html_css_fetcher_ops = {
-		.initialise = html_css_fetcher_initialise,
-		.acceptable = html_css_fetcher_can_fetch,
-		.setup = html_css_fetcher_setup,
-		.start = html_css_fetcher_start,
-		.abort = html_css_fetcher_abort,
-		.free = html_css_fetcher_free,
-		.poll = html_css_fetcher_poll,
-		.finalise = html_css_fetcher_finalise
-	};
+	/* MacSurf: assignment-form for CW8 C89 (no designated initializers).
+	 * Field order from content/fetchers.h: initialise, acceptable, setup,
+	 * start, abort, free, poll, fdset, finalise. */
+	struct fetcher_operation_table html_css_fetcher_ops;
+	memset(&html_css_fetcher_ops, 0, sizeof(html_css_fetcher_ops));
+	html_css_fetcher_ops.initialise = html_css_fetcher_initialise;
+	html_css_fetcher_ops.acceptable = html_css_fetcher_can_fetch;
+	html_css_fetcher_ops.setup      = html_css_fetcher_setup;
+	html_css_fetcher_ops.start      = html_css_fetcher_start;
+	html_css_fetcher_ops.abort      = html_css_fetcher_abort;
+	html_css_fetcher_ops.free       = html_css_fetcher_free;
+	html_css_fetcher_ops.poll       = html_css_fetcher_poll;
+	html_css_fetcher_ops.finalise   = html_css_fetcher_finalise;
 
 	return fetcher_add(lwc_string_ref(corestring_lwc_x_ns_css),
 			&html_css_fetcher_ops);

@@ -1632,12 +1632,11 @@ void html_overflow_scroll_callback(void *client_data,
 		break;
 	case SCROLLBAR_MSG_SCROLL_START:
 	{
-		struct rect rect = {
-			.x0 = scrollbar_data->x0,
-			.y0 = scrollbar_data->y0,
-			.x1 = scrollbar_data->x1,
-			.y1 = scrollbar_data->y1
-		};
+		struct rect rect;
+		rect.x0 = scrollbar_data->x0;
+		rect.y0 = scrollbar_data->y0;
+		rect.x1 = scrollbar_data->x1;
+		rect.y1 = scrollbar_data->y1;
 		drag_type = HTML_DRAG_SCROLLBAR;
 		drag_owner.scrollbar = scrollbar_data->scrollbar;
 		html_set_drag_type(html, drag_type, drag_owner, &rect);

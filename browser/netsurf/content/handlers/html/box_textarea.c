@@ -146,13 +146,12 @@ static void box_textarea_callback(void *data, struct textarea_msg *msg)
 					NULL);
 		} else {
 			/* Textarea drag started */
-			struct rect rect = {
-				.x0 = INT_MIN,
-				.y0 = INT_MIN,
-				.x1 = INT_MAX,
-				.y1 = INT_MAX
-			};
+			struct rect rect;
 			union html_drag_owner drag_owner;
+			rect.x0 = INT_MIN;
+			rect.y0 = INT_MIN;
+			rect.x1 = INT_MAX;
+			rect.y1 = INT_MAX;
 			drag_owner.textarea = box;
 
 			switch (msg->data.drag) {
@@ -261,13 +260,17 @@ bool box_textarea_create_textarea(html_content *html,
 	dom_exception err;
 	textarea_setup ta_setup;
 	textarea_flags ta_flags;
+	/* MacSurf: positional init for CW8 C89.
+	 * plot_font_style_t order: families, family, size, weight, flags,
+	 *                          background, foreground. */
 	plot_font_style_t fstyle = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 10 * PLOT_STYLE_SCALE,
-		.weight = 400,
-		.flags = FONTF_NONE,
-		.background = 0,
-		.foreground = 0,
+		NULL,
+		PLOT_FONT_FAMILY_SANS_SERIF,
+		10 * PLOT_STYLE_SCALE,
+		400,
+		FONTF_NONE,
+		0,
+		0
 	};
 	bool read_only = false;
 	bool disabled = false;

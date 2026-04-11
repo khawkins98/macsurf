@@ -310,12 +310,11 @@ static void html_get_dimensions(html_content *htmlc)
 	unsigned f_min;
 	unsigned w;
 	unsigned h;
-	union content_msg_data msg_data = {
-		.getdims = {
-			.viewport_width = &w,
-			.viewport_height = &h,
-		},
-	};
+	/* MacSurf: C89 unions can't use designated initializers — populate
+	 * the .getdims branch via assignment. */
+	union content_msg_data msg_data;
+	msg_data.getdims.viewport_width = &w;
+	msg_data.getdims.viewport_height = &h;
 
 	content_broadcast(&htmlc->base, CONTENT_MSG_GETDIMS, &msg_data);
 
@@ -2341,40 +2340,11 @@ html_textsearch_bounds(struct content *c,
 
 /**
  * HTML content handler function table
+ *
+ * MacSurf: was a static const designated initializer; CW8 C89 has
+ * neither, so populate the vtable at runtime in html_init().
  */
-static const content_handler html_content_handler = {
-	.fini = html_fini,
-	.create = html_create,
-	.process_data = html_process_data,
-	.data_complete = html_convert,
-	.reformat = html_reformat,
-	.destroy = html_destroy,
-	.stop = html_stop,
-	.mouse_track = html_mouse_track,
-	.mouse_action = html_mouse_action,
-	.keypress = html_keypress,
-	.redraw = html_redraw,
-	.open = html_open,
-	.close = html_close,
-	.get_selection = html_get_selection,
-	.clear_selection = html_clear_selection,
-	.get_contextual_content = html_get_contextual_content,
-	.scroll_at_point = html_scroll_at_point,
-	.drop_file_at_point = html_drop_file_at_point,
-	.debug_dump = html_debug_dump,
-	.debug = html_debug,
-	.clone = html_clone,
-	.get_encoding = html_encoding,
-	.type = html_content_type,
-	.exec = html_exec,
-	.saw_insecure_objects = html_saw_insecure_objects,
-	.textsearch_find = html_textsearch_find,
-	.textsearch_bounds = html_textsearch_bounds,
-	.textselection_redraw = html_textselection_redraw,
-	.textselection_copy = html_textselection_copy,
-	.textselection_get_end = html_textselection_get_end,
-	.no_share = true,
-};
+static content_handler html_content_handler;
 
 
 /* exported function documented in html/html.h */
@@ -2382,6 +2352,39 @@ nserror html_init(void)
 {
 	uint32_t i;
 	nserror error;
+
+	memset(&html_content_handler, 0, sizeof(html_content_handler));
+	html_content_handler.fini = html_fini;
+	html_content_handler.create = html_create;
+	html_content_handler.process_data = html_process_data;
+	html_content_handler.data_complete = html_convert;
+	html_content_handler.reformat = html_reformat;
+	html_content_handler.destroy = html_destroy;
+	html_content_handler.stop = html_stop;
+	html_content_handler.mouse_track = html_mouse_track;
+	html_content_handler.mouse_action = html_mouse_action;
+	html_content_handler.keypress = html_keypress;
+	html_content_handler.redraw = html_redraw;
+	html_content_handler.open = html_open;
+	html_content_handler.close = html_close;
+	html_content_handler.get_selection = html_get_selection;
+	html_content_handler.clear_selection = html_clear_selection;
+	html_content_handler.get_contextual_content = html_get_contextual_content;
+	html_content_handler.scroll_at_point = html_scroll_at_point;
+	html_content_handler.drop_file_at_point = html_drop_file_at_point;
+	html_content_handler.debug_dump = html_debug_dump;
+	html_content_handler.debug = html_debug;
+	html_content_handler.clone = html_clone;
+	html_content_handler.get_encoding = html_encoding;
+	html_content_handler.type = html_content_type;
+	html_content_handler.exec = html_exec;
+	html_content_handler.saw_insecure_objects = html_saw_insecure_objects;
+	html_content_handler.textsearch_find = html_textsearch_find;
+	html_content_handler.textsearch_bounds = html_textsearch_bounds;
+	html_content_handler.textselection_redraw = html_textselection_redraw;
+	html_content_handler.textselection_copy = html_textselection_copy;
+	html_content_handler.textselection_get_end = html_textselection_get_end;
+	html_content_handler.no_share = true;
 
 	error = html_css_init();
 	if (error != NSERROR_OK)
