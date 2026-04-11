@@ -22,8 +22,7 @@ extern "C"
 /* type for fixed point numbers */
 typedef int32_t css_fixed;
 
-static inline css_fixed
-css_add_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed css_add_fixed(const css_fixed x, const css_fixed y) {
 	int32_t ux = x;
 	int32_t uy = y;
 	int32_t res = ux + uy;
@@ -39,8 +38,7 @@ css_add_fixed(const css_fixed x, const css_fixed y) {
 	return res;
 }
 
-static inline css_fixed
-css_subtract_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed css_subtract_fixed(const css_fixed x, const css_fixed y) {
 	int32_t ux = x;
 	int32_t uy = y;
 	int32_t res = ux - uy;
@@ -55,8 +53,7 @@ css_subtract_fixed(const css_fixed x, const css_fixed y) {
 	return res;
 }
 
-static inline css_fixed
-css_divide_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed css_divide_fixed(const css_fixed x, const css_fixed y) {
 	int64_t xx = ((int64_t)x * (1 << CSS_RADIX_POINT)) / y;
 
 	if (xx < INT_MIN)
@@ -68,8 +65,7 @@ css_divide_fixed(const css_fixed x, const css_fixed y) {
 	return xx;
 }
 
-static inline css_fixed
-css_multiply_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed css_multiply_fixed(const css_fixed x, const css_fixed y) {
 	int64_t xx = ((int64_t)x * (int64_t)y) >> CSS_RADIX_POINT;
 
 	if (xx < INT_MIN)
@@ -81,8 +77,7 @@ css_multiply_fixed(const css_fixed x, const css_fixed y) {
 	return xx;
 }
 
-static inline css_fixed
-css_int_to_fixed(const int a) {
+static inline css_fixed css_int_to_fixed(const int a) {
 	int64_t xx = ((int64_t) a) * (1 << CSS_RADIX_POINT);
 
 	if (xx < INT_MIN)
@@ -94,8 +89,7 @@ css_int_to_fixed(const int a) {
 	return xx;
 }
 
-static inline css_fixed
-css_float_to_fixed(const float a) {
+static inline css_fixed css_float_to_fixed(const float a) {
 	float xx = a * (float) (1 << CSS_RADIX_POINT);
 
 	if (xx < INT_MIN)
