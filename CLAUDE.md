@@ -40,7 +40,7 @@ A single Go binary that strips TLS — receives plain HTTP from the Mac, fetches
 MacSurf is a Carbon CFM app running under CarbonLib on OS 9. For CarbonLib to fully engage, the binary MUST be identifiable as a Carbon fragment — otherwise `*InContext` calls crash at fixed addresses inside OTClientLib.
 
 - **`'carb'` resource is mandatory.** Without it, CFM treats the binary as classic PEF, CarbonLib does not load as a dependency, and any `*InContext` OT call enters an uninitialized CarbonLib client context and crashes. This is the single most important requirement for a Carbon app on OS 9.
-- **`MacSurf.r`** contains the `'carb'` resource (zero-length, ID 0). The `.r` file must be listed in the CW8 project alongside the `.c` files so CW's Rez step builds it into the resource fork.
+- **`MacSurf.rsrc`** contains the `'carb'` resource (zero-length, ID 0). It is a pre-compiled binary resource fork generated on Linux with a small Python script; CW8 links `.rsrc` files directly into the output resource fork with no Rez step. Must be listed in the CW8 project alongside the `.c` files.
 - **`RegisterAppearanceClient()`** must be called at startup after `InitCursor()`, gated by a Gestalt check for Appearance Manager presence. Matches Classilla's `CBrowserApp` constructor pattern.
 - **Skip** `InitGraf`/`InitFonts`/`InitWindows`/`InitMenus`/`TEInit`/`InitDialogs` under Carbon — Classilla explicitly skips them and so should MacSurf. Keep `InitCursor()` and `FlushEvents(everyEvent, 0)`.
 - **No preemptive threads.** OS 9 is cooperative. Use `WaitNextEvent` for the UI event loop. OT yields happen through the notifier callback (see below).
@@ -140,7 +140,7 @@ System paths:
 Use `gcc -fsyntax-only -std=c89 -pedantic -Dinline= -Ibrowser/netsurf/frontends/macos9/shims -Ibrowser/netsurf/frontends -Ibrowser/netsurf/include -Ibrowser/netsurf -include stdbool.h` to syntax-check frontend files on Linux before copying to Mac.
 
 ### Project File List (39 .c files)
-Added to MacSurf.mcp — see macsurf-project.md for full list. `MacSurf.r` (the `'carb'` resource file) must also be in the project.
+Added to MacSurf.mcp — see macsurf-project.md for full list. `MacSurf.rsrc` (pre-compiled binary `'carb'` resource, generated on Linux) must also be in the project — CW8 links `.rsrc` files directly into the output resource fork with no Rez step.
 
 ## Known Gotchas
 
