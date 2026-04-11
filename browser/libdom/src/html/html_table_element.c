@@ -464,13 +464,12 @@ dom_exception dom_html_table_element_create_caption(
 		dom_html_document *doc = (dom_html_document *)
 				((dom_node_internal *) element)->owner;
 
-		struct dom_html_element_create_params params = {
-			.type = DOM_HTML_ELEMENT_TYPE_CAPTION,
-			.doc = doc,
-			.name = doc->elements[DOM_HTML_ELEMENT_TYPE_CAPTION],
-			.namespace = ((dom_node_internal *)element)->namespace,
-			.prefix = ((dom_node_internal *)element)->prefix
-		};
+		struct dom_html_element_create_params params;
+		params.type = DOM_HTML_ELEMENT_TYPE_CAPTION;
+		params.doc = doc;
+		params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_CAPTION];
+		params.namespace = ((dom_node_internal *)element)->namespace;
+		params.prefix = ((dom_node_internal *)element)->prefix;
 
 		exp = _dom_html_table_caption_element_create(&params,
 				(dom_html_table_caption_element **)caption);
@@ -537,13 +536,12 @@ dom_exception dom_html_table_element_create_t_foot(
 		dom_html_document *doc = (dom_html_document *)
 				((dom_node_internal *) element)->owner;
 
-		struct dom_html_element_create_params params = {
-			.type = DOM_HTML_ELEMENT_TYPE_TFOOT,
-			.doc = doc,
-			.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TFOOT],
-			.namespace = ((dom_node_internal *)element)->namespace,
-			.prefix = ((dom_node_internal *)element)->prefix
-		};
+		struct dom_html_element_create_params params;
+		params.type = DOM_HTML_ELEMENT_TYPE_TFOOT;
+		params.doc = doc;
+		params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TFOOT];
+		params.namespace = ((dom_node_internal *)element)->namespace;
+		params.prefix = ((dom_node_internal *)element)->prefix;
 
 		exp = _dom_html_table_section_element_create(&params,
 				(dom_html_table_section_element **)t_foot);
@@ -615,13 +613,12 @@ dom_exception dom_html_table_element_create_t_head(
 		dom_html_document *doc = (dom_html_document *)
 				((dom_node_internal *) element)->owner;
 
-		struct dom_html_element_create_params params = {
-			.type = DOM_HTML_ELEMENT_TYPE_THEAD,
-			.doc = doc,
-			.name = doc->elements[DOM_HTML_ELEMENT_TYPE_THEAD],
-			.namespace = ((dom_node_internal *)element)->namespace,
-			.prefix = ((dom_node_internal *)element)->prefix
-		};
+		struct dom_html_element_create_params params;
+		params.type = DOM_HTML_ELEMENT_TYPE_THEAD;
+		params.doc = doc;
+		params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_THEAD];
+		params.namespace = ((dom_node_internal *)element)->namespace;
+		params.prefix = ((dom_node_internal *)element)->prefix;
 
 		exp = _dom_html_table_section_element_create(&params,
 				(dom_html_table_section_element **)t_head);
@@ -698,13 +695,12 @@ static dom_exception dom_html_table_element_create_t_body(
 		dom_html_document *doc = (dom_html_document *)
 				((dom_node_internal *) element)->owner;
 
-		struct dom_html_element_create_params params = {
-			.type = DOM_HTML_ELEMENT_TYPE_TBODY,
-			.doc = doc,
-			.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TBODY],
-			.namespace = ((dom_node_internal *)element)->namespace,
-			.prefix = ((dom_node_internal *)element)->prefix
-		};
+		struct dom_html_element_create_params params;
+		params.type = DOM_HTML_ELEMENT_TYPE_TBODY;
+		params.doc = doc;
+		params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TBODY];
+		params.namespace = ((dom_node_internal *)element)->namespace;
+		params.prefix = ((dom_node_internal *)element)->prefix;
 
 		exp = _dom_html_table_section_element_create(&params, t_body);
 		if(exp != DOM_NO_ERR) {
@@ -762,13 +758,12 @@ dom_exception dom_html_table_element_insert_row(
 		dom_html_table_row_element *row;
 		dom_node *new_row;
 
-		struct dom_html_element_create_params params = {
-			.type = DOM_HTML_ELEMENT_TYPE_TR,
-			.doc = doc,
-			.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TR],
-			.namespace = ((dom_node_internal *)element)->namespace,
-			.prefix = ((dom_node_internal *)element)->prefix
-		};
+		struct dom_html_element_create_params params;
+		params.type = DOM_HTML_ELEMENT_TYPE_TR;
+		params.doc = doc;
+		params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TR];
+		params.namespace = ((dom_node_internal *)element)->namespace;
+		params.prefix = ((dom_node_internal *)element)->prefix;
 
 		exp = _dom_html_table_row_element_create(&params, &row);
 		if(exp != DOM_NO_ERR) {

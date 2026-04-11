@@ -237,13 +237,12 @@ dom_exception dom_html_table_section_element_insert_row(
 	dom_exception exp;		/*< Variable for getting the exceptions*/
 	dom_node *new_node;
 
-	struct dom_html_element_create_params params = {
-		.type = DOM_HTML_ELEMENT_TYPE_TR,
-		.doc = doc,
-		.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TR],
-		.namespace = ((dom_node_internal *)element)->namespace,
-		.prefix = ((dom_node_internal *)element)->prefix
-	};
+	struct dom_html_element_create_params params;
+	params.type = DOM_HTML_ELEMENT_TYPE_TR;
+	params.doc = doc;
+	params.name = doc->elements[DOM_HTML_ELEMENT_TYPE_TR];
+	params.namespace = ((dom_node_internal *)element)->namespace;
+	params.prefix = ((dom_node_internal *)element)->prefix;
 
 	exp = _dom_html_table_row_element_create(&params,
 			(dom_html_table_row_element **)(void *) &new_node);
