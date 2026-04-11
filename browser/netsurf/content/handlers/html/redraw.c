@@ -611,11 +611,15 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	struct box *parent;
 	struct rect r = *clip;
 	css_color bgcol;
+	/* MacSurf: positional init for CW8 C89.
+	 * plot_style_t order: stroke_type, stroke_width, stroke_colour,
+	 *                     fill_type, fill_colour. */
 	plot_style_t pstyle_fill_bg = {
-		.fill_type = PLOT_OP_TYPE_SOLID,
-		.fill_colour = *background_colour,
+		PLOT_OP_TYPE_NONE, 0, 0,
+		PLOT_OP_TYPE_SOLID, 0
 	};
 	nserror res;
+	pstyle_fill_bg.fill_colour = *background_colour;
 
 	if (ctx->background_images == false)
 		return true;
@@ -835,11 +839,15 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	css_fixed hpos = 0, vpos = 0;
 	css_unit hunit = CSS_UNIT_PX, vunit = CSS_UNIT_PX;
 	css_color bgcol;
+	/* MacSurf: positional init for CW8 C89.
+	 * plot_style_t order: stroke_type, stroke_width, stroke_colour,
+	 *                     fill_type, fill_colour. */
 	plot_style_t pstyle_fill_bg = {
-		.fill_type = PLOT_OP_TYPE_SOLID,
-		.fill_colour = *background_colour,
+		PLOT_OP_TYPE_NONE, 0, 0,
+		PLOT_OP_TYPE_SOLID, 0
 	};
 	nserror res;
+	pstyle_fill_bg.fill_colour = *background_colour;
 
 	plot_content = (box->background != NULL);
 
@@ -981,10 +989,13 @@ html_redraw_text_decoration_inline(struct box *box,
 				   const struct redraw_context *ctx)
 {
 	struct box *c;
+	/* MacSurf: positional init (CW8 C89). plot_style_t order:
+	 * stroke_type, stroke_width, stroke_colour, fill_type, fill_colour. */
 	plot_style_t plot_style_box = {
-		.stroke_type = PLOT_OP_TYPE_SOLID,
-		.stroke_colour = colour,
+		PLOT_OP_TYPE_SOLID, 0, 0,
+		PLOT_OP_TYPE_NONE, 0
 	};
+	plot_style_box.stroke_colour = colour;
 	nserror res;
 	struct rect rect;
 
@@ -1029,10 +1040,13 @@ html_redraw_text_decoration_block(struct box *box,
 				  const struct redraw_context *ctx)
 {
 	struct box *c;
+	/* MacSurf: positional init (CW8 C89). plot_style_t order:
+	 * stroke_type, stroke_width, stroke_colour, fill_type, fill_colour. */
 	plot_style_t plot_style_box = {
-		.stroke_type = PLOT_OP_TYPE_SOLID,
-		.stroke_colour = colour,
+		PLOT_OP_TYPE_SOLID, 0, 0,
+		PLOT_OP_TYPE_NONE, 0
 	};
+	plot_style_box.stroke_colour = colour;
 	nserror res;
 	struct rect rect;
 
@@ -1948,10 +1962,13 @@ bool html_redraw(struct content *c, struct content_redraw_data *data,
 	struct box *box;
 	bool result = true;
 	bool select, select_only;
+	/* MacSurf: positional init (CW8 C89). plot_style_t order:
+	 * stroke_type, stroke_width, stroke_colour, fill_type, fill_colour. */
 	plot_style_t pstyle_fill_bg = {
-		.fill_type = PLOT_OP_TYPE_SOLID,
-		.fill_colour = data->background_colour,
+		PLOT_OP_TYPE_NONE, 0, 0,
+		PLOT_OP_TYPE_SOLID, 0
 	};
+	pstyle_fill_bg.fill_colour = data->background_colour;
 
 	box = html->layout;
 	assert(box);

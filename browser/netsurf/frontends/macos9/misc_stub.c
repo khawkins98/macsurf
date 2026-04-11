@@ -73,7 +73,7 @@ void fetch_abort(void *f) { (void)f; }
 /* Content handler init stubs — Phases 3+4 will replace these */
 nserror textplain_init(void) { return NSERROR_OK; }
 nserror image_init(void) { return NSERROR_OK; }
-nserror html_init(void) { return NSERROR_OK; }
+/* html_init — Phase 4: provided by content/handlers/html/html.c */
 /* nscss_init — Phase 3: provided by content/handlers/css/css.c */
 
 /* nscolour_update — Phase 2: provided by utils/nscolour.c */
@@ -83,11 +83,4 @@ nserror html_init(void) { return NSERROR_OK; }
 /* PDF save */
 nserror save_pdf(const char *path) { (void)path; return NSERROR_OK; }
 
-/* html_get_id_offset — declared in html/html.h */
-int html_get_id_offset(void *h, void *frag_id, int *x, int *y)
-{
-	(void)h; (void)frag_id;
-	if (x) *x = 0;
-	if (y) *y = 0;
-	return 0;
-}
+/* html_get_id_offset — Phase 4: provided by content/handlers/html/html.c */

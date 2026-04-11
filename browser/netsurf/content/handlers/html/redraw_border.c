@@ -34,23 +34,26 @@
 #include "html/private.h"
 
 
+/* MacSurf: positional init for CW8 C89.
+ * plot_style_t order: stroke_type, stroke_width, stroke_colour,
+ *                     fill_type, fill_colour. */
 static plot_style_t plot_style_bdr = {
-	.stroke_type = PLOT_OP_TYPE_DASH,
+	PLOT_OP_TYPE_DASH, 0, 0, PLOT_OP_TYPE_NONE, 0
 };
 static plot_style_t plot_style_fillbdr = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0
 };
 static plot_style_t plot_style_fillbdr_dark = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0
 };
 static plot_style_t plot_style_fillbdr_light = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0
 };
 static plot_style_t plot_style_fillbdr_ddark = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0
 };
 static plot_style_t plot_style_fillbdr_dlight = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0
 };
 
 

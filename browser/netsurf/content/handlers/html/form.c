@@ -76,17 +76,24 @@ struct form_select_menu {
 	struct content *c;
 };
 
+/* MacSurf: positional init for CW8 C89.
+ * plot_style_t order: stroke_type, stroke_width, stroke_colour,
+ *                     fill_type, fill_colour. */
 static plot_style_t plot_style_fill_selected = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
-	.fill_colour = SELECT_SELECTED_COLOUR,
+	PLOT_OP_TYPE_NONE, 0, 0,
+	PLOT_OP_TYPE_SOLID, SELECT_SELECTED_COLOUR
 };
 
+/* plot_font_style_t order: families, family, size, weight, flags,
+ *                          background, foreground. */
 static plot_font_style_t plot_fstyle_entry = {
-	.family = PLOT_FONT_FAMILY_SANS_SERIF,
-	.weight = 400,
-	.flags = FONTF_NONE,
-	.background = 0xffffff,
-	.foreground = 0x000000,
+	NULL,
+	PLOT_FONT_FAMILY_SANS_SERIF,
+	0,
+	400,
+	FONTF_NONE,
+	0xffffff,
+	0x000000
 };
 
 
@@ -1276,12 +1283,11 @@ form_select_menu_scroll_callback(void *client_data,
 			break;
 		case SCROLLBAR_MSG_SCROLL_START:
 		{
-			struct rect rect = {
-				.x0 = scrollbar_data->x0,
-				.y0 = scrollbar_data->y0,
-				.x1 = scrollbar_data->x1,
-				.y1 = scrollbar_data->y1
-			};
+			struct rect rect;
+			rect.x0 = scrollbar_data->x0;
+			rect.y0 = scrollbar_data->y0;
+			rect.x1 = scrollbar_data->x1;
+			rect.y1 = scrollbar_data->y1;
 
 			browser_window_set_drag_type(html->bw,
 					DRAGGING_CONTENT_SCROLLBAR, &rect);

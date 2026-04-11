@@ -84,16 +84,15 @@ box_contains_point(const css_unit_ctx *unit_len_ctx,
 	    css_computed_position(box->style) == CSS_POSITION_ABSOLUTE &&
 	    css_computed_clip(box->style, &css_rect) == CSS_CLIP_RECT) {
 		/* We have an absolutly positioned box with a clip rect */
-		struct rect r = {
-				 .x0 = box->border[LEFT].width,
-				 .y0 = box->border[TOP].width,
-				 .x1 = box->padding[LEFT] + box->width +
-				 box->border[RIGHT].width +
-				 box->padding[RIGHT],
-				 .y1 = box->padding[TOP] + box->height +
-				 box->border[BOTTOM].width +
-				 box->padding[BOTTOM]
-		};
+		struct rect r;
+		r.x0 = box->border[LEFT].width;
+		r.y0 = box->border[TOP].width;
+		r.x1 = box->padding[LEFT] + box->width +
+				box->border[RIGHT].width +
+				box->padding[RIGHT];
+		r.y1 = box->padding[TOP] + box->height +
+				box->border[BOTTOM].width +
+				box->padding[BOTTOM];
 		if (x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1) {
 			*physically = true;
 		} else {
