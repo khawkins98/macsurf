@@ -74,8 +74,10 @@ static inline css_error css__copy_lwc_string_array(
 	lwc_string **copy = NULL;
 
 	if (orig != NULL) {
-		for (lwc_string *const*i = orig; (*i) != NULL; i++) {
+		{ lwc_string *const*i;
+		for (i = orig; (*i) != NULL; i++) {
 			count++;
+		}
 		}
 
 		copy = malloc((count + 1) * sizeof(*copy));
@@ -84,9 +86,10 @@ static inline css_error css__copy_lwc_string_array(
 		}
 
 		if (ref) {
-			for (size_t i = 0; i < count; i++) {
+			{ size_t i;
+			for (i = 0; i < count; i++) {
 				copy[i] = lwc_string_ref(orig[i]);
-			}
+			} }
 			copy[count] = NULL;
 		} else {
 			memcpy(copy, orig, (count + 1) * sizeof(*copy));
@@ -107,9 +110,11 @@ static inline css_error css__copy_computed_counter_array(
 	css_computed_counter *copy = NULL;
 
 	if (orig != NULL) {
-		for (const css_computed_counter *i = orig;
+		{ const css_computed_counter *i;
+		for (i = orig;
 				i->name != NULL; i++) {
 			count++;
+		}
 		}
 
 		copy = malloc((count + 1) * sizeof(*copy));
@@ -118,10 +123,11 @@ static inline css_error css__copy_computed_counter_array(
 		}
 
 		if (ref) {
-			for (size_t i = 0; i < count; i++) {
+			{ size_t i;
+			for (i = 0; i < count; i++) {
 				copy[i].name = lwc_string_ref(orig[i].name);
 				copy[i].value = orig[i].value;
-			}
+			} }
 			copy[count].name = NULL;
 			copy[count].value = 0;
 		} else {
@@ -143,9 +149,11 @@ static inline css_error css__copy_computed_content_item_array(
 	css_computed_content_item *copy = NULL;
 
 	if (orig != NULL) {
-		for (const css_computed_content_item *i = orig;
+		{ const css_computed_content_item *i;
+		for (i = orig;
 				i->type != CSS_COMPUTED_CONTENT_NONE; i++) {
 			count++;
+		}
 		}
 
 		copy = malloc((count + 1) * sizeof(*copy));
@@ -154,7 +162,8 @@ static inline css_error css__copy_computed_content_item_array(
 		}
 
 		if (ref) {
-			for (size_t i = 0; i < count; i++) {
+			{ size_t i;
+			for (i = 0; i < count; i++) {
 				switch (orig[i].type) {
 				case CSS_COMPUTED_CONTENT_STRING:
 					copy[i].data.string = lwc_string_ref(
@@ -186,7 +195,7 @@ static inline css_error css__copy_computed_content_item_array(
 					break;
 				}
 				copy[i].type = orig[i].type;
-			}
+			} }
 			copy[count].type = CSS_COMPUTED_CONTENT_NONE;
 		} else {
 			memcpy(copy, orig, (count + 1) * sizeof(*copy));

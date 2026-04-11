@@ -481,10 +481,12 @@ static const symbol_t decimal_symbols[] = {
 	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
 };
 static const struct list_counter_style lcs_decimal = {
-	.name = "decimal",
-	.system = calc_numeric_system,
-	.symbols = decimal_symbols,
-	.items = (sizeof(decimal_symbols) / SYMBOL_SIZE),
+	"decimal",
+	calc_numeric_system,
+	NULL,
+	decimal_symbols,
+	NULL,
+	(sizeof(decimal_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t georgian_symbols[] = {
@@ -502,13 +504,13 @@ static const int georgian_weights[] = {
 	9,    8,    7,    6,    5,    4,    3,    2,    1
 };
 static const struct list_counter_style lcs_georgian =	{
-	.name="georgian",
-	.system = calc_additive_system,
-	.fallback = &lcs_decimal,
-	.symbols = georgian_symbols,
-	.weights = georgian_weights,
-	.items = (sizeof(georgian_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 19999 },
+	"georgian",
+	calc_additive_system,
+	&lcs_decimal,
+	georgian_symbols,
+	georgian_weights,
+	(sizeof(georgian_symbols) / SYMBOL_SIZE),
+	{ 1, 19999 }
 };
 
 
@@ -525,13 +527,13 @@ static const int armenian_weights[] = {
 	9,    8,    7,    6,    5,    4,    3,    2,    1
 };
 static const struct list_counter_style lcs_upper_armenian = {
-	.name = "upper-armenian",
-	.system = calc_additive_system,
-	.fallback = &lcs_decimal,
-	.symbols = upper_armenian_symbols,
-	.weights = armenian_weights,
-	.items = (sizeof(upper_armenian_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 9999 },
+	"upper-armenian",
+	calc_additive_system,
+	&lcs_decimal,
+	upper_armenian_symbols,
+	armenian_weights,
+	(sizeof(upper_armenian_symbols) / SYMBOL_SIZE),
+	{ 1, 9999 }
 };
 
 
@@ -542,22 +544,25 @@ static const symbol_t lower_armenian_symbols[] = {
 	"թ", "ը", "է", "զ", "ե", "դ", "գ", "բ", "ա"
 };
 static const struct list_counter_style lcs_lower_armenian = {
-	.name = "lower-armenian",
-	.system = calc_additive_system,
-	.fallback = &lcs_decimal,
-	.symbols = lower_armenian_symbols,
-	.weights = armenian_weights,
-	.items = (sizeof(lower_armenian_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 9999 },
+	"lower-armenian",
+	calc_additive_system,
+	&lcs_decimal,
+	lower_armenian_symbols,
+	armenian_weights,
+	(sizeof(lower_armenian_symbols) / SYMBOL_SIZE),
+	{ 1, 9999 }
 };
 
 
 static const struct list_counter_style lcs_decimal_leading_zero = {
-	.name = "decimal-leading-zero",
-	.system = calc_numeric_system,
-	.symbols = decimal_symbols,
-	.items = (sizeof(decimal_symbols) / SYMBOL_SIZE),
-	.pad = { .length = 2, .value = "0" },
+	"decimal-leading-zero",
+	calc_numeric_system,
+	NULL,
+	decimal_symbols,
+	NULL,
+	(sizeof(decimal_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 2, "0" }
 };
 
 
@@ -567,11 +572,12 @@ static const symbol_t lower_greek_symbols[] = {
 	"φ", "χ", "ψ", "ω"
 };
 static const struct list_counter_style lcs_lower_greek = {
-	.name = "lower-greek",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = lower_greek_symbols,
-	.items = (sizeof(lower_greek_symbols) / SYMBOL_SIZE),
+	"lower-greek",
+	calc_alphabet_system,
+	&lcs_decimal,
+	lower_greek_symbols,
+	NULL,
+	(sizeof(lower_greek_symbols) / SYMBOL_SIZE)
 };
 
 
@@ -581,11 +587,12 @@ static const symbol_t upper_alpha_symbols[] = {
 	"U", "V", "W", "X", "Y", "Z"
 };
 static const struct list_counter_style lcs_upper_alpha = {
-	.name = "upper-alpha",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = upper_alpha_symbols,
-	.items = (sizeof(upper_alpha_symbols) / SYMBOL_SIZE),
+	"upper-alpha",
+	calc_alphabet_system,
+	&lcs_decimal,
+	upper_alpha_symbols,
+	NULL,
+	(sizeof(upper_alpha_symbols) / SYMBOL_SIZE)
 };
 
 
@@ -595,11 +602,12 @@ static const symbol_t lower_alpha_symbols[] = {
 	"u", "v", "w", "x", "y", "z"
 };
 static struct list_counter_style lcs_lower_alpha = {
-	.name = "lower-alpha",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = lower_alpha_symbols,
-	.items = (sizeof(lower_alpha_symbols) / SYMBOL_SIZE),
+	"lower-alpha",
+	calc_alphabet_system,
+	&lcs_decimal,
+	lower_alpha_symbols,
+	NULL,
+	(sizeof(lower_alpha_symbols) / SYMBOL_SIZE)
 };
 
 
@@ -610,13 +618,13 @@ static const symbol_t upper_roman_symbols[] = {
 	"M", "D", "C", "L", "X", "V", "I"
 };
 static const struct list_counter_style lcs_upper_roman = {
-	.name = "upper-roman",
-	.system = calc_roman_system,
-	.fallback = &lcs_decimal,
-	.symbols = upper_roman_symbols,
-	.weights = roman_weights,
-	.items = (sizeof(upper_roman_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 3999 },
+	"upper-roman",
+	calc_roman_system,
+	&lcs_decimal,
+	upper_roman_symbols,
+	roman_weights,
+	(sizeof(upper_roman_symbols) / SYMBOL_SIZE),
+	{ 1, 3999 }
 };
 
 
@@ -624,58 +632,80 @@ static const symbol_t lower_roman_symbols[] = {
 	"m", "d", "c", "l", "x", "v", "i"
 };
 static const struct list_counter_style lcs_lower_roman = {
-	.name = "lower-roman",
-	.system = calc_roman_system,
-	.fallback = &lcs_decimal,
-	.symbols = lower_roman_symbols,
-	.weights = roman_weights,
-	.items = (sizeof(lower_roman_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 3999 },
+	"lower-roman",
+	calc_roman_system,
+	&lcs_decimal,
+	lower_roman_symbols,
+	roman_weights,
+	(sizeof(lower_roman_symbols) / SYMBOL_SIZE),
+	{ 1, 3999 }
 };
 
 static const symbol_t disc_symbols[] = { "\xE2\x80\xA2"}; /* 2022 BULLET */
 static const struct list_counter_style lcs_disc = {
-	.name = "disc",
-	.system = calc_cyclic_system,
-	.symbols = disc_symbols,
-	.items = (sizeof(disc_symbols) / SYMBOL_SIZE),
-	.suffix = " ",
+	"disc",
+	calc_cyclic_system,
+	NULL,
+	disc_symbols,
+	NULL,
+	(sizeof(disc_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	" "
 };
 
 static const symbol_t circle_symbols[] = { "\342\227\213"}; /* 25CB WHITE CIRCLE */
 static const struct list_counter_style lcs_circle = {
-	.name = "circle",
-	.system = calc_cyclic_system,
-	.symbols = circle_symbols,
-	.items = (sizeof(circle_symbols) / SYMBOL_SIZE),
-	.suffix = " ",
+	"circle",
+	calc_cyclic_system,
+	NULL,
+	circle_symbols,
+	NULL,
+	(sizeof(circle_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	" "
 };
 
 static const symbol_t square_symbols[] = { "\342\226\252"}; /* 25AA BLACK SMALL SQUARE */
 static const struct list_counter_style lcs_square = {
-	.name = "square",
-	.system = calc_cyclic_system,
-	.symbols = square_symbols,
-	.items = (sizeof(square_symbols) / SYMBOL_SIZE),
-	.suffix = " ",
+	"square",
+	calc_cyclic_system,
+	NULL,
+	square_symbols,
+	NULL,
+	(sizeof(square_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	" "
 };
 
 static const symbol_t binary_symbols[] = { "0", "1" };
 static const struct list_counter_style lcs_binary = {
-	.name = "binary",
-	.system = calc_numeric_system,
-	.symbols = binary_symbols,
-	.items = (sizeof(binary_symbols) / SYMBOL_SIZE),
+	"binary",
+	calc_numeric_system,
+	NULL,
+	binary_symbols,
+	NULL,
+	(sizeof(binary_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t octal_symbols[] = {
 	"0", "1", "2", "3", "4", "5", "6", "7"
 };
 static const struct list_counter_style lcs_octal = {
-	.name = "octal",
-	.system = calc_numeric_system,
-	.symbols = octal_symbols,
-	.items = (sizeof(octal_symbols) / SYMBOL_SIZE),
+	"octal",
+	calc_numeric_system,
+	NULL,
+	octal_symbols,
+	NULL,
+	(sizeof(octal_symbols) / SYMBOL_SIZE)
 };
 
 
@@ -684,10 +714,12 @@ static const symbol_t lower_hexadecimal_symbols[] = {
 	"a", "b", "c", "d", "e", "f"
 };
 static const struct list_counter_style lcs_lower_hexadecimal = {
-	.name = "lower-hexadecimal",
-	.system = calc_numeric_system,
-	.symbols = lower_hexadecimal_symbols,
-	.items = (sizeof(lower_hexadecimal_symbols) / SYMBOL_SIZE),
+	"lower-hexadecimal",
+	calc_numeric_system,
+	NULL,
+	lower_hexadecimal_symbols,
+	NULL,
+	(sizeof(lower_hexadecimal_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t upper_hexadecimal_symbols[] = {
@@ -695,81 +727,101 @@ static const symbol_t upper_hexadecimal_symbols[] = {
 	"a", "b", "c", "d", "e", "f"
 };
 static const struct list_counter_style lcs_upper_hexadecimal = {
-	.name = "upper-hexadecimal",
-	.system = calc_numeric_system,
-	.symbols = upper_hexadecimal_symbols,
-	.items = (sizeof(upper_hexadecimal_symbols) / SYMBOL_SIZE),
+	"upper-hexadecimal",
+	calc_numeric_system,
+	NULL,
+	upper_hexadecimal_symbols,
+	NULL,
+	(sizeof(upper_hexadecimal_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t arabic_indic_symbols[] = {
 	"\xd9\xa0", "\xd9\xa1", "\xd9\xa2", "\xd9\xa3", "\xd9\xa4", "\xd9\xa5", "\xd9\xa6", "\xd9\xa7", "\xd9\xa8", "\xd9\xa9"
 };
 static const struct list_counter_style lcs_arabic_indic = {
-	.name = "arabic-indic",
-	.system = calc_numeric_system,
-	.symbols = arabic_indic_symbols,
-	.items = (sizeof(arabic_indic_symbols) / SYMBOL_SIZE),
+	"arabic-indic",
+	calc_numeric_system,
+	NULL,
+	arabic_indic_symbols,
+	NULL,
+	(sizeof(arabic_indic_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t bengali_symbols[] = {
 	"০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"
 };
 static const struct list_counter_style lcs_bengali = {
-	.name = "bengali",
-	.system = calc_numeric_system,
-	.symbols = bengali_symbols,
-	.items = (sizeof(bengali_symbols) / SYMBOL_SIZE),
+	"bengali",
+	calc_numeric_system,
+	NULL,
+	bengali_symbols,
+	NULL,
+	(sizeof(bengali_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t cambodian_symbols[] = {
 	"០", "១", "២", "៣", "៤", "៥", "៦", "៧", "៨", "៩"
 };
 static const struct list_counter_style lcs_cambodian = {
-	.name = "cambodian",
-	.system = calc_numeric_system,
-	.symbols = cambodian_symbols,
-	.items = (sizeof(cambodian_symbols) / SYMBOL_SIZE),
+	"cambodian",
+	calc_numeric_system,
+	NULL,
+	cambodian_symbols,
+	NULL,
+	(sizeof(cambodian_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t cjk_decimal_symbols[] = {
 	"〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"
 };
 static const struct list_counter_style lcs_cjk_decimal = {
-	.name = "cjk-decimal",
-	.system = calc_numeric_system,
-	.symbols = cjk_decimal_symbols,
-	.suffix = "、",
-	.items = (sizeof(cjk_decimal_symbols) / SYMBOL_SIZE),
+	"cjk-decimal",
+	calc_numeric_system,
+	NULL,
+	cjk_decimal_symbols,
+	NULL,
+	(sizeof(cjk_decimal_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t devanagari_symbols[] = {
 	"०", "१", "२", "३", "४", "५", "६", "७", "८", "९"
 };
 static const struct list_counter_style lcs_devanagari = {
-	.name = "devanagari",
-	.system = calc_numeric_system,
-	.symbols = devanagari_symbols,
-	.items = (sizeof(devanagari_symbols) / SYMBOL_SIZE),
+	"devanagari",
+	calc_numeric_system,
+	NULL,
+	devanagari_symbols,
+	NULL,
+	(sizeof(devanagari_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t gujarati_symbols[] = {
 	"૦", "૧", "૨", "૩", "૪", "૫", "૬", "૭", "૮", "૯"
 };
 static const struct list_counter_style lcs_gujarati = {
-	.name = "gujarati",
-	.system = calc_numeric_system,
-	.symbols = gujarati_symbols,
-	.items = (sizeof(gujarati_symbols) / SYMBOL_SIZE),
+	"gujarati",
+	calc_numeric_system,
+	NULL,
+	gujarati_symbols,
+	NULL,
+	(sizeof(gujarati_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t gurmukhi_symbols[] = {
 	"੦", "੧", "੨", "੩", "੪", "੫", "੬", "੭", "੮", "੯"
 };
 static const struct list_counter_style lcs_gurmukhi = {
-	.name = "gurmukhi",
-	.system = calc_numeric_system,
-	.symbols = gurmukhi_symbols,
-	.items = (sizeof(gurmukhi_symbols) / SYMBOL_SIZE),
+	"gurmukhi",
+	calc_numeric_system,
+	NULL,
+	gurmukhi_symbols,
+	NULL,
+	(sizeof(gurmukhi_symbols) / SYMBOL_SIZE)
 };
 
 static const int hebrew_weights[] = {
@@ -787,195 +839,247 @@ static const symbol_t hebrew_symbols[] = {
 	"\xD7\x98", "\xD7\x97", "\xD7\x96", "\xD7\x95", "\xD7\x94", "\xD7\x93", "\xD7\x92", "\xD7\x91", "\xD7\x90"
 };
 static const struct list_counter_style lcs_hebrew = {
-	.name = "hebrew",
-	.system = calc_additive_system,
-	.fallback = &lcs_decimal,
-	.symbols = hebrew_symbols,
-	.weights = hebrew_weights,
-	.items = (sizeof(hebrew_symbols) / SYMBOL_SIZE),
-	.range = { .start = 1, .end = 10999 },
+	"hebrew",
+	calc_additive_system,
+	&lcs_decimal,
+	hebrew_symbols,
+	hebrew_weights,
+	(sizeof(hebrew_symbols) / SYMBOL_SIZE),
+	{ 1, 10999 }
 };
 
 static const symbol_t kannada_symbols[] = {
 	"\xE0\xB3\xA6", "\xE0\xB3\xA7", "\xE0\xB3\xA8", "\xE0\xB3\xA9", "\xE0\xB3\xAA", "\xE0\xB3\xAB", "\xE0\xB3\xAC", "\xE0\xB3\xAD", "\xE0\xB3\xAE", "\xE0\xB3\xAF"
 };
 static const struct list_counter_style lcs_kannada = {
-	.name = "kannada",
-	.system = calc_numeric_system,
-	.symbols = kannada_symbols,
-	.items = (sizeof(kannada_symbols) / SYMBOL_SIZE),
+	"kannada",
+	calc_numeric_system,
+	NULL,
+	kannada_symbols,
+	NULL,
+	(sizeof(kannada_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t lao_symbols[] = {
 	"໐", "໑", "໒", "໓", "໔", "໕", "໖", "໗", "໘", "໙"
 };
 static const struct list_counter_style lcs_lao = {
-	.name = "lao",
-	.system = calc_numeric_system,
-	.symbols = lao_symbols,
-	.items = (sizeof(lao_symbols) / SYMBOL_SIZE),
+	"lao",
+	calc_numeric_system,
+	NULL,
+	lao_symbols,
+	NULL,
+	(sizeof(lao_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t malayalam_symbols[] = {
 	"൦", "൧", "൨", "൩", "൪", "൫", "൬", "൭", "൮", "൯"
 };
 static const struct list_counter_style lcs_malayalam = {
-	.name = "malayalam",
-	.system = calc_numeric_system,
-	.symbols = malayalam_symbols,
-	.items = (sizeof(malayalam_symbols) / SYMBOL_SIZE),
+	"malayalam",
+	calc_numeric_system,
+	NULL,
+	malayalam_symbols,
+	NULL,
+	(sizeof(malayalam_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t mongolian_symbols[] = {
 	"᠐", "᠑", "᠒", "᠓", "᠔", "᠕", "᠖", "᠗", "᠘", "᠙"
 };
 static const struct list_counter_style lcs_mongolian = {
-	.name = "mongolian",
-	.system = calc_numeric_system,
-	.symbols = mongolian_symbols,
-	.items = (sizeof(mongolian_symbols) / SYMBOL_SIZE),
+	"mongolian",
+	calc_numeric_system,
+	NULL,
+	mongolian_symbols,
+	NULL,
+	(sizeof(mongolian_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t myanmar_symbols[] = {
 	"၀", "၁", "၂", "၃", "၄", "၅", "၆", "၇", "၈", "၉"
 };
 static const struct list_counter_style lcs_myanmar = {
-	.name = "myanmar",
-	.system = calc_numeric_system,
-	.symbols = myanmar_symbols,
-	.items = (sizeof(myanmar_symbols) / SYMBOL_SIZE),
+	"myanmar",
+	calc_numeric_system,
+	NULL,
+	myanmar_symbols,
+	NULL,
+	(sizeof(myanmar_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t oriya_symbols[] = {
 	"୦", "୧", "୨", "୩", "୪", "୫", "୬", "୭", "୮", "୯"
 };
 static const struct list_counter_style lcs_oriya = {
-	.name = "oriya",
-	.system = calc_numeric_system,
-	.symbols = oriya_symbols,
-	.items = (sizeof(oriya_symbols) / SYMBOL_SIZE),
+	"oriya",
+	calc_numeric_system,
+	NULL,
+	oriya_symbols,
+	NULL,
+	(sizeof(oriya_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t persian_symbols[] = {
 	"۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"
 };
 static const struct list_counter_style lcs_persian = {
-	.name = "persian",
-	.system = calc_numeric_system,
-	.symbols = persian_symbols,
-	.items = (sizeof(persian_symbols) / SYMBOL_SIZE),
+	"persian",
+	calc_numeric_system,
+	NULL,
+	persian_symbols,
+	NULL,
+	(sizeof(persian_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t tamil_symbols[] = {
 	"௦", "௧", "௨", "௩", "௪", "௫", "௬", "௭", "௮", "௯"
 };
 static const struct list_counter_style lcs_tamil = {
-	.name = "tamil",
-	.system = calc_numeric_system,
-	.symbols = tamil_symbols,
-	.items = (sizeof(tamil_symbols) / SYMBOL_SIZE),
+	"tamil",
+	calc_numeric_system,
+	NULL,
+	tamil_symbols,
+	NULL,
+	(sizeof(tamil_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t telugu_symbols[] = {
 	"౦", "౧", "౨", "౩", "౪", "౫", "౬", "౭", "౮", "౯"
 };
 static const struct list_counter_style lcs_telugu = {
-	.name = "telugu",
-	.system = calc_numeric_system,
-	.symbols = telugu_symbols,
-	.items = (sizeof(telugu_symbols) / SYMBOL_SIZE),
+	"telugu",
+	calc_numeric_system,
+	NULL,
+	telugu_symbols,
+	NULL,
+	(sizeof(telugu_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t thai_symbols[] = {
 	"๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"
 };
 static const struct list_counter_style lcs_thai = {
-	.name = "thai",
-	.system = calc_numeric_system,
-	.symbols = thai_symbols,
-	.items = (sizeof(thai_symbols) / SYMBOL_SIZE),
+	"thai",
+	calc_numeric_system,
+	NULL,
+	thai_symbols,
+	NULL,
+	(sizeof(thai_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t tibetan_symbols[] = {
 	"༠", "༡", "༢", "༣", "༤", "༥", "༦", "༧", "༨", "༩"
 };
 static const struct list_counter_style lcs_tibetan = {
-	.name = "tibetan",
-	.system = calc_numeric_system,
-	.symbols = tibetan_symbols,
-	.items = (sizeof(tibetan_symbols) / SYMBOL_SIZE),
+	"tibetan",
+	calc_numeric_system,
+	NULL,
+	tibetan_symbols,
+	NULL,
+	(sizeof(tibetan_symbols) / SYMBOL_SIZE)
 };
 
 static const symbol_t cjk_earthly_branch_symbols[] = {
 	"子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"
 };
 static struct list_counter_style lcs_cjk_earthly_branch = {
-	.name = "cjk-earthly-branch",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = cjk_earthly_branch_symbols,
-	.items = (sizeof(cjk_earthly_branch_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"cjk-earthly-branch",
+	calc_alphabet_system,
+	&lcs_decimal,
+	cjk_earthly_branch_symbols,
+	NULL,
+	(sizeof(cjk_earthly_branch_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t cjk_heavenly_stem_symbols[] = {
 	"甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"
 };
 static struct list_counter_style lcs_cjk_heavenly_stem = {
-	.name = "cjk-heavenly-stem",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = cjk_heavenly_stem_symbols,
-	.items = (sizeof(cjk_heavenly_stem_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"cjk-heavenly-stem",
+	calc_alphabet_system,
+	&lcs_decimal,
+	cjk_heavenly_stem_symbols,
+	NULL,
+	(sizeof(cjk_heavenly_stem_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t hiragana_symbols[] = {
 	"あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ", "さ", "し", "す", "せ", "そ", "た", "ち", "つ", "て", "と", "な", "に", "ぬ", "ね", "の", "は", "ひ", "ふ", "へ", "ほ", "ま", "み", "む", "め", "も", "や", "ゆ", "よ", "ら", "り", "る", "れ", "ろ", "わ", "ゐ", "ゑ", "を", "ん"
 };
 static struct list_counter_style lcs_hiragana = {
-	.name = "hiragana",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = hiragana_symbols,
-	.items = (sizeof(hiragana_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"hiragana",
+	calc_alphabet_system,
+	&lcs_decimal,
+	hiragana_symbols,
+	NULL,
+	(sizeof(hiragana_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t hiragana_iroha_symbols[] = {
 	"い", "ろ", "は", "に", "ほ", "へ", "と", "ち", "り", "ぬ", "る", "を", "わ", "か", "よ", "た", "れ", "そ", "つ", "ね", "な", "ら", "む", "う", "ゐ", "の", "お", "く", "や", "ま", "け", "ふ", "こ", "え", "て", "あ", "さ", "き", "ゆ", "め", "み", "し", "ゑ", "ひ", "も", "せ", "す"
 };
 static struct list_counter_style lcs_hiragana_iroha = {
-	.name = "hiragana-iroha",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = hiragana_iroha_symbols,
-	.items = (sizeof(hiragana_iroha_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"hiragana-iroha",
+	calc_alphabet_system,
+	&lcs_decimal,
+	hiragana_iroha_symbols,
+	NULL,
+	(sizeof(hiragana_iroha_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t katakana_symbols[] = {
 	"ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ", "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト", "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ", "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ", "ル", "レ", "ロ", "ワ", "ヰ", "ヱ", "ヲ", "ン"
 };
 static struct list_counter_style lcs_katakana = {
-	.name = "katakana",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = katakana_symbols,
-	.items = (sizeof(katakana_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"katakana",
+	calc_alphabet_system,
+	&lcs_decimal,
+	katakana_symbols,
+	NULL,
+	(sizeof(katakana_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 static const symbol_t katakana_iroha_symbols[] = {
 	"イ", "ロ", "ハ", "ニ", "ホ", "ヘ", "ト", "チ", "リ", "ヌ", "ル", "ヲ", "ワ", "カ", "ヨ", "タ", "レ", "ソ", "ツ", "ネ", "ナ", "ラ", "ム", "ウ", "ヰ", "ノ", "オ", "ク", "ヤ", "マ", "ケ", "フ", "コ", "エ", "テ", "ア", "サ", "キ", "ユ", "メ", "ミ", "シ", "ヱ", "ヒ", "モ", "セ", "ス"
 };
 static struct list_counter_style lcs_katakana_iroha = {
-	.name = "katakana-iroha",
-	.system = calc_alphabet_system,
-	.fallback = &lcs_decimal,
-	.symbols = katakana_iroha_symbols,
-	.items = (sizeof(katakana_iroha_symbols) / SYMBOL_SIZE),
-	.suffix = "、",
+	"katakana-iroha",
+	calc_alphabet_system,
+	&lcs_decimal,
+	katakana_iroha_symbols,
+	NULL,
+	(sizeof(katakana_iroha_symbols) / SYMBOL_SIZE),
+	{ 0, 0 },
+	{ 0, "\0" },
+	{ NULL, NULL },
+	NULL,
+	"、"
 };
 
 /**
@@ -994,15 +1098,17 @@ static const symbol_t japanese_informal_symbols[] = {
 	"九", "八", "七", "六", "五", "四", "三", "二", "一", "〇",
 };
 static const struct list_counter_style lcs_japanese_informal = {
-	.name = "japanese-informal",
-	.system = calc_additive_system,
-	.fallback = &lcs_cjk_decimal,
-	.symbols = japanese_informal_symbols,
-	.weights = complex_counter_weights,
-	.items = (sizeof(japanese_informal_symbols) / SYMBOL_SIZE),
-	.range = { .start = -9999, .end = 9999 },
-	.negative = { .pre = "マイナス" },
-	.suffix = "\xE3\x80\x81",
+	"japanese-informal",
+	calc_additive_system,
+	&lcs_cjk_decimal,
+	japanese_informal_symbols,
+	complex_counter_weights,
+	(sizeof(japanese_informal_symbols) / SYMBOL_SIZE),
+	{ -9999, 9999 },
+	{ 0, "\0" },
+	{ "マイナス", NULL },
+	NULL,
+	"\xE3\x80\x81"
 };
 
 static const symbol_t japanese_formal_symbols[] = {
@@ -1012,15 +1118,17 @@ static const symbol_t japanese_formal_symbols[] = {
 	"九", "八", "七", "六", "伍", "四", "参", "弐", "壱", "零",
 };
 static const struct list_counter_style lcs_japanese_formal = {
-	.name = "japanese-formal",
-	.system = calc_additive_system,
-	.fallback = &lcs_cjk_decimal,
-	.symbols = japanese_formal_symbols,
-	.weights = complex_counter_weights,
-	.items = (sizeof(japanese_formal_symbols) / SYMBOL_SIZE),
-	.range = { .start = -9999, .end = 9999 },
-	.negative = { .pre = "マイナス" },
-	.suffix = "\xE3\x80\x81",
+	"japanese-formal",
+	calc_additive_system,
+	&lcs_cjk_decimal,
+	japanese_formal_symbols,
+	complex_counter_weights,
+	(sizeof(japanese_formal_symbols) / SYMBOL_SIZE),
+	{ -9999, 9999 },
+	{ 0, "\0" },
+	{ "マイナス", NULL },
+	NULL,
+	"\xE3\x80\x81"
 };
 
 static const symbol_t korean_hangul_formal_symbols[] = {
@@ -1030,15 +1138,17 @@ static const symbol_t korean_hangul_formal_symbols[] = {
 	"구", "팔", "칠", "육", "오", "사", "삼", "이", "일", "영"
 };
 static const struct list_counter_style lcs_korean_hangul_formal = {
-	.name = "korean-hangul-formal",
-	.system = calc_additive_system,
-	.fallback = &lcs_cjk_decimal,
-	.symbols = korean_hangul_formal_symbols,
-	.weights = complex_counter_weights,
-	.items = (sizeof(korean_hangul_formal_symbols) / SYMBOL_SIZE),
-	.range = { .start = -9999, .end = 9999 },
-	.negative = { .pre = "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 " },
-	.suffix = ", ",
+	"korean-hangul-formal",
+	calc_additive_system,
+	&lcs_cjk_decimal,
+	korean_hangul_formal_symbols,
+	complex_counter_weights,
+	(sizeof(korean_hangul_formal_symbols) / SYMBOL_SIZE),
+	{ -9999, 9999 },
+	{ 0, "\0" },
+	{ "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 ", NULL },
+	NULL,
+	", "
 };
 
 static const symbol_t korean_hanja_informal_symbols[] = {
@@ -1048,15 +1158,17 @@ static const symbol_t korean_hanja_informal_symbols[] = {
 	"九", "八", "七", "六", "五", "四", "三", "二", "一", "零"
 };
 static const struct list_counter_style lcs_korean_hanja_informal = {
-	.name = "korean-hanja-informal",
-	.system = calc_additive_system,
-	.fallback = &lcs_cjk_decimal,
-	.symbols = korean_hanja_informal_symbols,
-	.weights = complex_counter_weights,
-	.items = (sizeof(korean_hanja_informal_symbols) / SYMBOL_SIZE),
-	.range = { .start = -9999, .end = 9999 },
-	.negative = { .pre = "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 " },
-	.suffix = ", ",
+	"korean-hanja-informal",
+	calc_additive_system,
+	&lcs_cjk_decimal,
+	korean_hanja_informal_symbols,
+	complex_counter_weights,
+	(sizeof(korean_hanja_informal_symbols) / SYMBOL_SIZE),
+	{ -9999, 9999 },
+	{ 0, "\0" },
+	{ "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 ", NULL },
+	NULL,
+	", "
 };
 
 static const symbol_t korean_hanja_formal_symbols[] = {
@@ -1066,15 +1178,17 @@ static const symbol_t korean_hanja_formal_symbols[] = {
 	"九", "八", "七", "六", "五", "四", "參", "貳", "壹", "零"
 };
 static const struct list_counter_style lcs_korean_hanja_formal = {
-	.name = "korean-hanja-formal",
-	.system = calc_additive_system,
-	.fallback = &lcs_cjk_decimal,
-	.symbols = korean_hanja_formal_symbols,
-	.weights = complex_counter_weights,
-	.items = (sizeof(korean_hanja_formal_symbols) / SYMBOL_SIZE),
-	.range = { .start = -9999, .end = 9999 },
-	.negative = { .pre = "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 " },
-	.suffix = ", ",
+	"korean-hanja-formal",
+	calc_additive_system,
+	&lcs_cjk_decimal,
+	korean_hanja_formal_symbols,
+	complex_counter_weights,
+	(sizeof(korean_hanja_formal_symbols) / SYMBOL_SIZE),
+	{ -9999, 9999 },
+	{ 0, "\0" },
+	{ "\xEB\xA7\x88\xEC\x9D\xB4\xEB\x84\x88\xEC\x8A\xA4 ", NULL },
+	NULL,
+	", "
 };
 
 
@@ -1199,12 +1313,11 @@ css_error css_computed_format_list_style(
 	css_error res = CSS_INVALID;
 	const struct list_counter_style *cstyle;
 	uint8_t aval[20];
-	struct numeric nval = {
-		.val = aval,
-		.len = sizeof(aval),
-		.used = 0,
-		.negative = false
-	};
+	struct numeric nval;
+	nval.val = aval;
+	nval.len = sizeof(aval);
+	nval.used = 0;
+	nval.negative = false;
 
 
 	cstyle = counter_style_from_computed_style(style);

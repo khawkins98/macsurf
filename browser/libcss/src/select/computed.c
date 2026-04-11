@@ -262,13 +262,14 @@ css_error css__computed_style_clone(
 		return error;
 	}
 
-	for (size_t i = 0; i < CSS_N_PROPERTIES; i++) {
+	{ size_t i;
+	for (i = 0; i < CSS_N_PROPERTIES; i++) {
 		error = prop_dispatch[i].copy(orig, clone);
 		if (error != CSS_OK) {
 			css_computed_style_destroy(clone);
 			return error;
 		}
-	}
+	} }
 
 	*clone_out = clone;
 	return CSS_OK;
@@ -707,7 +708,8 @@ uint8_t css_computed_width_px(
 {
 	enum css_width_e type;
 	css_unit unit = CSS_UNIT_PX;
-	css_fixed_or_calc value = {.value = 0};
+	css_fixed_or_calc value;
+	value.value = 0;
 
 	type = get_width(style, &value, &unit);
 	switch (type) {
@@ -753,7 +755,8 @@ uint8_t css_computed_width_px(
 uint8_t css_computed_width(const css_computed_style *style,
 		css_fixed *length, css_unit *unit)
 {
-	css_fixed_or_calc length_ = {.value = 0};
+	css_fixed_or_calc length_;
+	length_.value = 0;
 	uint8_t ret = get_width(style, &length_, unit);
 	if (ret == CSS_WIDTH_SET) {
 		if (*unit == CSS_UNIT_CALC) {

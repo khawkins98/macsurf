@@ -42,9 +42,10 @@ static void css__mq_cond_or_feature_destroy(
 static void css__mq_cond_destroy(css_mq_cond *cond)
 {
 	if (cond != NULL) {
-		for (uint32_t i = 0; i < cond->nparts; i++) {
+		{ uint32_t i;
+		for (i = 0; i < cond->nparts; i++) {
 			css__mq_cond_or_feature_destroy(cond->parts[i]);
-		}
+		} }
 		free(cond->parts);
 		free(cond);
 	}
@@ -683,9 +684,9 @@ static css_error mq_parse_media_in_parens(lwc_string **strings,
 	/* <media-in-parens> = ( <media-condition> ) | <media-feature> | <general-enclosed>
 	 */
 
-	//LPAREN -> condition-or-feature
-	//	  "not" or LPAREN -> condition
-	//	  IDENT | NUMBER | DIMENSION | RATIO -> feature
+	/* LPAREN -> condition-or-feature */
+	/* "not" or LPAREN -> condition */
+	/* IDENT | NUMBER | DIMENSION | RATIO -> feature */
 
 	token = parserutils_vector_iterate(vector, ctx);
 	if (token == NULL || tokenIsChar(token, '(') == false) {
@@ -972,8 +973,8 @@ static css_error mq_parse_media_query(lwc_string **strings,
 	 * <media-type> = <ident> (except "not", "and", "or", "only")
 	 */
 
-	// LPAREN -> media-condition
-	//    not LPAREN -> media-condition
+	/* LPAREN -> media-condition */
+	/* not LPAREN -> media-condition */
 
 	consumeWhitespace(vector, ctx);
 
@@ -1196,18 +1197,16 @@ css_error css_parse_media_query(lwc_string **strings,
 {
 	css_error err;
 	css_parser *parser;
-	css_mq_parse_ctx ctx = {
-		.strings = strings,
-	};
-	css_parser_optparams params_quirks = {
-		.quirks = false,
-	};
-	css_parser_optparams params_handler = {
-		.event_handler = {
-			.handler = css_parse_media_query_handle_event,
-			.pw = &ctx,
-		},
-	};
+	css_mq_parse_ctx ctx;
+	css_parser_optparams params_quirks;
+	css_parser_optparams params_handler;
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.strings = strings;
+	memset(&params_quirks, 0, sizeof(params_quirks));
+	params_quirks.quirks = false;
+	memset(&params_handler, 0, sizeof(params_handler));
+	params_handler.event_handler.handler = css_parse_media_query_handle_event;
+	params_handler.event_handler.pw = &ctx;
 
 	if (mq == NULL || len == 0) {
 		return CSS_BADPARM;

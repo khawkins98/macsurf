@@ -175,7 +175,8 @@ static inline bool mq_match_condition(
 {
 	bool matched = !cond->op;
 
-	for (uint32_t i = 0; i < cond->nparts; i++) {
+	{ uint32_t i;
+	for (i = 0; i < cond->nparts; i++) {
 		bool part_matched;
 		if (cond->parts[i]->type == CSS_MQ_FEATURE) {
 			part_matched = mq_match_feature(
@@ -201,7 +202,7 @@ static inline bool mq_match_condition(
 				break; /* Short-circuit */
 			}
 		}
-	}
+	} }
 
 	return matched != cond->negate;
 }

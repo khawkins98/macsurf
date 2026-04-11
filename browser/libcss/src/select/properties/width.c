@@ -23,22 +23,28 @@ css_error css__cascade_width(uint32_t opv, css_style *style,
 css_error css__set_width_from_hint(const css_hint *hint,
 		css_computed_style *style)
 {
+	css_fixed_or_calc _v;
+	_v.value = hint->data.length.value;
 	return set_width(style, hint->status,
-			(css_fixed_or_calc)(hint->data.length.value), hint->data.length.unit);
+			_v, hint->data.length.unit);
 }
 
 css_error css__initial_width(css_select_state *state)
 {
-	return set_width(state->computed, CSS_WIDTH_AUTO, (css_fixed_or_calc)0, CSS_UNIT_PX);
+	css_fixed_or_calc _v;
+	_v.value = 0;
+	return set_width(state->computed, CSS_WIDTH_AUTO, _v, CSS_UNIT_PX);
 }
 
 css_error css__copy_width(
 		const css_computed_style *from,
 		css_computed_style *to)
 {
-	css_fixed_or_calc length = (css_fixed_or_calc)0;
+	css_fixed_or_calc length;
 	css_unit unit = CSS_UNIT_PX;
-	uint8_t type = get_width(from, &length, &unit);
+	uint8_t type;
+	length.value = 0;
+	type = get_width(from, &length, &unit);
 
 	if (from == to) {
 		return CSS_OK;
@@ -51,9 +57,11 @@ css_error css__compose_width(const css_computed_style *parent,
 		const css_computed_style *child,
 		css_computed_style *result)
 {
-	css_fixed_or_calc length = (css_fixed_or_calc)0;
+	css_fixed_or_calc length;
 	css_unit unit = CSS_UNIT_PX;
-	uint8_t type = get_width(child, &length, &unit);
+	uint8_t type;
+	length.value = 0;
+	type = get_width(child, &length, &unit);
 
 	return css__copy_width(
 			type == CSS_WIDTH_INHERIT ? parent : child,

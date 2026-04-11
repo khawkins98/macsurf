@@ -167,7 +167,7 @@ css_error css__cascade_border_width(uint32_t opv, css_style *style,
 			break;
 		case BORDER_WIDTH_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
@@ -208,7 +208,7 @@ css_error css__cascade_length_auto(uint32_t opv, css_style *style,
 			break;
 		case BOTTOM_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
@@ -232,9 +232,10 @@ css_error css__cascade_length_auto_calc(uint32_t opv, css_style *style,
 				css_unit))
 {
 	uint16_t value = CSS_BOTTOM_INHERIT;
-	css_fixed_or_calc length = (css_fixed_or_calc)0;
+	css_fixed_or_calc length;
 	uint32_t unit = CSS_UNIT_PX;
 	uint32_t snum = 0;
+	length.value = 0;
 
 	if (hasFlagValue(opv) == false) {
 		switch (getValue(opv)) {
@@ -250,7 +251,7 @@ css_error css__cascade_length_auto_calc(uint32_t opv, css_style *style,
 			break;
 		case BOTTOM_CALC:
 			value = CSS_BOTTOM_SET;
-			advance_bytecode(style, sizeof(unit)); // TODO: Skip unit, not sure what to do
+			advance_bytecode(style, sizeof(unit)); /* TODO: Skip unit, not sure what to do */
 			snum = *((uint32_t *) style->bytecode);
 			advance_bytecode(style, sizeof(snum));
 			unit = CSS_UNIT_CALC;
@@ -293,7 +294,7 @@ css_error css__cascade_length_normal(uint32_t opv, css_style *style,
 			break;
 		case LETTER_SPACING_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
@@ -334,7 +335,7 @@ css_error css__cascade_length_none(uint32_t opv, css_style *style,
 			break;
 		case MAX_HEIGHT_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
@@ -372,7 +373,7 @@ css_error css__cascade_length(uint32_t opv, css_style *style,
 			break;
 		case MIN_HEIGHT_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
@@ -409,7 +410,7 @@ css_error css__cascade_number(uint32_t opv, css_style *style,
 			break;
 		case ORPHANS_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");

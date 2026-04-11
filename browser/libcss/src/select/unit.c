@@ -372,10 +372,9 @@ static inline css_hint_length css_unit__get_font_size(
 		const css_computed_style *style,
 		css_fixed font_size_default)
 {
-	css_hint_length size = {
-		.value = font_size_default,
-		.unit = CSS_UNIT_PX,
-	};
+	css_hint_length size;
+	size.value = font_size_default;
+	size.unit = CSS_UNIT_PX;
 
 	if (style != NULL) {
 		enum css_font_size_e status = get_font_size(style,
@@ -401,10 +400,9 @@ css_error css_unit_compute_absolute_font_size(
 		css_fixed font_size_default,
 		css_hint *size)
 {
-	css_hint_length ref_len = {
-		.value = font_size_default,
-		.unit = CSS_UNIT_PX,
-	};
+	css_hint_length ref_len;
+	ref_len.value = font_size_default;
+	ref_len.unit = CSS_UNIT_PX;
 
 	if (ref_length != NULL) {
 		/* Must be absolute. */
