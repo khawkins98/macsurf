@@ -230,6 +230,7 @@ static hubbub_error create_element(void *parser, const hubbub_tag *tag,
 	}
 
 	/* Now do some special per-element-type handling */
+	{
 	dom_html_element_type tag_type;
 	err = dom_html_element_get_tag_type(element, &tag_type);
 	if (err != DOM_NO_ERR) {
@@ -262,6 +263,7 @@ static hubbub_error create_element(void *parser, const hubbub_tag *tag,
 		/* Nothing */
 		break;
 	}
+	} /* end tag_type block (C89: declaration after statement) */
 
 
 	*result = element;

@@ -205,7 +205,19 @@
         <VALUE>{Project}/../../../../libhubbub/src</VALUE>
     </SETTING>
 
-    <!-- 9. Mac OS Universal Headers -->
+    <!-- 9. libdom public headers -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/../../../../libdom/include</VALUE>
+    </SETTING>
+
+    <!-- 10. libdom internal headers (relative #include "core/node.h") -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}/../../../../libdom/src</VALUE>
+    </SETTING>
+
+    <!-- 11. Mac OS Universal Headers -->
     <SETTING>
         <NAME>SystemSearchPath</NAME>
         <VALUE>{Compiler}/MacOS Support/Headers/Universal Headers</VALUE>
@@ -946,6 +958,676 @@
         <FILEFLAGS>compile</FILEFLAGS>
     </FILE>
 
+    <!-- ============================================================== -->
+    <!--  libdom — 95 .c files in tier order                             -->
+    <!-- ============================================================== -->
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/utils/hashtable.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/utils/namespace.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/utils/validate.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/utils/character_valid.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/utils/walk.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/string.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/attr.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/characterdata.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/typeinfo.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/tokenlist.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/node.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/nodelist.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/namednodemap.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/cdatasection.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/comment.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/doc_fragment.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/entity_ref.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/pi.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/text.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/document.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/document_type.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/core/implementation.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/event_listener.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/event_target.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/dispatch.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/custom_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/document_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/keyboard_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/mouse_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/mouse_multi_wheel_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/mouse_wheel_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/mutation_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/mutation_name_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/text_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/events/ui_event.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_collection.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_options_collection.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_document.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_anchor_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_applet_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_area_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_base_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_basefont_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_body_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_br_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_button_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_canvas_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_directory_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_div_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_dlist_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_fieldset_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_font_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_form_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_frame_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_frameset_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_head_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_heading_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_hr_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_html_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_iframe_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_image_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_input_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_isindex_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_label_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_legend_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_li_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_link_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_map_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_menu_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_meta_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_mod_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_object_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_olist_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_opt_group_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_option_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_paragraph_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_param_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_pre_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_quote_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_script_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_select_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_style_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_tablecaption_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_tablecell_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_tablecol_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_table_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_tablerow_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_tablesection_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_text_area_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_title_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/src/html/html_ulist_element.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../../libdom/bindings/hubbub/parser.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+
 </FILELIST>
 
 <!-- ================================================================== -->
@@ -1012,6 +1694,103 @@
     <FILEREF><PATH>../../../../libhubbub/src/treebuilder/after_after_frameset.c</PATH></FILEREF>
     <FILEREF><PATH>../../../../libhubbub/src/treebuilder/treebuilder.c</PATH></FILEREF>
     <FILEREF><PATH>../../../../libhubbub/src/parser.c</PATH></FILEREF>
+
+    <!-- libdom (tier order: utils → core string → core nodes → events → html infrastructure → element files → hubbub binding) -->
+    <FILEREF><PATH>../../../../libdom/src/utils/hashtable.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/utils/namespace.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/utils/validate.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/utils/character_valid.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/utils/walk.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/string.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/attr.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/characterdata.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/typeinfo.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/tokenlist.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/node.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/nodelist.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/namednodemap.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/cdatasection.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/comment.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/doc_fragment.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/entity_ref.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/pi.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/text.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/document.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/document_type.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/core/implementation.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/event_listener.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/event_target.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/dispatch.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/custom_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/document_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/keyboard_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/mouse_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/mouse_multi_wheel_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/mouse_wheel_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/mutation_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/mutation_name_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/text_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/events/ui_event.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_collection.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_options_collection.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_document.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_anchor_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_applet_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_area_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_base_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_basefont_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_body_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_br_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_button_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_canvas_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_directory_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_div_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_dlist_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_fieldset_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_font_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_form_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_frame_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_frameset_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_head_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_heading_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_hr_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_html_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_iframe_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_image_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_input_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_isindex_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_label_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_legend_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_li_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_link_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_map_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_menu_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_meta_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_mod_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_object_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_olist_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_opt_group_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_option_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_paragraph_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_param_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_pre_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_quote_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_script_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_select_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_style_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_tablecaption_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_tablecell_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_tablecol_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_table_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_tablerow_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_tablesection_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_text_area_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_title_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/src/html/html_ulist_element.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../../libdom/bindings/hubbub/parser.c</PATH></FILEREF>
 
     <!-- NetSurf Core Utils -->
     <FILEREF><PATH>../../../utils/utils.c</PATH></FILEREF>
