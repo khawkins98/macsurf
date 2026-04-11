@@ -172,7 +172,17 @@ Combined LOC: ~125K. Stub footprint replaced: 3,688 lines (parserutils utf8.h + 
 - [libdom-port.md](docs/research/libdom-port.md)
 - [libcss-port.md](docs/research/libcss-port.md)
 
-**Next milestone:** wire NetSurf core's `html_init()` / `nscss_init()` to call into the now-real libdom + libhubbub + libcss, hook the OT fetcher into `hlcache_handle_retrieve`, and replace the v0.1 manual HTML strip with the full rendering pipeline.
+**Next milestone — NetSurf core wiring (5 phases).** All five libraries are now ported and C89-clean (443 .c files in MacSurf.mcp), so the remaining work is glue between NetSurf core and the libraries. Full audit and sequencing in [docs/research/netsurf-core-wiring.md](docs/research/netsurf-core-wiring.md). Phases:
+
+1. **HTTP fetcher rewrite** — `macos9_http_fetcher.c` implementing the real `fetcher_operation_table`, replacing the v0.1 standalone OT fetch path. Reuses the OT primitives from `macos9_fetch.c`. Delete `fetch_stub.c`.
+2. **Content handler infrastructure** — add `content/content_factory.c` + ~9 utils/ helpers (corestrings, libdom, talloc, hashtable, idna, etc.) + ~4 desktop/ helpers (selection, scrollbar, textarea, system_colour). Cascading compile errors expected.
+3. **CSS handler** — add 5 files from `content/handlers/css/`, convert designated initializers, delete `frontends/macos9/css/` stubs.
+4. **HTML handler** — add 23 files from `content/handlers/html/`, convert ~9 designated initializers (including the `html_content_handler` vtable with 16+ function pointer fields), 1 for-scope decl in `layout_flex.c`, delete `frontends/macos9/html/` stubs, create `dom/bindings/hubbub/parser.h` wrapper header.
+5. **End-to-end render** — implement `plot_text` / `plot_clip` / `plot_rectangle` in QuickDraw in `plotters.c`, wire `browser_window_create` to drive a real fetch through `hlcache_handle_retrieve`.
+
+**Total scope:** ~44 new .c files in MacSurf.mcp (taking the project to ~487 files), ~800 lines of new frontend code, ~25 designated init conversions, 226 lines of stub deletion. **Image rendering deferred to v0.3** — `image_init()` is fully `#ifdef WITH_*` gated, so without `WITH_BMP`/`WITH_GIF`/etc. it's a no-op and saves 28 files / 5.4K LOC of work this milestone.
+
+**Most likely bottleneck:** the talloc question. NetSurf's `utils/talloc.c` is a Samba-derived hierarchical allocator with POSIX-y patterns; if it doesn't compile under CW8 it needs its own port pass before HTML can land. Documented in §13 open question 3 of the wiring audit.
 
 ### Library port audit checklist
 
