@@ -397,8 +397,8 @@ static void HWB_to_RGB(
 		*g = grey_int;
 		*b = grey_int;
 	} else {
-		css_fixed rf, gf, bf; // 0..25500
-		css_fixed val = FSUB(F_100, FADD(white, black)); // 0..100
+		css_fixed rf, gf, bf; /* 0..25500 */
+		css_fixed val = FSUB(F_100, FADD(white, black)); /* 0..100 */
 
 		HSL_to_RGB_fixed(hue, INTTOFIX(100), INTTOFIX(50),
 				&rf, &gf, &bf);
@@ -433,7 +433,8 @@ static bool parse_rgb(
 	bool legacy = false;
 	bool had_none = false;
 
-	for (int i = 0; i < 4; i++) {
+	{ int i;
+	for (i = 0; i < 4; i++) {
 		uint8_t *component;
 		css_fixed num;
 		size_t consumed = 0;
@@ -531,7 +532,7 @@ static bool parse_rgb(
 			}
 			parserutils_vector_iterate(vector, ctx);
 		}
-	}
+	} }
 
 	*result = ((unsigned)a << 24) | (r << 16) | (g << 8) | b;
 

@@ -284,9 +284,10 @@ css_error css_select_ctx_destroy(css_select_ctx *ctx)
 		css_computed_style_destroy(ctx->default_style);
 
 	if (ctx->sheets != NULL) {
-		for (uint32_t index = 0; index < ctx->n_sheets; index++) {
+		{ uint32_t index;
+		for (index = 0; index < ctx->n_sheets; index++) {
 			css__mq_query_destroy(ctx->sheets[index].media);
-		}
+		} }
 		free(ctx->sheets);
 	}
 
@@ -657,7 +658,8 @@ static css_error css__create_node_bloom(
 
 	/* Add class names to bloom */
 	if (state->classes != NULL) {
-		for (uint32_t i = 0; i < state->n_classes; i++) {
+		{ uint32_t i;
+		for (i = 0; i < state->n_classes; i++) {
 			lwc_string *s = state->classes[i];
 			if (lwc_string_caseless_hash_value(s,
 					&hash) != lwc_error_ok) {
@@ -665,7 +667,7 @@ static css_error css__create_node_bloom(
 				goto cleanup;
 			}
 			css_bloom_add_hash(bloom, hash);
-		}
+		} }
 	}
 
 	/* Merge parent bloom into node bloom */
@@ -856,7 +858,8 @@ static css_error css_select_style__get_sharable_node_data_for_candidate(
 	/* TODO: no need to care about the order, but it's simpler to
 	 *       have an ordered match, and authors are more likely to be
 	 *       consistent than  not. */
-	for (uint32_t i = 0; i < share_candidate_n_classes; i++) {
+	{ uint32_t i;
+	for (i = 0; i < share_candidate_n_classes; i++) {
 		bool match;
 		if (lwc_string_caseless_isequal(
 				state->classes[i],
@@ -869,7 +872,7 @@ static css_error css_select_style__get_sharable_node_data_for_candidate(
 #endif
 			goto cleanup;
 		}
-	}
+	} }
 
 	if (node_data->flags & CSS_NODE_FLAGS_HAS_HINTS) {
 		/* TODO: check hints match.  For now, just prevent sharing */
@@ -884,9 +887,10 @@ static css_error css_select_style__get_sharable_node_data_for_candidate(
 
 cleanup:
 	if (share_candidate_classes != NULL) {
-		for (uint32_t i = 0; i < share_candidate_n_classes; i++) {
+		{ uint32_t i;
+		for (i = 0; i < share_candidate_n_classes; i++) {
 			lwc_string_unref(share_candidate_classes[i]);
-		}
+		} }
 	}
 
 	return CSS_OK;
@@ -1026,9 +1030,10 @@ static void css_select__finalise_selection_state(
 	}
 
 	if (state->classes != NULL) {
-		for (uint32_t i = 0; i < state->n_classes; i++) {
+		{ uint32_t i;
+		for (i = 0; i < state->n_classes; i++) {
 			lwc_string_unref(state->classes[i]);
-		}
+		} }
 	}
 
 	lwc_string_unref(state->id);
@@ -1036,15 +1041,17 @@ static void css_select__finalise_selection_state(
 	lwc_string_unref(state->element.name);
 
 	if (state->revert != NULL) {
-		for (size_t i = 0; i < CSS_ORIGIN_AUTHOR; i++) {
-			for (size_t j = 0; j < CSS_PSEUDO_ELEMENT_COUNT; j++) {
+		{ size_t i;
+		for (i = 0; i < CSS_ORIGIN_AUTHOR; i++) {
+			{ size_t j;
+			for (j = 0; j < CSS_PSEUDO_ELEMENT_COUNT; j++) {
 				if (state->revert[i].style[j] == NULL) {
 					continue;
 				}
 				css_computed_style_destroy(
 						state->revert[i].style[j]);
-			}
-		}
+			} }
+		} }
 		free(state->revert);
 	}
 }

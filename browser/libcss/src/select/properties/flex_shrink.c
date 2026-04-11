@@ -30,7 +30,7 @@ css_error css__cascade_flex_shrink(uint32_t opv, css_style *style,
 			break;
 		case FLEX_SHRINK_CALC:
 			advance_bytecode(style, sizeof(unit));
-			advance_bytecode(style, sizeof(unit)); // TODO
+			advance_bytecode(style, sizeof(unit)); /* TODO */
 			return CSS_OK;
 		default:
 			assert(0 && "Invalid value");
