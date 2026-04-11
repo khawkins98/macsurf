@@ -114,13 +114,14 @@ static inline css_error set_background_image(css_computed_style *style, uint8_t
 		type, lwc_string *string)
 {
 	uint32_t *bits = &style->i.bits[BACKGROUND_IMAGE_INDEX];
-	
+	lwc_string *old_string;
+
 	/* 1bit: t : type */
 	*bits = (*bits & ~BACKGROUND_IMAGE_MASK) | (((uint32_t)type & 0x1) <<
 			BACKGROUND_IMAGE_SHIFT);
-	
-	lwc_string *old_string = style->i.background_image;
-	
+
+	old_string = style->i.background_image;
+
 	if (string != NULL) {
 		style->i.background_image = lwc_string_ref(string);
 	} else {
@@ -911,14 +912,15 @@ static inline css_error set_counter_increment(css_computed_style *style,
 		uint8_t type, css_computed_counter *counter_arr)
 {
 	uint32_t *bits = &style->i.bits[COUNTER_INCREMENT_INDEX];
-	
+	css_computed_counter *old_counter_arr;
+	css_computed_counter *c;
+
 	/* 1bit: t : type */
 	*bits = (*bits & ~COUNTER_INCREMENT_MASK) | (((uint32_t)type & 0x1) <<
 			COUNTER_INCREMENT_SHIFT);
-	
-	css_computed_counter *old_counter_arr = style->counter_increment;
-	css_computed_counter *c;
-	
+
+	old_counter_arr = style->counter_increment;
+
 	for (c = counter_arr; c != NULL && c->name != NULL; c++)
 		c->name = lwc_string_ref(c->name);
 	
@@ -947,14 +949,15 @@ static inline css_error set_counter_reset(css_computed_style *style, uint8_t
 		type, css_computed_counter *counter_arr)
 {
 	uint32_t *bits = &style->i.bits[COUNTER_RESET_INDEX];
-	
+	css_computed_counter *old_counter_arr;
+	css_computed_counter *c;
+
 	/* 1bit: t : type */
 	*bits = (*bits & ~COUNTER_RESET_MASK) | (((uint32_t)type & 0x1) <<
 			COUNTER_RESET_SHIFT);
-	
-	css_computed_counter *old_counter_arr = style->counter_reset;
-	css_computed_counter *c;
-	
+
+	old_counter_arr = style->counter_reset;
+
 	for (c = counter_arr; c != NULL && c->name != NULL; c++)
 		c->name = lwc_string_ref(c->name);
 	
@@ -983,14 +986,15 @@ static inline css_error set_cursor(css_computed_style *style, uint8_t type,
 		lwc_string **string_arr)
 {
 	uint32_t *bits = &style->i.bits[CURSOR_INDEX];
-	
+	lwc_string **old_string_arr;
+	lwc_string **s;
+
 	/* 5bits: ttttt : type */
 	*bits = (*bits & ~CURSOR_MASK) | (((uint32_t)type & 0x1f) <<
 			CURSOR_SHIFT);
-	
-	lwc_string **old_string_arr = style->cursor;
-	lwc_string **s;
-	
+
+	old_string_arr = style->cursor;
+
 	for (s = string_arr; s != NULL && *s != NULL; s++)
 		*s = lwc_string_ref(*s);
 	
@@ -1211,14 +1215,15 @@ static inline css_error set_font_family(css_computed_style *style, uint8_t
 		type, lwc_string **string_arr)
 {
 	uint32_t *bits = &style->i.bits[FONT_FAMILY_INDEX];
-	
+	lwc_string **old_string_arr;
+	lwc_string **s;
+
 	/* 3bits: ttt : type */
 	*bits = (*bits & ~FONT_FAMILY_MASK) | (((uint32_t)type & 0x7) <<
 			FONT_FAMILY_SHIFT);
-	
-	lwc_string **old_string_arr = style->font_family;
-	lwc_string **s;
-	
+
+	old_string_arr = style->font_family;
+
 	for (s = string_arr; s != NULL && *s != NULL; s++)
 		*s = lwc_string_ref(*s);
 	
@@ -1426,13 +1431,14 @@ static inline css_error set_list_style_image(css_computed_style *style, uint8_t
 		type, lwc_string *string)
 {
 	uint32_t *bits = &style->i.bits[LIST_STYLE_IMAGE_INDEX];
-	
+	lwc_string *old_string;
+
 	/* 1bit: t : type */
 	*bits = (*bits & ~LIST_STYLE_IMAGE_MASK) | (((uint32_t)type & 0x1) <<
 			LIST_STYLE_IMAGE_SHIFT);
-	
-	lwc_string *old_string = style->i.list_style_image;
-	
+
+	old_string = style->i.list_style_image;
+
 	if (string != NULL) {
 		style->i.list_style_image = lwc_string_ref(string);
 	} else {
@@ -1979,14 +1985,15 @@ static inline css_error set_quotes(css_computed_style *style, uint8_t type,
 		lwc_string **string_arr)
 {
 	uint32_t *bits = &style->i.bits[QUOTES_INDEX];
-	
+	lwc_string **old_string_arr;
+	lwc_string **s;
+
 	/* 1bit: t : type */
 	*bits = (*bits & ~QUOTES_MASK) | (((uint32_t)type & 0x1) <<
 			QUOTES_SHIFT);
-	
-	lwc_string **old_string_arr = style->quotes;
-	lwc_string **s;
-	
+
+	old_string_arr = style->quotes;
+
 	for (s = string_arr; s != NULL && *s != NULL; s++)
 		*s = lwc_string_ref(*s);
 	
