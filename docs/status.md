@@ -7,9 +7,9 @@
 
 ## 1. What Works Today
 
-MacSurf builds with CodeWarrior 8 on Mac OS 9 and runs on a Power Mac G3/G4. The app:
+MacSurf builds with CodeWarrior 8 on Mac OS 9 and runs on a Power Macintosh G3 Minitower. The app:
 
-- Launches successfully under Carbon on Mac OS 9.2
+- Launches successfully under Carbon on Mac OS 9.1
 - Displays a menu bar (Apple, File, Edit, Go, Help)
 - Opens a 640x480 document window titled "MacSurf" with scroll bars and a URL bar placeholder
 - Runs a cooperative `WaitNextEvent` event loop with proper idle sleep
@@ -187,6 +187,31 @@ This mirrors the RISC OS `riscos_poll()` pattern — the event loop is the sched
 - **No JavaScript.** `WITHOUT_DUKTAPE` is defined globally. All JS stubs return immediately.
 - **No HTTPS.** The browser never makes TLS connections. All HTTPS is handled by the proxy.
 - **64MB minimum RAM.** The target is Power Mac G3/G4 with 64MB+. The 8MB application heap partition should be sufficient for basic browsing.
+
+## Test Environment and Compatibility
+
+**Development and verified-working environment:**
+- Mac OS 9.1
+- Power Macintosh G3 Minitower (beige)
+- CodeWarrior 8 Pro on-machine build
+
+Every milestone in this project — including v0.1.0-first-fetch — has been
+built and exercised on that specific machine. Any claim that MacSurf "runs
+on 9.2" refers to external reference code (Classilla, SSHeven, Retro68 OT
+demo) used as research inputs, not to MacSurf itself.
+
+**Community compatibility target:**
+- Mac OS 9.2.2
+- Power Macintosh G4 (any supported model)
+
+9.2.2 on a G4 is the most common active vintage-Mac-OS-9 configuration
+among people who still use these machines, so it is the primary
+compatibility target for shipping binaries. **9.2.2 compatibility is not
+yet explicitly verified** — it is an open testing gap, tracked here until
+someone builds or runs MacSurf on a G4 / 9.2.2 setup and confirms the
+results. Differences we need to watch for include CarbonLib version
+(CarbonLib 1.0.4 ships with 9.1, 1.6 with 9.2.2), Appearance Manager
+behavior, and any Open Transport version differences between the two.
 - **Big-endian PPC.** All bitmap and network byte order operations must account for PowerPC big-endian architecture.
 
 ---

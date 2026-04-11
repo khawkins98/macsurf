@@ -21,7 +21,9 @@ A single Go binary that strips TLS — receives plain HTTP from the Mac, fetches
 
 ## Key Technical Constraints
 
-- Target: Power Mac G3/G4, Mac OS 9.1-9.2.2, minimum 64MB RAM
+- Development environment: Mac OS 9.1 on a Power Macintosh G3 Minitower (beige). All verified-working results come from this machine.
+- Community compatibility target: Mac OS 9.2.2 on a Power Mac G4. Most-common active OS 9 setup today; not yet explicitly verified — open testing gap.
+- Broader target range: Power Mac G3/G4, Mac OS 9.1-9.2.2, minimum 64MB RAM
 - Compiler: CodeWarrior 8 (on-machine) or cross-compile GCC PPC from Linux
 - No threading — OS 9 is cooperative multitasking, use WaitNextEvent loop
 - No HTTPS in browser — all TLS handled by proxy
@@ -47,7 +49,7 @@ MacSurf is a Carbon CFM app running under CarbonLib on OS 9. For CarbonLib to fu
 
 ## Open Transport Rules
 
-MacSurf uses **plain (non-`InContext`) Open Transport calls**. This is verified against the Retro68 OT TCP demo and SSHeven, both of which run on real OS 9.2 hardware.
+MacSurf uses **plain (non-`InContext`) Open Transport calls**. This is verified against the Retro68 OT TCP demo and SSHeven, both of which run on real OS 9.2 hardware (external references — MacSurf itself develops and verifies on 9.1/G3).
 
 - Use `InitOpenTransport()`, `OTOpenEndpoint()`, `CloseOpenTransport()` — **not** the `*InContext` variants. The InContext variants route through CarbonLib's OTClientLib, which has been the source of every crash we've seen.
 - Use `OTUseSyncIdleEvents(ep, true)` plus a notifier that calls `YieldToAnyThread()` on `kOTSyncIdleEvent`. This is the cooperative-multitasking answer for synchronous OT calls — OT fires `kOTSyncIdleEvent` periodically while blocked, the notifier yields to the Thread Manager, and the app stays responsive without touching `WaitNextEvent` from inside the fetch.
