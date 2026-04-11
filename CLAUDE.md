@@ -141,8 +141,61 @@ System paths:
 ### Linux Cross-Check
 Use `gcc -fsyntax-only -std=c89 -pedantic -Dinline= -Ibrowser/netsurf/frontends/macos9/shims -Ibrowser/netsurf/frontends -Ibrowser/netsurf/include -Ibrowser/netsurf -include stdbool.h` to syntax-check frontend files on Linux before copying to Mac.
 
-### Project File List (27 .c files)
-Added to MacSurf.mcp — 12 frontend `.c` files, 5 shim `.c` files, 10 NetSurf core `.c` files (utils + content + desktop). `MacSurf.rsrc` (pre-compiled binary `'carb'` resource, generated on Linux) must also be in the project — CW8 links `.rsrc` files directly into the output resource fork with no Rez step. The `*_stub.c` files exist on disk but are NOT in the project file list. See [docs/research/architecture-inventory.md](docs/research/architecture-inventory.md) for the full breakdown.
+### Project File List (470 .c files)
+Added to MacSurf.mcp:
+- 12 frontend `.c` files
+- 5 shim `.c` files
+- 10 NetSurf core `.c` files (utils + content + desktop)
+- 15 libparserutils
+- 30 libhubbub
+- 95 libdom
+- 303 libcss
+
+`MacSurf.rsrc` (pre-compiled binary `'carb'` resource, generated on Linux) must also be in the project — CW8 links `.rsrc` files directly into the output resource fork with no Rez step. The `*_stub.c` files exist on disk but are NOT in the project file list. See [docs/research/architecture-inventory.md](docs/research/architecture-inventory.md) for the full breakdown.
+
+### Library Dependency Chain — COMPLETE
+
+All five NetSurf core libraries are ported and C89-clean:
+
+| Library | .c files | Status |
+|---|---:|---|
+| libwapcaplet | (via lwc_stub.c) | ✓ done at v0.1 |
+| libparserutils | 15 | ✓ commit 8074a74 |
+| libhubbub (HTML5 parser) | 30 | ✓ commit fd8d915 |
+| libdom (DOM implementation) | 95 | ✓ commit 744232d |
+| libcss (CSS parser + cascade) | 303 | ✓ commit 02628cf |
+| **Total in MacSurf.mcp** | **443** | |
+
+Combined LOC: ~125K. Stub footprint replaced: 3,688 lines (parserutils utf8.h + dom.h + libcss.h). All four port audits + execution reports live in [docs/research/](docs/research/):
+- [parserutils-port.md](docs/research/parserutils-port.md)
+- [libhubbub-port.md](docs/research/libhubbub-port.md)
+- [libdom-port.md](docs/research/libdom-port.md)
+- [libcss-port.md](docs/research/libcss-port.md)
+
+**Next milestone:** wire NetSurf core's `html_init()` / `nscss_init()` to call into the now-real libdom + libhubbub + libcss, hook the OT fetcher into `hlcache_handle_retrieve`, and replace the v0.1 manual HTML strip with the full rendering pipeline.
+
+### Library port audit checklist
+
+When auditing a new C99 library for CW8 / strict C89, grep for:
+- `inline` keyword
+- `//` line comments (start-of-line AND trailing — but EXCLUDE URLs in `/* */` block comments, especially `http://www.opensource.org/licenses/...`)
+- C99 designated initializers (`^\s*\.\w+\s*=`) — and **count instances per file**, not just file count. format_list_style.c had 47 in one file.
+- For-scope declarations: integer types AND **pointer-type variants** (`for (TYPE *NAME = ...)`, `for (const TYPE *NAME = ...)`). The libcss audit missed pointer-type for-scope and undercounted by 10 sites.
+- `restrict` keyword
+- Compound literals
+- `__VA_ARGS__` variadic macros
+- `long long`
+- Variable-length arrays
+- Flexible array members
+- Forward enum declarations
+- `__attribute__` / `__builtin_*`
+- `snprintf` / `vsnprintf`
+- `%zu` / `%zd` printf formats
+- `<iconv.h>`, `<errno.h>`, `<strings.h>`, `<sys/types.h>` and other POSIX
+- **GNU union casts** — `(union_type)0` or `(typedef_name)expr` where the typedef resolves to a union. Standard C89 forbids casting to union types. The libcss audit missed 5 sites of `(css_fixed_or_calc)0`.
+- **Union initializers using designated syntax** — `{.field = value}` for a typedef'd union looks identical to a struct designated init in grep output. C89 union initializers must use `{value}` (positional, first member only).
+- Build-time codegen (`gperf`, perl scripts, `.inc` files included from `.c` files)
+- Existing MacSurf stubs in `frontends/macos9/<libname>/` that will conflict with the real headers
 
 ## Docs
 

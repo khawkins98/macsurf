@@ -69,11 +69,14 @@ mechanical.
 | `select/` | `arena.c`, `calc.c`, `computed.c`, `dispatch.c`, `font_face.c`, `format_list_style.c`, `hash.c`, `mq.c`, `select.c`, `unit.c` |
 | `select/properties/` | 127 files: one per CSS property's selector, e.g. `align_content.c`, `azimuth.c`, ..., `z_index.c` |
 
-**Total `.c` files in scope (post-codegen):** **302**
-- 36 hand-written + 119 generated in `parse/properties/`
+**Total `.c` files in scope (post-codegen):** **303**
+- 36 hand-written + 120 generated in `parse/properties/`
+  (audit initially said 119 generated; properties.gen actually has
+  120 rules including the `*_side` variants)
 - 127 in `select/properties/`
 - 10 in `select/`
 - 6 in `parse/`
+- 1 in `src/` (`stylesheet.c` — missed in the initial audit)
 - 2 in `utils/`
 - 1 in `lex/`
 - 1 in `charset/`
@@ -122,34 +125,71 @@ The risk with sed is multi-line `//` comments — but if every `//` is a
 single-line trailing remark or a single-line block, sed handles it
 mechanically.
 
-### 3. C99 designated initializers — **REAL, 3 files**
+### 3. C99 designated initializers — **REAL, 53+ instances in 5 files**
+
+Initial audit identified 3 files. Magnitude was massively undercounted:
 
 ```
-src/parse/mq.c                       lines 1200-1208 (event handler struct)
-src/select/format_list_style.c       lines 484-510 (list-style structures, multiple)
-src/select/unit.c                    lines 376, 405 (font_size structures)
+src/parse/mq.c                       3 nested struct inits in css_parse_media_query
+src/select/unit.c                    2 css_hint_length inits
+src/select/format_list_style.c       47 static const struct list_counter_style blocks
+                                     + 1 struct numeric init = 48 total
+src/select/computed.c                2 union css_fixed_or_calc inits at lines 711, 757
+                                     ← MISSED in initial audit
+src/select/properties/width.c        4 (css_fixed_or_calc) cast sites (see §10)
+src/select/properties/helpers.c      1 (css_fixed_or_calc) cast site (see §10)
 ```
 
-`mq.c` is the worst — initializes a nested `event_handler` struct. The
-others are simpler `name`, `system`, `symbols` field initializers.
+`format_list_style.c` is by far the worst case: 47 `static const struct
+list_counter_style` blocks at file scope, each initializing up to 11
+fields including nested structs (range, pad, negative). C89 forbids
+non-constant aggregate initializers — many of these are static and
+constant, but C89 also forbids designated initializer SYNTAX entirely
+regardless of whether the values are computable.
 
-**Fix shape:** same as libdom — convert to assignment-statement form.
-Estimated 30-40 lines edited across the 3 files.
+**Fix shape:** different per case:
+- Function-scope inits → declaration + assignment statements
+- File-scope `static const` inits → positional initializers in struct
+  field order with explicit defaults for unset fields. Done via a
+  Python helper that parses `.field=value` pairs (handling balanced
+  braces and string literals) and emits positional values in struct
+  field order.
 
-### 4. C99 for-scope declarations — **REAL, first time, 4 files**
+The Python conversion approach scaled to 47 blocks in one file. Would
+not have been tractable by hand.
+
+### 4. C99 for-scope declarations — **REAL, 17 sites in 6 files**
+
+The initial audit listed 7 sites in 4 files. A wider grep run during
+execution caught 10 more sites that the initial pattern missed:
 
 ```
-src/parse/properties/utils.c:436     for (int i = 0; i < 4; i++)
-src/select/computed.c:265            for (size_t i = 0; i < CSS_N_PROPERTIES; i++)
-src/select/select.c:1039             for (size_t i = 0; i < CSS_ORIGIN_AUTHOR; i++)
-src/select/select.c:1040             for (size_t j = 0; j < CSS_PSEUDO_ELEMENT_COUNT; j++)
+src/parse/mq.c:45                 for (uint32_t i = 0; ...)
+src/parse/properties/utils.c:436  for (int i = 0; i < 4; i++)
+src/select/mq.h:178               for (uint32_t i = 0; ...)
+src/select/computed.c:265         for (size_t i = 0; i < CSS_N_PROPERTIES; i++)
+src/select/select.c:287           for (uint32_t index = 0; ...)
+src/select/select.c:660           for (uint32_t i = 0; ...)
+src/select/select.c:859           for (uint32_t i = 0; ...)
+src/select/select.c:887           for (uint32_t i = 0; ...)
+src/select/select.c:1029          for (uint32_t i = 0; ...)
+src/select/select.c:1039          for (size_t i = 0; ...) (nested with j)
+src/select/select.c:1040          for (size_t j = 0; ...)
+src/select/properties/helpers.h:77   for (lwc_string *const*i = orig; ...)  ← missed
 src/select/properties/helpers.h:87   for (size_t i = 0; i < count; i++)
-src/select/properties/helpers.h:121  (same)
-src/select/properties/helpers.h:157  (same)
+src/select/properties/helpers.h:110  for (const css_computed_counter *i = ...)  ← missed
+src/select/properties/helpers.h:121  (size_t i)
+src/select/properties/helpers.h:146  for (const css_computed_content_item *i = ...)  ← missed
+src/select/properties/helpers.h:157  (size_t i)
 ```
 
-Total: 7 instances across 4 files. CW8 strict C89 will reject all of
-them.
+CW8 strict C89 will reject all of them.
+
+**Lesson for future audits:** the initial regex matched
+`for ([int|size_t|uint|long|unsigned] NAME = ...)` but missed
+**pointer-type for-scope** like `for (TYPE *i = ...)` or
+`for (const TYPE *NAME = ...)`. Future audit greps must include the
+`(\s*\*?\s*[a-z_]+)` variant.
 
 **Fix shape:** mechanical conversion. Each `for (TYPE i = 0; ...)`
 becomes:
@@ -192,6 +232,44 @@ src/parse/properties/utils.c:1456 strncasecmp(...) - 30+ call sites for unit nam
 **Existing infrastructure:** `frontends/macos9/shims/strings.h` was
 created during the libhubbub port and forwards to `<string.h>`. **No
 new shim needed.**
+
+### 7b. GNU union cast extension — **5 sites, 3 files, NOT in initial audit**
+
+This category was **completely missed** by the initial audit. Discovered
+during the syntax check loop. The first time we hit a GCC-specific
+extension that has no C89 equivalent.
+
+```
+src/select/autogenerated_destroy.inc:113   set_width(style, 0, (css_fixed_or_calc)0, CSS_UNIT_PX);
+src/select/properties/width.c:27          (css_fixed_or_calc)(hint->data.length.value)
+src/select/properties/width.c:32          (css_fixed_or_calc)0
+src/select/properties/width.c:39          css_fixed_or_calc length = (css_fixed_or_calc)0;
+src/select/properties/width.c:54          css_fixed_or_calc length = (css_fixed_or_calc)0;
+src/select/properties/helpers.c:235       css_fixed_or_calc length = (css_fixed_or_calc)0;
+```
+
+`css_fixed_or_calc` is a `typedef union { css_fixed value; lwc_string
+*calc; }` defined in `select/autogenerated_computed.h`. Casting to a
+union type is a **GNU extension** — standard C89 forbids it entirely.
+gcc with `-pedantic` reports `cast to union type from type not present
+in union`.
+
+**Fix shape:** explicit temp-variable initialization. For each call
+site:
+```c
+css_fixed_or_calc _v;
+_v.value = 0;        /* or _v.value = X */
+some_function(..., _v, ...);
+```
+
+Five sites, 3 files. The pattern is localized to the width property's
+set/get/copy/compose quartet — same upstream code repeated 4 times
+verbatim — plus the set_width call inside the destroy.inc generated
+file.
+
+**Lesson for future audits:** grep for `(\w+)0` and `(\w+)\(` cast
+forms to catch union casts and other type casts that may be GNU
+extensions.
 
 ### 8. POSIX dependencies — none beyond `<strings.h>`
 
@@ -487,6 +565,38 @@ biggest port yet by a wide margin.
   large files (each ~5K LOC). They're already in the tree but they may
   contain C99 features themselves (they're code-generator output).
   Worth a read-pass before the first build attempt.
+
+## Audit accuracy retrospective
+
+This is the least accurate audit of the four library ports. Things the
+static-grep audit missed and that turned up during execution:
+
+| Item | Audit said | Actual |
+|---|---|---|
+| `.c` files in MacSurf.mcp | 302 | **303** (`stylesheet.c` missed) |
+| Generated files | 119 | **120** (properties.gen has 120 rules) |
+| For-scope sites | 7 in 4 files | **17 in 6 files** (pointer-type variant missed) |
+| Designated init instances | "3 files" | 5 files / **53+ instances** (47 in one file) |
+| GNU union cast sites | not flagged | **5 in 3 files** — first GNU extension with no C89 equivalent |
+
+**For future audits, grep for additionally:**
+
+1. **Pointer-type for-scope:** `for (TYPE *NAME = ...)` and
+   `for (const TYPE *NAME = ...)` — the initial regex only caught
+   integer-type declarations.
+2. **Union cast forms:** `(union_type)0` or any `(typedef_name)expr`
+   pattern where `typedef_name` resolves to a union. The GCC extension
+   for casting to union types is not in standard C89 and produces
+   `cast to union type from type not present in union` errors.
+3. **Designated initializer count per file** — not just file count.
+   `format_list_style.c` had 47 blocks in one file; the audit said
+   "3 files" and undercounted the per-file workload by an order of
+   magnitude.
+4. **Union literal designated init** like `{.value = 0}` for
+   `css_fixed_or_calc` — this looks like a struct initializer in
+   grep output but is a union initializer with the same syntax. C89
+   union initializers must use `{ value }` (positional, first member
+   only).
 
 ## Bottom line
 
