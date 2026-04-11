@@ -410,6 +410,70 @@
         <FILEFLAGS>compile</FILEFLAGS>
     </FILE>
 
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/corestrings.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/libdom.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/nscolour.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/useragent.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/bloom.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/hashtable.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/idna.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/punycode.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../utils/ssl_certs.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+
     <!-- ============================================================== -->
     <!--  NetSurf Content                                                -->
     <!-- ============================================================== -->
@@ -430,7 +494,7 @@
 
     <FILE>
         <PATHTYPE>Project</PATHTYPE>
-        <PATH>../../../content/fs_backing_store.c</PATH>
+        <PATH>../../../content/no_backing_store.c</PATH>
         <FILEKIND>Text</FILEKIND>
         <FILEFLAGS>compile</FILEFLAGS>
     </FILE>
@@ -462,6 +526,21 @@
         <FILEKIND>Text</FILEKIND>
         <FILEFLAGS>compile</FILEFLAGS>
     </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/content_factory.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../content/textsearch.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
 
     <!-- ============================================================== -->
     <!--  NetSurf Desktop                                                -->
@@ -501,6 +580,35 @@
         <FILEKIND>Text</FILEKIND>
         <FILEFLAGS>compile</FILEFLAGS>
     </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/selection.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/scrollbar.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/textarea.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
+    <FILE>
+        <PATHTYPE>Project</PATHTYPE>
+        <PATH>../../../desktop/system_colour.c</PATH>
+        <FILEKIND>Text</FILEKIND>
+        <FILEFLAGS>compile</FILEFLAGS>
+    </FILE>
+
 
     <!-- ============================================================== -->
     <!--  MacSurf Frontend                                               -->
@@ -4259,15 +4367,26 @@
     <FILEREF><PATH>../../../utils/utf8.c</PATH></FILEREF>
     <FILEREF><PATH>../../../utils/messages.c</PATH></FILEREF>
     <FILEREF><PATH>../../../utils/nsoption.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/corestrings.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/libdom.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/nscolour.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/useragent.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/bloom.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/hashtable.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/idna.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/punycode.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../utils/ssl_certs.c</PATH></FILEREF>
 
     <!-- NetSurf Content -->
     <FILEREF><PATH>../../../content/llcache.c</PATH></FILEREF>
     <FILEREF><PATH>../../../content/fetch.c</PATH></FILEREF>
-    <FILEREF><PATH>../../../content/fs_backing_store.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/no_backing_store.c</PATH></FILEREF>
     <FILEREF><PATH>../../../content/content.c</PATH></FILEREF>
     <FILEREF><PATH>../../../content/hlcache.c</PATH></FILEREF>
     <FILEREF><PATH>../../../content/mimesniff.c</PATH></FILEREF>
     <FILEREF><PATH>../../../content/urldb.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/content_factory.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../content/textsearch.c</PATH></FILEREF>
 
     <!-- NetSurf Desktop -->
     <FILEREF><PATH>../../../desktop/browser.c</PATH></FILEREF>
@@ -4275,6 +4394,10 @@
     <FILEREF><PATH>../../../desktop/netsurf.c</PATH></FILEREF>
     <FILEREF><PATH>../../../desktop/gui_factory.c</PATH></FILEREF>
     <FILEREF><PATH>../../../desktop/plot_style.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/selection.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/scrollbar.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/textarea.c</PATH></FILEREF>
+    <FILEREF><PATH>../../../desktop/system_colour.c</PATH></FILEREF>
 
     <!-- MacSurf Frontend -->
     <FILEREF><PATH>main.c</PATH></FILEREF>
@@ -4328,17 +4451,28 @@
         <FILEREF><PATH>../../../utils/utf8.c</PATH></FILEREF>
         <FILEREF><PATH>../../../utils/messages.c</PATH></FILEREF>
         <FILEREF><PATH>../../../utils/nsoption.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/corestrings.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/libdom.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/nscolour.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/useragent.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/bloom.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/hashtable.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/idna.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/punycode.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../utils/ssl_certs.c</PATH></FILEREF>
     </GROUP>
 
     <GROUP>
         <NAME>NetSurf Content</NAME>
         <FILEREF><PATH>../../../content/llcache.c</PATH></FILEREF>
         <FILEREF><PATH>../../../content/fetch.c</PATH></FILEREF>
-        <FILEREF><PATH>../../../content/fs_backing_store.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/no_backing_store.c</PATH></FILEREF>
         <FILEREF><PATH>../../../content/content.c</PATH></FILEREF>
         <FILEREF><PATH>../../../content/hlcache.c</PATH></FILEREF>
         <FILEREF><PATH>../../../content/mimesniff.c</PATH></FILEREF>
         <FILEREF><PATH>../../../content/urldb.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/content_factory.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../content/textsearch.c</PATH></FILEREF>
     </GROUP>
 
     <GROUP>
@@ -4348,6 +4482,10 @@
         <FILEREF><PATH>../../../desktop/netsurf.c</PATH></FILEREF>
         <FILEREF><PATH>../../../desktop/gui_factory.c</PATH></FILEREF>
         <FILEREF><PATH>../../../desktop/plot_style.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/selection.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/scrollbar.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/textarea.c</PATH></FILEREF>
+        <FILEREF><PATH>../../../desktop/system_colour.c</PATH></FILEREF>
     </GROUP>
 
     <GROUP>
