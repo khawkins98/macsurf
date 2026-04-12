@@ -8,6 +8,7 @@
 #ifndef css_select_strings_h_
 #define css_select_strings_h_
 
+#include <libwapcaplet/libwapcaplet.h>
 #include <libcss/errors.h>
 
 /** Useful interned strings */
