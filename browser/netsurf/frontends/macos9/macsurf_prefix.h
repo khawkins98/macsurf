@@ -35,17 +35,13 @@ typedef unsigned long mode_t;
 #define _INTTYPES_H
 #define _CINTTYPES
 
-/* Provide intrinsic types globally */
-typedef signed char int8_t;
-typedef unsigned char uint8_t;
-typedef short int16_t;
-typedef unsigned short uint16_t;
-typedef long int32_t;
-typedef unsigned long uint32_t;
-typedef long long int64_t;
-typedef unsigned long long uint64_t;
-typedef unsigned long uintptr_t;
-typedef long intptr_t;
+/* Provide integer types via our C89-safe shim. The shim has per-type
+ * guards (#ifndef _INT8_T etc.) so it's safe even if MacTypes.h or
+ * MSL have already typedef'd some of these.  After this include,
+ * block future re-inclusion of the shim itself. */
+#include "stdint.h"
+#define MACOS9_SHIMS_STDINT_H
+#define MACSURF_INTTYPES_H
 
 /* Map C99 _Bool to CodeWarrior */
 #ifndef _Bool
