@@ -320,7 +320,7 @@ nserror netsurf_mkdir_all(const char *fname)
 nserror
 netsurf_recursive_rm(const char *path)
 {
-	DIR *parent;
+	MAC_DIR *parent;
 	struct dirent *entry;
 	nserror ret = NSERROR_OK;
 	struct stat ent_stat; /* stat result of leaf entry */

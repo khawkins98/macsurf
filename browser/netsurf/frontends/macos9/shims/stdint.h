@@ -39,7 +39,7 @@ typedef short              int16_t;
 #if !defined(_INT32_T) && !defined(__int32_t_defined)
 #define _INT32_T
 #define __int32_t_defined
-typedef long               int32_t;
+typedef int                int32_t;
 #endif
 
 #if !defined(_INT64_T) && !defined(__int64_t_defined)
@@ -64,7 +64,7 @@ typedef unsigned short     uint16_t;
 #if !defined(_UINT32_T) && !defined(__uint32_t_defined)
 #define _UINT32_T
 #define __uint32_t_defined
-typedef unsigned long      uint32_t;
+typedef unsigned int       uint32_t;
 #endif
 
 #if !defined(_UINT64_T) && !defined(__uint64_t_defined)
