@@ -54,7 +54,7 @@ struct tm *gmtime(const long *timer);
 
 #include "utils/ascii.h"
 #include "utils/errors.h"
-#include "utils/time.h"
+#include "utils/ns_time.h"
 
 
 /**

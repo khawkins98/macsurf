@@ -1,26 +1,3 @@
-Could not find or load the file �background.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : ')' expected
-box_textarea.c line 174   "Drag type %d not handled.",
-
-Error   : ';' expected
-box_textarea.c line 175   msg->data.drag);
-
-Error   : ')' expected
-browser_history.c line 383   "Creating thumbnail for %s", nsurl_access(entry->page.url));
-
-Error   : ';' expected
-browser_history.c line 383   "Creating thumbnail for %s", nsurl_access(entry->page.url));
-
-Error   : ')' expected
-browser_history.c line 445   NSLOG(netsurf, INFO, "Updating history entry for %s", title);
-
-Error   : ')' expected
-browser_history.c line 469   NSLOG(netsurf, INFO, "Updated scroll offsets to %g by %g",
-
-Error   : ';' expected
-browser_history.c line 471   history->current->page.scroll_y);
-
 Error   : illegal implicit conversion from 'int' to
 'const char *'
 browser_window.c line 1043   tmp = strchr(userpass, ':');
@@ -58,27 +35,8 @@ Error   : illegal implicit conversion from 'int' to
 'struct tm *'
 cookie_manager.c line 251   if ((ftime = localtime(value)) != NULL) {
 
-Error   : ')' expected
-css_fetcher.c line 70   NSLOG(netsurf, INFO, "html_css_fetcher_initialise called for %s",
-
-Error   : ';' expected
-css_fetcher.c line 71   lwc_string_data(scheme));
-
-Error   : ')' expected
-css_fetcher.c line 77   NSLOG(netsurf, INFO, "html_css_fetcher_finalise called for %s",
-
-Error   : ';' expected
-css_fetcher.c line 78   lwc_string_data(scheme));
-
-Error   : ')' expected
-css_fetcher.c line 262   NSLOG(netsurf, INFO, "Processing of %s failed!",
-
-Error   : ';' expected
-css_fetcher.c line 263   nsurl_access(c->url));
-
-Could not find or load the file �css_parse.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �css_select.c� for target �MacSurf� for project �MacSurf�.
+Error   : undefined identifier 'css__charset_extract'
+css_parse.c line 425   css__charset_extract, &p->stream);
 
 Error   : identifier 'css__number_from_string(...)' redeclared
 was declared as: 'int (...)'
@@ -137,141 +95,925 @@ Could not find or load the file �cssh_css.c� for target �MacSurf� for pr
 
 Could not find or load the file �cssh_select.c� for target �MacSurf� for project �MacSurf�.
 
-Error   : ')' expected
-dom_event.c line 266   NSLOG(netsurf, DEEPDEBUG, "Encountered a script, node %p showed up", script);
+Error   : ';' expected
+dom_hashtable.c line 30   const dom_hash_vtable *vtable; /**< Vtable */
+
+Error   : declaration syntax error
+dom_hashtable.c line 35   };
+
+Error   : declaration syntax error
+dom_hashtable.c line 50   dom_hash_table *_dom_hash_create(unsigned int chains, 
 
 Error   : ')' expected
-dom_event.c line 650   "javascript context: %p (htmlc: %p)",
+dom_hashtable.c line 51   const dom_hash_vtable *vtable, void *pw)
+
+Error   : declaration syntax error
+dom_hashtable.c line 52   {
+
+Error   : declaration syntax error
+dom_hashtable.c line 53   dom_hash_table *r = malloc(sizeof(struct dom_hash_table));
+
+Error   : declaration syntax error
+dom_hashtable.c line 54   if (r == NULL) {
+
+Error   : declaration syntax error
+dom_hashtable.c line 55   return NULL;
+
+Error   : declaration syntax error
+dom_hashtable.c line 56   }
+
+Error   : declaration syntax error
+dom_hashtable.c line 58   r->vtable = vtable;
+
+Error   : declaration syntax error
+dom_hashtable.c line 59   r->pw = pw;
+
+Error   : declaration syntax error
+dom_hashtable.c line 60   r->nentries = 0;
+
+Error   : declaration syntax error
+dom_hashtable.c line 61   r->nchains = chains;
+
+Error   : declaration syntax error
+dom_hashtable.c line 62   r->chain = calloc(chains, sizeof(struct _dom_hash_entry *));
+
+Error   : declaration syntax error
+dom_hashtable.c line 63   if (r->chain == NULL) {
+
+Error   : identifier 'free(void *)' redeclared
+was declared as: 'void (void *)'
+now declared as: 'int (...)'
+dom_hashtable.c line 64   free(r);
+
+Error   : identifier expected
+dom_hashtable.c line 65   return NULL;
+
+Error   : identifier expected
+dom_hashtable.c line 66   }
+
+Error   : identifier expected
+dom_hashtable.c line 69   }
+
+Error   : ')' expected
+dom_hashtable.c line 78   dom_hash_table *_dom_hash_clone(dom_hash_table *ht)
 
 Error   : ';' expected
-dom_event.c line 652   htmlc);
+dom_hashtable.c line 79   {
+
+Error   : illegal function definition
+dom_hashtable.c line 80   void *key = NULL, *nkey = NULL;
+
+Error   : illegal function definition
+dom_hashtable.c line 81   void *value = NULL, *nvalue = NULL;
+
+Error   : illegal function definition
+dom_hashtable.c line 82   uintptr_t c1, *c2 = NULL;
+
+Error   : illegal function definition
+dom_hashtable.c line 83   struct dom_hash_table *ret;
+
+Error   : illegal function definition
+dom_hashtable.c line 85   ret = _dom_hash_create(ht->nchains, ht->vtable, ht->pw);
+
+Error   : identifier expected
+dom_hashtable.c line 86   if (ret == NULL)
+
+Error   : ';' expected
+dom_hashtable.c line 87   return NULL;
+
+Error   : identifier expected
+dom_hashtable.c line 89   while ( (key = _dom_hash_iterate(ht, &c1, &c2)) != NULL) {
+
+Error   : illegal function definition
+dom_hashtable.c line 90   nkey = ht->vtable->clone_key(key, ht->pw);
+
+Error   : identifier expected
+dom_hashtable.c line 91   if (nkey == NULL) {
+
+Error   : illegal function definition
+dom_hashtable.c line 92   _dom_hash_destroy(ret);
+
+Error   : identifier expected
+dom_hashtable.c line 93   return NULL;
+
+Error   : identifier expected
+dom_hashtable.c line 94   }
+
+Error   : identifier expected
+dom_hashtable.c line 96   value = _dom_hash_get(ht, key);
+
+Error   : illegal function definition
+dom_hashtable.c line 97   nvalue = ht->vtable->clone_value(value, ht->pw);
+
+Error   : identifier expected
+dom_hashtable.c line 98   if (nvalue == NULL) {
+
+Error   : illegal function definition
+dom_hashtable.c line 99   ht->vtable->destroy_key(nkey, ht->pw);
+
+Error   : illegal function definition
+dom_hashtable.c line 100   _dom_hash_destroy(ret);
+
+Error   : identifier expected
+dom_hashtable.c line 101   return NULL;
+
+Error   : identifier expected
+dom_hashtable.c line 102   }
+
+Error   : declaration syntax error
+dom_hashtable.c line 104   0
+
+Error   : illegal function definition
+dom_hashtable.c line 105   _dom_hash_destroy(ret);
+
+Error   : identifier expected
+dom_hashtable.c line 106   return NULL;
+
+Error   : identifier expected
+dom_hashtable.c line 107   }
+
+Error   : identifier expected
+dom_hashtable.c line 108   }
+
+Error   : illegal function definition
+dom_hashtable.c line 110   return ret;
+
+Error   : identifier expected
+dom_hashtable.c line 111   }
 
 Error   : ')' expected
-dom_event.c line 771   "phase:%d type:%s", phase, dom_string_data(type));
+dom_hashtable.c line 119   void _dom_hash_destroy(dom_hash_table *ht) 
 
-Could not find or load the file �dom_hashtable.c� for target �MacSurf� for project �MacSurf�.
+Error   : ';' expected
+dom_hashtable.c line 120   {
 
-Could not find or load the file �dt_bitmap.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 121   unsigned int i;
 
-Could not find or load the file �dt_browser.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 123   if (ht == NULL)
 
-Could not find or load the file �dt_download.c� for target �MacSurf� for project �MacSurf�.
+Error   : ';' expected
+dom_hashtable.c line 124   return;
 
-Could not find or load the file �dt_global_history.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 126   for (i = 0; i < ht->nchains; i++) {
 
-Could not find or load the file �dt_hotlist.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 127   if (ht->chain[i] != NULL) {
 
-Could not find or load the file �dt_local_history.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 128   struct _dom_hash_entry *e = ht->chain[i];
 
-Could not find or load the file �dt_mouse.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 129   while (e) {
 
-Could not find or load the file �dt_print.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 130   struct _dom_hash_entry *n = e->next;
 
-Could not find or load the file �dt_save_pdf.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 131   ht->vtable->destroy_key(e->key, ht->pw);
 
-Could not find or load the file �dt_search.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 132   ht->vtable->destroy_value(e->value, ht->pw);
 
-Could not find or load the file �dt_searchweb.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 133   free(e);
 
-Could not find or load the file �dt_selection.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+dom_hashtable.c line 134   e = n;
 
-Could not find or load the file �dt_textarea.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 135   }
 
-Could not find or load the file �dt_treeview.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 136   }
 
-Could not find or load the file �dt_version.c� for target �MacSurf� for project �MacSurf�.
+Error   : identifier expected
+dom_hashtable.c line 137   }
+
+Error   : ')' expected
+dom_hashtable.c line 139   free(ht->chain);
+
+Error   : illegal function definition
+dom_hashtable.c line 140   free(ht);
+
+Error   : identifier expected
+dom_hashtable.c line 141   }
+
+Error   : ')' expected
+dom_hashtable.c line 152   bool _dom_hash_add(dom_hash_table *ht, void *key, void *value, 
+
+Error   : identifier expected
+dom_hashtable.c line 153    unsigned char
+
+Error   : illegal function definition
+dom_hashtable.c line 155   unsigned int h, c;
+
+Error   : illegal function definition
+dom_hashtable.c line 156   struct _dom_hash_entry *e;
+
+Error   : identifier expected
+dom_hashtable.c line 158   if (ht == NULL || key == NULL || value == NULL)
+
+Error   : ';' expected
+dom_hashtable.c line 159   return false;
+
+Error   : illegal function definition
+dom_hashtable.c line 161   h = ht->vtable->hash(key, ht->pw);
+
+Error   : illegal function definition
+dom_hashtable.c line 162   c = h % ht->nchains;
+
+Error   : identifier expected
+dom_hashtable.c line 164   for (e = ht->chain[c]; e; e = e->next) {
+
+Error   : identifier expected
+dom_hashtable.c line 165   if (ht->vtable->key_isequal(key, e->key, ht->pw)) {
+
+Error   : identifier expected
+dom_hashtable.c line 166   if (replace == true) {
+
+Error   : illegal function definition
+dom_hashtable.c line 167   e->value = value;
+
+Error   : identifier expected
+dom_hashtable.c line 168   return true;
+
+Error   : identifier expected
+dom_hashtable.c line 169   } else {
+
+Error   : illegal return value in void/constructor/destructor function
+dom_hashtable.c line 170   0
+
+Error   : declaration syntax error
+dom_hashtable.c line 172   }
+
+Error   : declaration syntax error
+dom_hashtable.c line 173   }
+
+Error   : declaration syntax error
+dom_hashtable.c line 175   e = malloc(sizeof(struct _dom_hash_entry));
+
+Error   : declaration syntax error
+dom_hashtable.c line 176   if (e == NULL) {
+
+Error   : declaration syntax error
+dom_hashtable.c line 177   return false;
+
+Error   : declaration syntax error
+dom_hashtable.c line 178   }
+
+Error   : declaration syntax error
+dom_hashtable.c line 180   e->key = key;
+
+Error   : declaration syntax error
+dom_hashtable.c line 181   e->value = value;
+
+Error   : declaration syntax error
+dom_hashtable.c line 183   e->next = ht->chain[c];
+
+Error   : declaration syntax error
+dom_hashtable.c line 184   ht->chain[c] = e;
+
+Error   : declaration syntax error
+dom_hashtable.c line 185   ht->nentries++;
+
+Error   : declaration syntax error
+dom_hashtable.c line 187   return true;
+
+Error   : declaration syntax error
+dom_hashtable.c line 188   }
+
+Error   : illegal use of incomplete struct/union/class 'struct dom_hash_table'
+dom_hashtable.c line 205   h = ht->vtable->hash(key, ht->pw);
+
+Error   : illegal use of incomplete struct/union/class 'struct dom_hash_table'
+dom_hashtable.c line 206   c = h % ht->nchains;
+
+Error   : illegal use of incomplete struct/union/class 'struct dom_hash_table'
+dom_hashtable.c line 208   for (e = ht->chain[c]; e; e = e->next) {
+
+Error   : illegal use of incomplete struct/union/class 'struct dom_hash_table'
+dom_hashtable.c line 209   if (ht->vtable->key_isequal(key, e->key, ht->pw))
+
+Error   : expression syntax error
+dt_bitmap.c line 155   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 155   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 155   for (int y = 0; y < height; y++) {
+
+Error   : ';' expected
+dt_bitmap.c line 156   uint8_t *row = buffer;
+
+Error   : expression syntax error
+dt_bitmap.c line 158   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 158   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 158   for (int x = 0; x < width; x++) {
+
+Error   : ';' expected
+dt_bitmap.c line 159   const uint32_t px = *((uint32_t *)(void *) row);
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 161   row[to.r] = ((const uint8_t *) &px)[from.r];
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 162   row[to.g] = ((const uint8_t *) &px)[from.g];
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 163   row[to.b] = ((const uint8_t *) &px)[from.b];
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 164   row[to.a] = ((const uint8_t *) &px)[from.a];
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 166   row += sizeof(uint32_t);
+
+Error   : declaration syntax error
+dt_bitmap.c line 169   buffer += rowstride;
+
+Error   : declaration syntax error
+dt_bitmap.c line 170   }
+
+Error   : declaration syntax error
+dt_bitmap.c line 171   }
+
+Error   : expression syntax error
+dt_bitmap.c line 191   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 191   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 191   for (int y = 0; y < height; y++) {
+
+Error   : ';' expected
+dt_bitmap.c line 192   uint8_t *row = buffer;
+
+Error   : expression syntax error
+dt_bitmap.c line 194   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 194   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 194   for (int x = 0; x < width; x++) {
+
+Error   : ';' expected
+dt_bitmap.c line 195   const uint32_t px = *((uint32_t *)(void *) row);
+
+Error   : expression syntax error
+dt_bitmap.c line 196   uint32_t a, r, g, b;
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 198   r = ((const uint8_t *) &px)[from.r];
+
+Error   : undefined identifier 'g'
+dt_bitmap.c line 199   g = ((const uint8_t *) &px)[from.g];
+
+Error   : undefined identifier 'b'
+dt_bitmap.c line 200   b = ((const uint8_t *) &px)[from.b];
+
+Error   : undefined identifier 'a'
+dt_bitmap.c line 201   a = ((const uint8_t *) &px)[from.a];
+
+Error   : undefined identifier 'a'
+dt_bitmap.c line 203   if (a != 0) {
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 204   r = ((r * (a + 1)) >> 8) & 0xff;
+
+Error   : undefined identifier 'g'
+dt_bitmap.c line 205   g = ((g * (a + 1)) >> 8) & 0xff;
+
+Error   : undefined identifier 'b'
+dt_bitmap.c line 206   b = ((b * (a + 1)) >> 8) & 0xff;
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 208   r = g = b = 0;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 211   row[to.r] = r;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 212   row[to.g] = g;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 213   row[to.b] = b;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 214   row[to.a] = a;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 216   row += sizeof(uint32_t);
+
+Error   : declaration syntax error
+dt_bitmap.c line 219   buffer += rowstride;
+
+Error   : declaration syntax error
+dt_bitmap.c line 220   }
+
+Error   : declaration syntax error
+dt_bitmap.c line 221   }
+
+Error   : expression syntax error
+dt_bitmap.c line 241   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 241   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 241   for (int y = 0; y < height; y++) {
+
+Error   : ';' expected
+dt_bitmap.c line 242   uint8_t *row = buffer;
+
+Error   : expression syntax error
+dt_bitmap.c line 244   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 244   for (int x = 0; x < width; x++) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 244   for (int x = 0; x < width; x++) {
+
+Error   : ';' expected
+dt_bitmap.c line 245   const uint32_t px = *((uint32_t *)(void *) row);
+
+Error   : expression syntax error
+dt_bitmap.c line 246   uint32_t a, r, g, b;
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 248   r = ((const uint8_t *) &px)[from.r];
+
+Error   : undefined identifier 'g'
+dt_bitmap.c line 249   g = ((const uint8_t *) &px)[from.g];
+
+Error   : undefined identifier 'b'
+dt_bitmap.c line 250   b = ((const uint8_t *) &px)[from.b];
+
+Error   : undefined identifier 'a'
+dt_bitmap.c line 251   a = ((const uint8_t *) &px)[from.a];
+
+Error   : undefined identifier 'a'
+dt_bitmap.c line 253   if (a != 0) {
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 254   r = (r << 8) / a;
+
+Error   : undefined identifier 'g'
+dt_bitmap.c line 255   g = (g << 8) / a;
+
+Error   : undefined identifier 'b'
+dt_bitmap.c line 256   b = (b << 8) / a;
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 258   r = (r > 255) ? 255 : r;
+
+Error   : undefined identifier 'g'
+dt_bitmap.c line 259   g = (g > 255) ? 255 : g;
+
+Error   : undefined identifier 'b'
+dt_bitmap.c line 260   b = (b > 255) ? 255 : b;
+
+Error   : undefined identifier 'r'
+dt_bitmap.c line 262   r = g = b = 0;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 265   row[to.r] = r;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 266   row[to.g] = g;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 267   row[to.b] = b;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 268   row[to.a] = a;
+
+Error   : undefined identifier 'row'
+dt_bitmap.c line 270   row += sizeof(uint32_t);
+
+Error   : declaration syntax error
+dt_bitmap.c line 273   buffer += rowstride;
+
+Error   : declaration syntax error
+dt_bitmap.c line 274   }
+
+Error   : declaration syntax error
+dt_bitmap.c line 275   }
+
+Error   : expression syntax error
+dt_bitmap.c line 325   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 325   for (int y = 0; y < height; y++) {
+
+Error   : undefined identifier 'y'
+dt_bitmap.c line 325   for (int y = 0; y < height; y++) {
+
+Error   : ';' expected
+dt_bitmap.c line 326   const uint8_t *row = buffer;
+
+Error   : expression syntax error
+dt_bitmap.c line 328   for (int x = bitmap_layout.a; x < width; x += 4) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 328   for (int x = bitmap_layout.a; x < width; x += 4) {
+
+Error   : undefined identifier 'x'
+dt_bitmap.c line 328   for (int x = bitmap_layout.a; x < width; x += 4) {
+
+Error   : ';' expected
+dt_bitmap.c line 329   if (row[x] != 0xff) {
+
+Error   : declaration syntax error
+dt_bitmap.c line 332   }
+
+Error   : declaration syntax error
+dt_bitmap.c line 334   buffer += rowstride;
+
+Error   : declaration syntax error
+dt_bitmap.c line 335   }
+
+Error   : declaration syntax error
+dt_bitmap.c line 337   return true;
+
+Error   : declaration syntax error
+dt_bitmap.c line 338   }
+
+Error   : illegal implicit conversion from 'int' to
+'const char *'
+dt_download.c line 59   const char *slash = strrchr(filename, '/');
+
+Error   : illegal implicit conversion from 'int' to
+'struct tm *'
+dt_global_history.c line 282   if ((lvtime = localtime(&data->last_visit)) != NULL) {
+
+Error   : illegal implicit conversion from 'int' to
+'struct tm *'
+dt_global_history.c line 607   full_time = localtime(&t);
+
+Error   : illegal use of incomplete struct/union/class 'struct tm'
+dt_global_history.c line 608   full_time->tm_sec = 0;
+
+Error   : illegal use of incomplete struct/union/class 'struct tm'
+dt_global_history.c line 609   full_time->tm_min = 0;
+
+Error   : illegal use of incomplete struct/union/class 'struct tm'
+dt_global_history.c line 610   full_time->tm_hour = 0;
+
+Error   : illegal use of incomplete struct/union/class 'struct tm'
+dt_global_history.c line 618   gh_ctx.weekday = full_time->tm_wday;
+
+Error   : illegal implicit conversion from 'int' to
+'struct tm *'
+dt_hotlist.c line 204   if ((lvtime = localtime(&data->last_visit)) != NULL) {
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 151   nl = strchr(nl, '\n');
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 170   nl = strchr(nl, '|');
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 179   nl = strchr(nl, '|');
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 188   nl = strchr(nl, '|');
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 197   nl = strchr(nl, '|');
+
+Error   : illegal implicit conversion from 'int' to
+'char *'
+dt_searchweb.c line 206   nl = strchr(nl, '\n');
+
+Error   : illegal implicit conversion from 'struct scrollbar *' to
+'unsigned char'
+dt_textarea.c line 2463   bool bar_x = ta->bar_x;
+
+Error   : illegal implicit conversion from 'struct scrollbar *' to
+'unsigned char'
+dt_textarea.c line 2464   bool bar_y = ta->bar_y;
+
+Error   : expression syntax error
+dt_treeview.c line 831   struct treeview_node_entry *entry = (struct treeview_node_entry *)n;
+
+Error   : expression syntax error
+dt_treeview.c line 832    unsigned char
+
+Error   : expression syntax error
+dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
+
+Error   : undefined identifier 'i'
+dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
+
+Error   : undefined identifier 'i'
+dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
+
+Error   : ';' expected
+dt_treeview.c line 835   struct treeview_field *ef = &(sw->tree->fields[i + 1]);
+
+Error   : undefined identifier 'ef'
+dt_treeview.c line 836   if (ef->flags & TREE_FLAG_SEARCHABLE) {
+
+Error   : ';' expected
+dt_treeview.c line 837   if (strcasestr(entry->fields[i].value.data,
+
+Error   : ';' expected
+dt_treeview.c line 838   sw->text) != NULL) {
+
+Error   : undefined identifier 'matched'
+dt_treeview.c line 839   matched = true;
+
+Error   : illegal use of keyword
+dt_treeview.c line 840   break;
+
+Error   : declaration syntax error
+dt_treeview.c line 842   }
+
+Error   : declaration syntax error
+dt_treeview.c line 843   }
+
+Error   : declaration syntax error
+dt_treeview.c line 845   if (!matched && strcasestr(n->text.data, sw->text) != NULL) {
+
+Error   : illegal function definition
+dt_treeview.c line 846   matched = true;
+
+Error   : identifier expected
+dt_treeview.c line 847   }
+
+Error   : illegal function definition
+dt_treeview.c line 849   if (matched) {
+
+Error   : ';' expected
+dt_treeview.c line 850   n->flags |= TV_NFLAGS_MATCHED;
+
+Error   : illegal function definition
+dt_treeview.c line 851   sw->window_height += n->height;
+
+Error   : identifier expected
+dt_treeview.c line 852   } else {
+
+Error   : pointer/array required
+dt_treeview.c line 853   n->flags &= ~TV_NFLAGS_MATCHED;
+
+Error   : declaration syntax error
+dt_treeview.c line 856   return NSERROR_OK;
+
+Error   : declaration syntax error
+dt_treeview.c line 857   }
+
+Error   : illegal implicit conversion from 'struct plot_font_style' to
+'struct lwc_string_s *const *'
+dt_treeview.c line 2001   .text = text,
+
+Error   : expression syntax error
+dt_treeview.c line 2269   for (struct treeview_node *n = node;
+
+Error   : undefined identifier 'n'
+dt_treeview.c line 2270   (n != NULL) && (n->flags & TV_NFLAGS_EXPANDED);
+
+Error   : undefined identifier 'n'
+dt_treeview.c line 2271   n = n->parent) {
+
+Error   : ';' expected
+dt_treeview.c line 2272   n->height += additional_height_entries +
+
+Error   : declaration syntax error
+dt_treeview.c line 2276   if (tree->search.search &&
+
+Error   : declaration syntax error
+dt_treeview.c line 2277   node->type == TREE_NODE_ENTRY &&
+
+Error   : declaration syntax error
+dt_treeview.c line 2278   node->flags & TV_NFLAGS_MATCHED) {
+
+Error   : declaration syntax error
+dt_treeview.c line 2279   tree->search.height += additional_height_entries;
+
+Error   : declaration syntax error
+dt_treeview.c line 2280   }
+
+Error   : declaration syntax error
+dt_treeview.c line 2283   if (additional_height_entries + additional_height_folders != 0) {
+
+Error   : declaration syntax error
+dt_treeview.c line 2284   treeview__cw_update_size(tree, -1,
+
+Error   : ';' expected
+dt_treeview.c line 2285   treeview__get_display_height(tree));
+
+Error   : identifier expected
+dt_treeview.c line 2286   }
+
+Error   : illegal function definition
+dt_treeview.c line 2288   return NSERROR_OK;
+
+Error   : identifier expected
+dt_treeview.c line 2289   }
+
+Error   : illegal function definition
+dt_treeview.c line 2294   {
+
+Error   : illegal function definition
+dt_treeview.c line 2295   nserror res;
+
+Error   : illegal function definition
+dt_treeview.c line 2297   res = treeview_node_expand_internal(tree, node);
+
+Error   : declaration syntax error
+dt_treeview.c line 2298   nslog_log( "dt_treeview.c", "",  2298, "Expanding!")
+
+Error   : identifier expected
+dt_treeview.c line 2299   if (res == NSERROR_OK) {
+
+Error   : illegal function definition
+dt_treeview.c line 2301   treeview__redraw_from_node(tree, node);
+
+Error   : declaration syntax error
+dt_treeview.c line 2302   nslog_log( "dt_treeview.c", "",  2302, "Expanded!")
+
+Error   : identifier expected
+dt_treeview.c line 2303   }
+
+Error   : illegal function definition
+dt_treeview.c line 2305   return res;
+
+Error   : identifier expected
+dt_treeview.c line 2306   }
+
+Error   : illegal function definition
+dt_treeview.c line 2312   struct treeview_contract_data {
+
+Error   : object 'tree' redefined
+dt_treeview.c line 2313   treeview *tree;
+
+Error   : illegal function definition
+dt_treeview.c line 2314   bool only_entries;
+
+Error   : identifier expected
+dt_treeview.c line 2315   };
+
+Error   : illegal function definition
+dt_treeview.c line 2326   static nserror treeview_node_contract_cb(treeview_node *n, void *ctx, bool *end)
+
+Error   : illegal function definition
+dt_treeview.c line 2327   {
+
+Error   : illegal function definition
+dt_treeview.c line 2328   struct treeview_contract_data *data = ctx;
+
+Error   : illegal function definition
+dt_treeview.c line 2329   int h_reduction_folder = 0;
+
+Error   : illegal function definition
+dt_treeview.c line 2330   int h_reduction_entry = 0;
+
+Error   : ')' expected
+dt_treeview.c line 2332   assert(n != NULL);
+
+Error   : ')' expected
+dt_treeview.c line 2333   assert(n->type != TREE_NODE_ROOT);
+
+Error   : illegal function definition
+dt_treeview.c line 2335   n->flags &= ~TV_NFLAGS_SELECTED;
+
+Error   : identifier expected
+dt_treeview.c line 2337   if ((n->flags & TV_NFLAGS_EXPANDED) == false ||
+
+Error   : ')' expected
+dt_treeview.c line 2338   (n->type == TREE_NODE_FOLDER && data->only_entries)) {
+
+Error   : identifier expected
+dt_treeview.c line 2340   return NSERROR_OK;
+
+Error   : identifier expected
+dt_treeview.c line 2341   }
+
+Error   : ')' expected
+dt_treeview.c line 2344   switch (n->type) {
+
+Error   : identifier expected
+dt_treeview.c line 2345   case TREE_NODE_FOLDER:
+
+Error   : illegal function definition
+dt_treeview.c line 2346   h_reduction_folder = n->height - tree_g.line_height;
+
+Error   : identifier expected
+dt_treeview.c line 2347   break;
+
+Error   : identifier expected
+dt_treeview.c line 2349   case TREE_NODE_ENTRY:
+
+Error   : illegal function definition
+dt_treeview.c line 2350   h_reduction_entry = n->height - tree_g.line_height;
+
+Error   : identifier expected
+dt_treeview.c line 2351   break;
+
+Error   : identifier expected
+dt_treeview.c line 2353   default:
+
+Error   : identifier expected
+dt_treeview.c line 2354   break;
+
+Error   : identifier expected
+dt_treeview.c line 2355   }
+
+Error   : ')' expected
+dt_treeview.c line 2358   assert(h_reduction_folder + h_reduction_entry >= 0);
+
+Error   : identifier expected
+dt_treeview.c line 2359   for (struct treeview_node *node = n;
+
+Error   : ')' expected
+dt_treeview.c line 2360   (node != NULL) && (node->flags & TV_NFLAGS_EXPANDED);
+
+Error   : illegal function definition
+dt_treeview.c line 2361   node = node->parent) {
+
+Error   : illegal function definition
+dt_treeview.c line 2362   node->height -= h_reduction_folder + h_reduction_entry;
+
+Error   : identifier expected
+dt_treeview.c line 2363   }
+
+Error   : ')' expected
+dt_treeview.c line 2365   if (data->tree->search.search) {
+
+Error   : illegal function definition
+dt_treeview.c line 2366   data->tree->search.height -= h_reduction_entry;
+
+Error   : identifier expected
+dt_treeview.c line 2367   }
+
+Error   : identifier expected
+dt_treeview.c line 2369   n->flags ^= TV_NFLAGS_EXPANDED;
+
+Error   : identifier expected
+dt_treeview.c line 2371   return NSERROR_OK;
+
+Error   : identifier expected
+dt_treeview.c line 2372   }
+
+Error   : illegal function definition
+dt_treeview.c line 2384   {
+
+Error   : illegal use of incomplete struct/union/class 'struct treeview_contract_data'
+dt_treeview.c line 2385   struct treeview_contract_data data;
+
+Error   : illegal function definition
+dt_treeview.c line 2386   bool selected;
+
+Error   : ')' expected
+dt_treeview.c line 2387   assert(node != NULL);
+
+Error   : identifier expected
+dt_treeview.c line 2389   if ((node->flags & TV_NFLAGS_EXPANDED) == false) {
+
+Error   : declaration syntax error
+dt_treeview.c line 2391   nslog_log( "dt_treeview.c", "",  2391, "Tried to contract a contracted node.")
+
+Error   : identifier expected
+dt_treeview.c line 2392   return NSERROR_OK;
+
+Error   : identifier expected
+dt_treeview.c line 2393   }
+
+Error   : identifier expected
+dt_treeview.c line 2395   data.tree = tree;
+
+Error   : illegal function definition
+dt_treeview.c line 2396   data.only_entries = false;
+
+Error   : illegal function definition
+dt_treeview.c line 2397   selected = node->flags & TV_NFLAGS_SELECTED;
+
+Error   : declaration syntax error
+dt_treeview.c line 2401   0L
+
+Error   : declaration syntax error
+dt_treeview.c line 2404   treeview_node_contract_cb(node, &data, false);
+
+Error   : the file 'testament.h' cannot be opened
+dt_version.c line 19   #include "testament.h"
 
 Could not find or load the file �dump.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : ')' expected
-fetch.c line 152   "Attempting to start fetch %p, fetcher %p, url %s", fetch,
-
-Error   : ';' expected
-fetch.c line 154   nsurl_access(fetch->url));
-
-Error   : ')' expected
-fetch.c line 211   NSLOG(fetch, DEBUG, "queue_ring: %s",
-
-Error   : ';' expected
-fetch.c line 212   nsurl_access(q->url));
-
-Error   : ')' expected
-fetch.c line 219   NSLOG(fetch, DEBUG, "fetch_ring: %s",
-
-Error   : ';' expected
-fetch.c line 220   nsurl_access(f->url));
-
-Error   : ')' expected
-fetch.c line 240   "queue_ring %i, fetch_ring %i",
-
-Error   : ';' expected
-fetch.c line 242   all_active);
-
-Error   : ')' expected
-fetch.c line 251   "%d queued, %d fetching",
-
-Error   : ';' expected
-fetch.c line 253   all_active);
-
-Error   : ')' expected
-fetch.c line 256   NSLOG(fetch, DEBUG, "Fetch ring is now %d elements.", all_active);
-
-Error   : ')' expected
-fetch.c line 257   NSLOG(fetch, DEBUG, "Queue ring is now %d elements.", all_queued);
-
-Error   : ';' expected
-fetch.c line 257   NSLOG(fetch, DEBUG, "Queue ring is now %d elements.", all_queued);
-
-Error   : ')' expected
-fetch.c line 342   "Fetcher for scheme %s still has %d active users at quit.",
-
-Error   : ';' expected
-fetch.c line 344   fetchers[fetcherd].refcount);
-
-Error   : ')' expected
-fetch.c line 481   NSLOG(fetch, DEBUG, "fetch %p, url '%s'", fetch, nsurl_access(url));
-
-Error   : ')' expected
-fetch.c line 540   "fetch %p, fetcher %p, url '%s'", f, f->fetcher_handle,
-
-Error   : ';' expected
-fetch.c line 541   nsurl_access(f->url));
-
-Error   : ')' expected
-fetch.c line 556   "During the fetch of %s, the fetcher did not finish.",
-
-Error   : ';' expected
-fetch.c line 557   nsurl_access(f->url));
-
-Error   : ')' expected
-fetch.c line 563   "Freeing fetch %p, fetcher %p",
-
-Error   : ';' expected
-fetch.c line 565   f->fetcher_handle);
-
-Error   : ')' expected
-fetch.c line 707   "Freeing rawfile: %s", list->rawfile);
-
-Error   : ')' expected
-fetch.c line 769   "Fetch %p, fetcher %p can be freed",
-
-Error   : ';' expected
-fetch.c line 771   fetch->fetcher_handle);
-
-Error   : ')' expected
-fetch.c line 784   NSLOG(fetch, DEBUG, "Fetch ring is now %d elements.", all_active);
-
-Error   : ';' expected
-fetch.c line 784   NSLOG(fetch, DEBUG, "Fetch ring is now %d elements.", all_active);
-
-Error   : ')' expected
-fetch.c line 785   NSLOG(fetch, DEBUG, "Queue ring is now %d elements.", all_queued);
-
-Error   : ';' expected
-fetch.c line 785   NSLOG(fetch, DEBUG, "Queue ring is now %d elements.", all_queued);
-
-Error   : ')' expected
-fetch.c line 792   NSLOG(fetch, DEBUG, "Setting HTTP code to %d", http_code);
 
 Error   : expression syntax error
 flex.c line 152   css_fixed grow_num = short_auto ? INTTOFIX(1) : 0;
@@ -285,93 +1027,15 @@ flex.c line 164   css_fixed shrink_num = short_none ? 0 : INTTOFIX(1);
 Error   : undefined identifier 'shrink_num'
 flex.c line 165   error = css__stylesheet_style_append(shrink_style, shrink_num);
 
-Error   : ')' expected
-form.c line 204   "keyname allocation failure for %s%s", name, ksfx);
-
-Error   : ';' expected
-form.c line 204   "keyname allocation failure for %s%s", name, ksfx);
-
-Error   : ')' expected
-form.c line 329   "Could not get text area disabled property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 343   "Could not get text area name property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 357   "Could not get text area content. exp %d", exp);
-
-Error   : ')' expected
-form.c line 449   "Could not get select disabled property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 462   "Could not get select name property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 497   "Could not get options item %"PRId32, option_index);
-
-Error   : ')' expected
-form.c line 774   "Could not get input disabled property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 787   "Could not get input name property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 900   "Unable to get disabled property. exp %d", exp);
-
-Error   : ')' expected
-form.c line 946   "Could not get button name property. exp %d", exp);
-
 Error   : illegal implicit conversion from 'int' to
 'char *'
 form.c line 1009   c = strstr(temp, "UTF-8");
-
-Error   : ')' expected
-form.c line 1111   "retrieving form element %"PRIu32" failed with %d",
-
-Error   : ';' expected
-form.c line 1112   element_idx, exp);
-
-Error   : ')' expected
-form.c line 1121   "getting element node name %"PRIu32" failed with %d",
-
-Error   : ';' expected
-form.c line 1122   element_idx, exp);
-
-Error   : ')' expected
-form.c line 1165   "Unhandled element type: %*s",
-
-Error   : ';' expected
-form.c line 1167   dom_string_data(nodename));
-
-Error   : ')' expected
-form.c line 1466   NSLOG(netsurf, INFO, "Control:%p name:%p value:%p initial:%p",
-
-Error   : ';' expected
-form.c line 1467   control, control->name, control->value, control->initial_value);
-
-Error   : ')' expected
-form.c line 1482   "select option:%p text:%p value:%p", option,
-
-Error   : ';' expected
-form.c line 1483   option->text, option->value);
 
 Error   : illegal constant expression
 frames.c line 334   int widths[bw->cols][bw->rows];
 
 Error   : illegal constant expression
 frames.c line 335   int heights[bw->cols][bw->rows];
-
-Error   : ')' expected
-frames.c line 633   NSLOG(netsurf, INFO, "Created frame '%s'",
-
-Error   : ';' expected
-frames.c line 634   window->name);
-
-Error   : expression syntax error
-frames.c line 635   else
-
-Error   : ';' expected
-frames.c line 637   do { if (NSLOG_LEVEL_INFO >=    NSLOG_LEVEL_INFO) { nslog_log( "frames.c", "",  637, "Created frame (unnamed)"); } } while(0)
 
 Could not find or load the file �generics.c� for target �MacSurf� for project �MacSurf�.
 
@@ -404,107 +1068,8 @@ hashmap.c line 248   }
 
 Could not find or load the file �hints.c� for target �MacSurf� for project �MacSurf�.
 
-Error   : ')' expected
-html.c line 125   NSLOG(netsurf, INFO, "Dispatching '%*s' against %p",
-
-Error   : ';' expected
-html.c line 126   (int)dom_string_length(type), dom_string_data(type), target);
-
-Error   : ')' expected
-html.c line 202   NSLOG(netsurf, INFO, "Dispatching '%*s' against %p",
-
-Error   : ';' expected
-html.c line 203   (int)dom_string_length(type), dom_string_data(type), target);
-
-Error   : ')' expected
-html.c line 222   NSLOG(netsurf, INFO, "DOM to box conversion complete (content %p)", c);
-
-Error   : ')' expected
-html.c line 388   NSLOG(netsurf, INFO, "DOM to box (%p)", htmlc);
-
-Error   : ')' expected
-html.c line 793   NSLOG(netsurf, INFO, "quirks set to %d", htmlc->quirks);
-
-Error   : ';' expected
-html.c line 793   NSLOG(netsurf, INFO, "quirks set to %d", htmlc->quirks);
-
-Error   : ')' expected
-html.c line 797   NSLOG(netsurf, INFO, "%d fetches active (%p)", htmlc->base.active, c);
-
-Error   : ';' expected
-html.c line 797   NSLOG(netsurf, INFO, "%d fetches active (%p)", htmlc->base.active, c);
-
-Error   : ')' expected
-html.c line 853   NSLOG(netsurf, INFO, "Completing parse (%p)", htmlc);
-
-Error   : ')' expected
-html.c line 876   NSLOG(netsurf, INFO, "Can't begin conversion (%p)", htmlc);
-
-Error   : ')' expected
-html.c line 883   NSLOG(netsurf, INFO, "Conversion aborted (%p) (active: %u)",
-
-Error   : ';' expected
-html.c line 884   htmlc, htmlc->base.active);
-
-Error   : ')' expected
-html.c line 1041   NSLOG(netsurf, INFO, "Unexpected status %d (%p)", c->status,
-
-Error   : ';' expected
-html.c line 1042   c);
-
-Error   : ')' expected
-html.c line 1206   NSLOG(netsurf, INFO, "content %p", c);
-
 Error   : illegal return value in void/constructor/destructor function
 html.c line 1667   return html__set_file_gadget_filename(hlcache_handle_get_content(hl),
-
-Error   : ')' expected
-html.c line 1803   "local to utf8 encoding failed (%s)",
-
-Error   : ';' expected
-html.c line 1804   messages_get_errorcode(ret));
-
-Error   : ')' expected
-html.c line 1882   NSLOG(netsurf, INFO, "DOM structure dump returning %d", ret);
-
-Error   : ';' expected
-html.c line 1882   NSLOG(netsurf, INFO, "DOM structure dump returning %d", ret);
-
-Could not find or load the file �html_css.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �html_font.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �hub_parser.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : ')' expected
-idna.c line 756   "Cannot verify ACE label %s", host);
-
-Error   : ')' expected
-imagemap.c line 248   NSLOG(netsurf, INFO, "Imagemap: %s", map->key);
-
-Error   : ')' expected
-imagemap.c line 253   NSLOG(netsurf, INFO, "\tDefault: %s",
-
-Error   : ';' expected
-imagemap.c line 254   nsurl_access(entry->url));
-
-Error   : ')' expected
-imagemap.c line 258   "\tRectangle: %s: [(%d,%d),(%d,%d)]",
-
-Error   : ';' expected
-imagemap.c line 263   entry->bounds.rect.y1);
-
-Error   : ')' expected
-imagemap.c line 267   "\tCircle: %s: [(%d,%d),%d]",
-
-Error   : ';' expected
-imagemap.c line 271   entry->bounds.circle.r);
-
-Error   : ')' expected
-imagemap.c line 275   "\tPolygon: %s:",
-
-Error   : ';' expected
-imagemap.c line 276   nsurl_access(entry->url));
 
 Error   : illegal implicit conversion from 'int' to
 'char *'
@@ -526,309 +1091,10 @@ Error   : illegal implicit conversion from 'int' to
 'char *'
 imagemap.c line 472   val = strtok(NULL, ",");
 
-Error   : ')' expected
-interaction.c line 853   NSLOG(netsurf, ERROR, "%s",
-
-Error   : ';' expected
-interaction.c line 854   messages_get_errorcode(res));
-
-Error   : ')' expected
-interaction.c line 1516   NSLOG(netsurf, ERROR, "%s", messages_get_errorcode(res));
-
 Could not find or load the file �internal.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : ')' expected
-layout.c line 501   NSLOG(layout, DEBUG, "%p: min %i, max %i", b, min, max);
-
-Error   : ';' expected
-layout.c line 501   NSLOG(layout, DEBUG, "%p: min %i, max %i", b, min, max);
-
-Error   : ')' expected
-layout.c line 792   NSLOG(layout, DEBUG,  "line_min %i, line_max %i", min, max);
-
-Error   : ';' expected
-layout.c line 792   NSLOG(layout, DEBUG,  "line_min %i, line_max %i", min, max);
-
-Error   : ')' expected
-layout.c line 1293   NSLOG(layout, DEBUG, "y0 %i, y1 %i, x0 %i, x1 %i", y0, y1, *x0, *x1);
-
-Error   : ')' expected
-layout.c line 1322   NSLOG(layout, DEBUG,  "x0 %i, x1 %i, left %p, right %p", *x0, *x1,
-
-Error   : ';' expected
-layout.c line 1323   *left, *right);
-
-Error   : ')' expected
-layout.c line 1783   "table %p, column %u: type %s, width %i, min %i, max %i",
-
-Error   : ';' expected
-layout.c line 1795   col[i].max);
-
-Error   : ')' expected
-layout.c line 1814   NSLOG(layout, DEBUG,  "required_width %i", required_width);
-
-Error   : ';' expected
-layout.c line 1814   NSLOG(layout, DEBUG,  "required_width %i", required_width);
-
-Error   : ')' expected
-layout.c line 1820   "width %i, min %i, max %i, auto %i, required %i", table_width,
-
-Error   : ';' expected
-layout.c line 1821   table->min_width, table->max_width, auto_width, required_width);
-
-Error   : ')' expected
-layout.c line 2282   NSLOG(layout, DEBUG,  "block %p, object %p, width %i", block,
-
-Error   : ';' expected
-layout.c line 2283   hlcache_handle_get_url(block->object), block->width);
-
-Error   : ')' expected
-layout.c line 2403   "split_box %p len: %" PRIsizet " \"%.*s\"",
-
-Error   : ';' expected
-layout.c line 2407   split_box->text);
-
-Error   : ')' expected
-layout.c line 2409   "  new_box %p len: %" PRIsizet " \"%.*s\"",
-
-Error   : ';' expected
-layout.c line 2413   c2->text);
-
-Error   : ')' expected
-layout.c line 2620   "c %p, width %i, cx %i, y %i, cont %p", c,
-
-Error   : ';' expected
-layout.c line 2621   width, cx, y, cont);
-
-Error   : ')' expected
-layout.c line 2738   "first %p, first->text '%.*s', width %i, y %i, cx %i, cy %i",
-
-Error   : ';' expected
-layout.c line 2745   cy);
-
-Error   : ')' expected
-layout.c line 2776   NSLOG(layout, DEBUG,  "x0 %i, x1 %i, x1 - x0 %i", x0, x1, x1 - x0);
-
-Error   : ';' expected
-layout.c line 2776   NSLOG(layout, DEBUG,  "x0 %i, x1 %i, x1 - x0 %i", x0, x1, x1 - x0);
-
-Error   : ')' expected
-layout.c line 2784   NSLOG(layout, DEBUG,  "pass 1: b %p, x %i", b, x);
-
-Error   : ';' expected
-layout.c line 2784   NSLOG(layout, DEBUG,  "pass 1: b %p, x %i", b, x);
-
-Error   : ')' expected
-layout.c line 3003   NSLOG(layout, DEBUG,  "x0 %i, x1 %i, x1 - x0 %i", x0, x1, x1 - x0);
-
-Error   : ';' expected
-layout.c line 3003   NSLOG(layout, DEBUG,  "x0 %i, x1 %i, x1 - x0 %i", x0, x1, x1 - x0);
-
-Error   : ')' expected
-layout.c line 3007   NSLOG(layout, DEBUG,  "pass 2: b %p, x %i", b, x);
-
-Error   : ')' expected
-layout.c line 3074   NSLOG(layout, DEBUG,  "float %p", b);
-
-Error   : ')' expected
-layout.c line 3085   "%p : %d %d",
-
-Error   : ';' expected
-layout.c line 3088   d->border[TOP].width);
-
-Error   : ')' expected
-layout.c line 3223   ", w %i, left %p, right %p, inline_count %u",
-
-Error   : ';' expected
-layout.c line 3231   inline_count);
-
-Error   : ')' expected
-layout.c line 3261   "cy %i, left->y %i, left->height %i",
-
-Error   : ';' expected
-layout.c line 3264   left->height);
-
-Error   : ')' expected
-layout.c line 3268   NSLOG(layout, DEBUG,  "used_height %i",
-
-Error   : ';' expected
-layout.c line 3269   used_height);
-
-Error   : ')' expected
-layout.c line 3295   "'%.*s' %i %"PRIsizet" %i",
-
-Error   : ';' expected
-layout.c line 3297   x1 - x0, split, w);
-
-Error   : ')' expected
-layout.c line 3455   "inline_container %p, width %i, cont %p, cx %i, cy %i",
-
-Error   : ';' expected
-layout.c line 3460   cy);
-
-Error   : ')' expected
-layout.c line 3489   NSLOG(layout, DEBUG, "c %p", c);
-
-Error   : ')' expected
-layout.c line 3796   NSLOG(layout, DEBUG,  "box %p, cx %i, cy %i, width %i",
-
-Error   : ';' expected
-layout.c line 3797   box, cx, cy, box->width);
-
-Error   : ')' expected
-layout.c line 4610   "%i + %i + %i + %i + %i + %i + %i + %i + %i = %i",
-
-Error   : ';' expected
-layout.c line 4613   containing_block->width);
-
-Error   : ')' expected
-layout.c line 4778   "%i + %i + %i + %i + %i + %i + %i + %i + %i = %i",
-
-Error   : ';' expected
-layout.c line 4781   containing_block->width);
-
-Error   : ')' expected
-layout.c line 4821   "%i + %i + %i + %i + %i + %i + %i + %i + %i = %i",
-
-Error   : ';' expected
-layout.c line 4824   containing_block->height);
-
-Error   : ')' expected
-layout.c line 4911   "%i + %i + %i + %i + %i + %i + %i + %i + %i = %i",
-
-Error   : ';' expected
-layout.c line 4914   containing_block->height);
-
-Error   : ')' expected
-layout.c line 5069   NSLOG(layout, DEBUG,  "left %i, right %i, top %i, bottom %i", left,
-
-Error   : ';' expected
-layout.c line 5070   right, top, bottom);
-
-Error   : ')' expected
-layout.c line 5402   NSLOG(layout, DEBUG, "Doing layout to %ix%i of %s",
-
-Error   : ';' expected
-layout.c line 5404   &content->base)));
-
-Error   : ')' expected
-layout_flex.c line 246   NSLOG(flex, ERROR, "box %p: layout failed", b);
-
-Error   : ')' expected
-layout_flex.c line 270   NSLOG(flex, DEEPDEBUG, "box %p: delta_outer_main: %i",
-
-Error   : ';' expected
-layout_flex.c line 271   b, delta_outer_main);
-
-Error   : ')' expected
-layout_flex.c line 330   NSLOG(flex, DEEPDEBUG, "flex-item box: %p: base_size: %i, main_size %i",
-
-Error   : ';' expected
-layout_flex.c line 331   b, item->base_size, item->main_size);
-
-Error   : ')' expected
-layout_flex.c line 365   NSLOG(flex, DEEPDEBUG, "flex-item box: %p: width: %i",
-
-Error   : ';' expected
-layout_flex.c line 366   b, b->width);
-
-Error   : ')' expected
-layout_flex.c line 429   NSLOG(flex, DEEPDEBUG, "flex container %p: available main: %i",
-
-Error   : ';' expected
-layout_flex.c line 430   ctx->flex, ctx->available_main);
-
-Error   : ')' expected
-layout_flex.c line 493   "Frozen at target_main_size: %i",
-
-Error   : ';' expected
-layout_flex.c line 494   item->box, item->target_main_size);
-
-Error   : ')' expected
-layout_flex.c line 544   NSLOG(flex, DEEPDEBUG, "Remaining free space: %i",
-
-Error   : ';' expected
-layout_flex.c line 545   remaining_free_main);
-
-Error   : ')' expected
-layout_flex.c line 570   NSLOG(flex, DEEPDEBUG, "item %p: target_main_size: %i",
-
-Error   : ';' expected
-layout_flex.c line 571   item->box, target_main_size);
-
-Error   : ')' expected
-layout_flex.c line 581   NSLOG(flex, DEEPDEBUG, "Violation: max_main: %i",
-
-Error   : ';' expected
-layout_flex.c line 582   item->max_main);
-
-Error   : ')' expected
-layout_flex.c line 588   NSLOG(flex, DEEPDEBUG, "Violation: min_main: %i",
-
-Error   : ';' expected
-layout_flex.c line 589   item->min_main);
-
-Error   : ')' expected
-layout_flex.c line 595   NSLOG(flex, DEEPDEBUG, "Violation: box min_width: %i",
-
-Error   : ';' expected
-layout_flex.c line 596   item->box->min_width);
-
-Error   : ')' expected
-layout_flex.c line 609   NSLOG(flex, DEEPDEBUG, "Total violation: %i", total_violation);
-
-Error   : ')' expected
-layout_flex.c line 727   NSLOG(flex, DEEPDEBUG, "box %p: line %zu: first: %zu, count: %zu",
-
-Error   : ';' expected
-layout_flex.c line 729   line->first, line->count);
-
-Error   : ')' expected
-layout_flex.c line 730   NSLOG(flex, DEEPDEBUG, "Line main_size: %i, available_main: %i",
-
-Error   : ';' expected
-layout_flex.c line 731   line->main_size, available_main);
-
-Error   : ')' expected
-layout_flex.c line 765   NSLOG(flex, DEEPDEBUG, "flex-container: %p: Resolver pass",
-
-Error   : ';' expected
-layout_flex.c line 766   ctx->flex);
-
-Error   : ')' expected
-layout_flex.c line 920   "fitted: %zu (total: %zu/%zu)",
-
-Error   : ';' expected
-layout_flex.c line 922   pos, ctx->item.count);
-
-Error   : ')' expected
-layout_flex.c line 1066   NSLOG(flex, DEEPDEBUG, "box %p: %s, available_width %i, width: %i",
-
-Error   : ';' expected
-layout_flex.c line 1068   available_width, flex->width);
-
-Error   : ')' expected
-layout_flex.c line 1086   NSLOG(flex, DEEPDEBUG, "box %p: available_main: %i",
-
-Error   : ';' expected
-layout_flex.c line 1087   flex, ctx->available_main);
-
-Error   : ')' expected
-layout_flex.c line 1088   NSLOG(flex, DEEPDEBUG, "box %p: available_cross: %i",
-
-Error   : ';' expected
-layout_flex.c line 1089   flex, ctx->available_cross);
-
-Error   : ')' expected
-layout_flex.c line 1121   NSLOG(flex, DEEPDEBUG, "box %p: %s: w: %i, h: %i", flex,
-
-Error   : ';' expected
-layout_flex.c line 1123   flex->width, flex->height);
 
 Error   : undefined identifier 'strncmp'
 libwapcaplet.c line 148   strncmp, (lwc_memcpy)memcpy);
-
-Could not find or load the file �list_style.c� for target �MacSurf� for project �MacSurf�.
 
 Error   : illegal implicit conversion from 'int' to
 'const char *'
@@ -878,7 +1144,17 @@ Error   : illegal implicit conversion from 'int' to
 'char *'
 macos9_fetch.c line 170   sep = strstr(buf, "\r\n\r\n");
 
-Could not find or load the file �macos9_font.c� for target �MacSurf� for project �MacSurf�.
+Error   : illegal function definition
+(included from:
+ macos9.h:10
+ macos9_font.c:23)
+MacWindows.h line 3861   AliasHandle   alias);
+
+Error   : illegal function definition
+(included from:
+ macos9.h:10
+ macos9_font.c:23)
+MacWindows.h line 3875   AliasHandle *  alias);
 
 Error   : declaration syntax error
 (included from:
@@ -932,14 +1208,6 @@ Error   : illegal function definition
  misc.c:16)
 MacWindows.h line 3875   AliasHandle *  alias);
 
-Could not find or load the file �ns_content.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �ns_file.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �ns_hashtable.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �ns_utf8.c� for target �MacSurf� for project �MacSurf�.
-
 Error   : ',' expected
 nsoption.c line 118   if (sscanf(value, "%"SCNx32"", &rgbcolour) == 1) {
 
@@ -983,47 +1251,6 @@ nsoption.c line 889   val = strchr(arg, '=');
 Could not find or load the file �nsurl.c� for target �MacSurf� for project �MacSurf�.
 
 Could not find or load the file �nsurl_parse.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : ')' expected
-object.c line 198   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ';' expected
-object.c line 198   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ')' expected
-object.c line 230   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ';' expected
-object.c line 230   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ')' expected
-object.c line 542   NSLOG(netsurf, INFO, "%d fetches active",
-
-Error   : ';' expected
-object.c line 543   c->base.active);
-
-Error   : ')' expected
-object.c line 564   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ';' expected
-object.c line 564   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ')' expected
-object.c line 650   NSLOG(netsurf, INFO, "%d fetches active",
-
-Error   : ';' expected
-object.c line 651   htmlc->base.active);
-
-Error   : ')' expected
-object.c line 693   NSLOG(netsurf, INFO, "object %p", victim->content);
-
-Error   : ')' expected
-object.c line 767   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ';' expected
-object.c line 767   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Could not find or load the file �p_font.c� for target �MacSurf� for project �MacSurf�.
 
 Error   : expression syntax error
 page-info.c line 335   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
@@ -1343,8 +1570,6 @@ MacWindows.h line 3875   AliasHandle *  alias);
 
 Could not find or load the file �primitives.c� for target �MacSurf� for project �MacSurf�.
 
-Could not find or load the file �pu_utf8.c� for target �MacSurf� for project �MacSurf�.
-
 Error   : expression syntax error
 redraw.c line 999   nserror res;
 
@@ -1403,21 +1628,21 @@ Error   : illegal function definition
 redraw.c line 1042   struct box *c;
 
 Error   : illegal function definition
-redraw.c line 1045   plot_style_t plot_style_box = {
+redraw.c line 1043   nserror res;
+
+Error   : illegal function definition
+redraw.c line 1044   struct rect rect;
+
+Error   : illegal function definition
+redraw.c line 1047   plot_style_t plot_style_box = {
 
 Error   : ';' expected
-redraw.c line 1048   };
+redraw.c line 1050   };
 
 Error   : declaration syntax error
-redraw.c line 1049   plot_style_box.stroke_colour = colour;
+redraw.c line 1051   plot_style_box.stroke_colour = colour;
 
 Error   : ';' expected
-redraw.c line 1050   nserror res;
-
-Error   : illegal name overloading
-redraw.c line 1051   struct rect rect;
-
-Error   : declaration syntax error
 redraw.c line 1054   for (c = box->children; c; c = c->next) {
 
 Error   : declaration syntax error
@@ -1555,36 +1780,6 @@ redraw.c line 1128   return true;
 Error   : declaration syntax error
 redraw.c line 1129   }
 
-Error   : ')' expected
-redraw.c line 1919   NSLOG(netsurf, INFO, "%s", messages_get_errorcode(res));
-
-Error   : ')' expected
-save_complete.c line 178   NSLOG(netsurf, INFO, "fopen(): %s", strerror(errno));
-
-Error   : ';' expected
-save_complete.c line 178   NSLOG(netsurf, INFO, "fopen(): %s", strerror(errno));
-
-Error   : ')' expected
-save_complete.c line 1131   NSLOG(netsurf, INFO, "Unhandled node type: %d", type);
-
-Error   : ')' expected
-save_complete.c line 1163   NSLOG(netsurf, INFO, "fopen(): %s", strerror(errno));
-
-Error   : ';' expected
-save_complete.c line 1163   NSLOG(netsurf, INFO, "fopen(): %s", strerror(errno));
-
-Error   : ')' expected
-save_complete.c line 1252   NSLOG(netsurf, INFO, "fopen(): %s", strerror(errno));
-
-Error   : ')' expected
-save_complete.c line 1280   NSLOG(netsurf, INFO, "Failed to compile regexp '%s': %s\n",
-
-Error   : ';' expected
-save_complete.c line 1281   regex, errbuf);
-
-Error   : ')' expected
-save_text.c line 79   "failed to convert to local encoding, return %d", ret);
-
 Error   : illegal function definition
 (included from:
  macos9.h:10
@@ -1596,114 +1791,6 @@ Error   : illegal function definition
  macos9.h:10
  schedule.c:18)
 MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : ')' expected
-script.c line 183   NSLOG(netsurf, INFO, "script %d done '%s'", i,
-
-Error   : ';' expected
-script.c line 184   nsurl_access(hlcache_handle_get_url(script)));
-
-Error   : ')' expected
-script.c line 186   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 186   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 191   NSLOG(netsurf, INFO, "script %s failed: %s",
-
-Error   : ';' expected
-script.c line 193   event->data.errordata.errormsg);
-
-Error   : ')' expected
-script.c line 198   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 198   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 246   NSLOG(netsurf, INFO, "script %d done '%s'", i,
-
-Error   : ';' expected
-script.c line 247   nsurl_access(hlcache_handle_get_url(script)));
-
-Error   : ')' expected
-script.c line 249   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 249   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 254   NSLOG(netsurf, INFO, "script %s failed: %s",
-
-Error   : ';' expected
-script.c line 256   event->data.errordata.errormsg);
-
-Error   : ')' expected
-script.c line 261   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 261   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 312   NSLOG(netsurf, INFO, "script %d done '%s'", i,
-
-Error   : ';' expected
-script.c line 313   nsurl_access(hlcache_handle_get_url(script)));
-
-Error   : ')' expected
-script.c line 315   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 315   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 334   NSLOG(netsurf, INFO, "unpause returned 0x%x", err);
-
-Error   : ')' expected
-script.c line 341   NSLOG(netsurf, INFO, "script %s failed: %s",
-
-Error   : ';' expected
-script.c line 343   event->data.errordata.errormsg);
-
-Error   : ')' expected
-script.c line 349   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ';' expected
-script.c line 349   NSLOG(netsurf, INFO, "%d fetches active", parent->base.active);
-
-Error   : ')' expected
-script.c line 357   NSLOG(netsurf, INFO, "unpause returned 0x%x", err);
-
-Error   : ')' expected
-script.c line 404   NSLOG(netsurf, INFO, "script %i '%s'", c->scripts_count,
-
-Error   : ';' expected
-script.c line 405   nsurl_access(joined));
-
-Error   : ')' expected
-script.c line 489   NSLOG(netsurf, INFO, "Fetch failed with error %d", ns_error);
-
-Error   : ';' expected
-script.c line 489   NSLOG(netsurf, INFO, "Fetch failed with error %d", ns_error);
-
-Error   : ')' expected
-script.c line 493   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ';' expected
-script.c line 493   NSLOG(netsurf, INFO, "%d fetches active", c->base.active);
-
-Error   : ')' expected
-script.c line 582   NSLOG(netsurf, INFO, "javascript context %p ", c->js_thread);
-
-Error   : ';' expected
-script.c line 582   NSLOG(netsurf, INFO, "javascript context %p ", c->js_thread);
-
-Error   : ')' expected
-script.c line 589   NSLOG(netsurf, INFO, "content %p parser %p node %p", c, c->parser,
-
-Error   : ';' expected
-script.c line 590   node);
 
 Could not find or load the file �strict-transport-security.c� for target �MacSurf� for project �MacSurf�.
 
@@ -1758,12 +1845,6 @@ urldb.c line 4008   (dot = strchr(hptr + 1, '.')) == NULL ||
 Error   : illegal implicit conversion from 'int' to
 'char *'
 urldb.c line 4065   dot = strchr(c->domain + 1, '.');
-
-Error   : ')' expected
-useragent.c line 73   NSLOG(netsurf, INFO, "Built user agent \"%s\"",
-
-Error   : ';' expected
-useragent.c line 74   core_user_agent_string);
 
 Error   : illegal function definition
 (included from:
