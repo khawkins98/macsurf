@@ -16,13 +16,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-/* Bulletproof POSIX type foundation (bypassing MSL/local shadowing).
- * <time.h> cannot be used here — CW8 finds NetSurf's utils/time.h.
- * <stat.h> cannot be used here — MSL doesn't provide a standalone one. */
-#ifndef _TIME_T
-#define _TIME_T
-typedef long time_t;
-#endif
+/* POSIX type foundation. <time.h> is safe now that NetSurf's
+ * utils/time.h was renamed to utils/ns_time.h. */
+#include <time.h>
 
 #ifndef _MODE_T
 #define _MODE_T

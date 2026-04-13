@@ -45,7 +45,7 @@
 #include "utils/messages.h"
 #include "utils/nsurl.h"
 #include "utils/utils.h"
-#include "utils/time.h"
+#include "utils/ns_time.h"
 #include "utils/http.h"
 #include "utils/nsoption.h"
 #include "netsurf/misc.h"

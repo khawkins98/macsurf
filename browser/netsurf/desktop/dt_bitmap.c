@@ -151,11 +151,12 @@ static inline void bitmap__format_convert(
 		struct bitmap_colour_layout to,
 		struct bitmap_colour_layout from)
 {
+	int x, y;
 	/* Just swapping the components around */
-	for (int y = 0; y < height; y++) {
+	for (y = 0; y < height; y++) {
 		uint8_t *row = buffer;
 
-		for (int x = 0; x < width; x++) {
+		for (x = 0; x < width; x++) {
 			const uint32_t px = *((uint32_t *)(void *) row);
 
 			row[to.r] = ((const uint8_t *) &px)[from.r];
@@ -188,10 +189,11 @@ static inline void bitmap__format_convert_to_pma(
 		struct bitmap_colour_layout to,
 		struct bitmap_colour_layout from)
 {
-	for (int y = 0; y < height; y++) {
+	int x, y;
+	for (y = 0; y < height; y++) {
 		uint8_t *row = buffer;
 
-		for (int x = 0; x < width; x++) {
+		for (x = 0; x < width; x++) {
 			const uint32_t px = *((uint32_t *)(void *) row);
 			uint32_t a, r, g, b;
 
