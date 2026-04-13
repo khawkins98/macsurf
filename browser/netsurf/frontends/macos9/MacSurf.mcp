@@ -131,7 +131,7 @@
 
     <SETTING>
         <NAME>MWFrontEnd_C_prefix_file</NAME>
-        <VALUE></VALUE>
+        <VALUE>macsurf_prefix.h</VALUE>
     </SETTING>
 
     <!-- ============================================================== -->
@@ -156,6 +156,13 @@
         {Project} = directory containing this .mcp file
         {Compiler} = CodeWarrior installation root
     -->
+
+    <!-- 0. Frontend root — stub headers for libwapcaplet/, dom/, nsutils/
+         etc. that shadow the upstream originals. MUST come before #2. -->
+    <SETTING>
+        <NAME>UserSearchPath</NAME>
+        <VALUE>{Project}</VALUE>
+    </SETTING>
 
     <!-- 1. Frontend-local includes (macos9.h, shim headers) -->
     <SETTING>
