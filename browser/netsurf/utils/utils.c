@@ -369,7 +369,7 @@ int scandir(const char *dir, struct dirent ***namelist,
 	struct dirent *ent = NULL, *new_ent;
 	int alloc_n = 0;
 	int n = 0;
-	DIR *d;
+	MAC_DIR *d;
 
 	d = opendir(dir);
 	if (d == NULL) {

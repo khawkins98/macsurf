@@ -19,11 +19,15 @@ struct dirent {
     char d_name[NAME_MAX + 1];
 };
 
-typedef struct _DIR DIR;
+/* Use MAC_DIR to avoid collision with libhubbub's element-type.h
+ * enum which defines DIR as an HTML element type constant.
+ * NetSurf code that uses DIR * (file.c, utils.c) is patched to
+ * use MAC_DIR * instead. */
+typedef struct _DIR MAC_DIR;
 
-DIR    *opendir(const char *path);
-struct dirent *readdir(DIR *dir);
-int     closedir(DIR *dir);
-void    rewinddir(DIR *dir);
+MAC_DIR    *opendir(const char *path);
+struct dirent *readdir(MAC_DIR *dir);
+int     closedir(MAC_DIR *dir);
+void    rewinddir(MAC_DIR *dir);
 
 #endif /* MAC_DIRENT_H */
