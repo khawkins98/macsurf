@@ -16,11 +16,11 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-#include <hubbub/errors.h>
-
-#include <dom/dom.h>
-
+/* errors.h (in this same directory) is self-contained and provides
+ * both the HUBBUB constants and dom_hubbub_error without needing
+ * <hubbub/errors.h>. dom_node and dom_document come from <dom/dom.h>. */
 #include "errors.h"
+#include <dom/dom.h>
 
 /**
  * Type of script completion function
