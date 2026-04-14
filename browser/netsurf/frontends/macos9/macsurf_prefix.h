@@ -25,7 +25,9 @@
 typedef long time_t;
 #endif
 
-/* struct tm — needed by localtime(), strftime() etc. */
+/* struct tm — needed by localtime(), strftime() etc.
+ * Set _TIME_H too so ns_time.c's own guard blocks its redeclaration. */
+#define _TIME_H
 #ifndef _STRUCT_TM
 #define _STRUCT_TM
 struct tm {
