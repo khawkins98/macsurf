@@ -331,8 +331,9 @@ nserror browser_window_destroy_iframes(struct browser_window *bw)
  */
 static void browser_window_recalculate_frameset_internal(struct browser_window *bw)
 {
-	int widths[bw->cols][bw->rows];
-	int heights[bw->cols][bw->rows];
+	/* C89: no VLAs. Use fixed max (framesets are always small). */
+	int widths[16][16];
+	int heights[16][16];
 	int bw_width, bw_height;
 	int avail_width, avail_height;
 	int row, row2, col, index;

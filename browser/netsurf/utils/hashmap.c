@@ -232,10 +232,12 @@ hashmap_remove(hashmap_t *hashmap, void *key)
 bool
 hashmap_iterate(hashmap_t *hashmap, hashmap_iteration_cb_t cb, void *ctx)
 {
-	for (uint32_t bucket = 0;
+	uint32_t bucket;
+	hashmap_entry_t *entry;
+	for (bucket = 0;
 	     bucket < hashmap->bucket_count;
 	     bucket++) {
-		for (hashmap_entry_t *entry = hashmap->buckets[bucket];
+		for (entry = hashmap->buckets[bucket];
 		     entry != NULL;
 		     entry = entry->next) {
 			/* If the callback returns true, we early-exit */
