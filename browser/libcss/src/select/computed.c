@@ -756,8 +756,9 @@ uint8_t css_computed_width(const css_computed_style *style,
 		css_fixed *length, css_unit *unit)
 {
 	css_fixed_or_calc length_;
+	uint8_t ret;
 	length_.value = 0;
-	uint8_t ret = get_width(style, &length_, unit);
+	ret = get_width(style, &length_, unit);
 	if (ret == CSS_WIDTH_SET) {
 		if (*unit == CSS_UNIT_CALC) {
 			return CSS_WIDTH_AUTO;

@@ -291,132 +291,6 @@ Could not find or load the file �cssh_css.c� for target �MacSurf� for pr
 
 Could not find or load the file �cssh_select.c� for target �MacSurf� for project �MacSurf�.
 
-Error   : expression syntax error
-dt_bitmap.c line 243   for (int y = 0; y < height; y++) {
-
-Error   : undefined identifier 'y'
-dt_bitmap.c line 243   for (int y = 0; y < height; y++) {
-
-Error   : undefined identifier 'y'
-dt_bitmap.c line 243   for (int y = 0; y < height; y++) {
-
-Error   : ';' expected
-dt_bitmap.c line 244   uint8_t *row = buffer;
-
-Error   : expression syntax error
-dt_bitmap.c line 246   for (int x = 0; x < width; x++) {
-
-Error   : undefined identifier 'x'
-dt_bitmap.c line 246   for (int x = 0; x < width; x++) {
-
-Error   : undefined identifier 'x'
-dt_bitmap.c line 246   for (int x = 0; x < width; x++) {
-
-Error   : ';' expected
-dt_bitmap.c line 247   const uint32_t px = *((uint32_t *)(void *) row);
-
-Error   : expression syntax error
-dt_bitmap.c line 248   uint32_t a, r, g, b;
-
-Error   : undefined identifier 'r'
-dt_bitmap.c line 250   r = ((const uint8_t *) &px)[from.r];
-
-Error   : undefined identifier 'g'
-dt_bitmap.c line 251   g = ((const uint8_t *) &px)[from.g];
-
-Error   : undefined identifier 'b'
-dt_bitmap.c line 252   b = ((const uint8_t *) &px)[from.b];
-
-Error   : undefined identifier 'a'
-dt_bitmap.c line 253   a = ((const uint8_t *) &px)[from.a];
-
-Error   : undefined identifier 'a'
-dt_bitmap.c line 255   if (a != 0) {
-
-Error   : undefined identifier 'r'
-dt_bitmap.c line 256   r = (r << 8) / a;
-
-Error   : undefined identifier 'g'
-dt_bitmap.c line 257   g = (g << 8) / a;
-
-Error   : undefined identifier 'b'
-dt_bitmap.c line 258   b = (b << 8) / a;
-
-Error   : undefined identifier 'r'
-dt_bitmap.c line 260   r = (r > 255) ? 255 : r;
-
-Error   : undefined identifier 'g'
-dt_bitmap.c line 261   g = (g > 255) ? 255 : g;
-
-Error   : undefined identifier 'b'
-dt_bitmap.c line 262   b = (b > 255) ? 255 : b;
-
-Error   : undefined identifier 'r'
-dt_bitmap.c line 264   r = g = b = 0;
-
-Error   : undefined identifier 'row'
-dt_bitmap.c line 267   row[to.r] = r;
-
-Error   : undefined identifier 'row'
-dt_bitmap.c line 268   row[to.g] = g;
-
-Error   : undefined identifier 'row'
-dt_bitmap.c line 269   row[to.b] = b;
-
-Error   : undefined identifier 'row'
-dt_bitmap.c line 270   row[to.a] = a;
-
-Error   : undefined identifier 'row'
-dt_bitmap.c line 272   row += sizeof(uint32_t);
-
-Error   : declaration syntax error
-dt_bitmap.c line 275   buffer += rowstride;
-
-Error   : declaration syntax error
-dt_bitmap.c line 276   }
-
-Error   : declaration syntax error
-dt_bitmap.c line 277   }
-
-Error   : expression syntax error
-dt_bitmap.c line 327   for (int y = 0; y < height; y++) {
-
-Error   : undefined identifier 'y'
-dt_bitmap.c line 327   for (int y = 0; y < height; y++) {
-
-Error   : undefined identifier 'y'
-dt_bitmap.c line 327   for (int y = 0; y < height; y++) {
-
-Error   : ';' expected
-dt_bitmap.c line 328   const uint8_t *row = buffer;
-
-Error   : expression syntax error
-dt_bitmap.c line 330   for (int x = bitmap_layout.a; x < width; x += 4) {
-
-Error   : undefined identifier 'x'
-dt_bitmap.c line 330   for (int x = bitmap_layout.a; x < width; x += 4) {
-
-Error   : undefined identifier 'x'
-dt_bitmap.c line 330   for (int x = bitmap_layout.a; x < width; x += 4) {
-
-Error   : ';' expected
-dt_bitmap.c line 331   if (row[x] != 0xff) {
-
-Error   : declaration syntax error
-dt_bitmap.c line 334   }
-
-Error   : declaration syntax error
-dt_bitmap.c line 336   buffer += rowstride;
-
-Error   : declaration syntax error
-dt_bitmap.c line 337   }
-
-Error   : declaration syntax error
-dt_bitmap.c line 339   return true;
-
-Error   : declaration syntax error
-dt_bitmap.c line 340   }
-
 Error   : illegal implicit conversion from 'int' to
 'const char *'
 dt_download.c line 59   const char *slash = strrchr(filename, '/');
@@ -813,306 +687,306 @@ Error   : illegal implicit conversion from 'struct scrollbar *' to
 'unsigned char'
 dt_textarea.c line 2464   bool bar_y = ta->bar_y;
 
-Error   : expression syntax error
-dt_treeview.c line 831   struct treeview_node_entry *entry = (struct treeview_node_entry *)n;
-
-Error   : expression syntax error
-dt_treeview.c line 832    unsigned char
-
-Error   : expression syntax error
-dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
-
-Error   : undefined identifier 'i'
-dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
-
-Error   : undefined identifier 'i'
-dt_treeview.c line 834   for (int i = 0; i < sw->tree->n_fields; i++) {
-
-Error   : ';' expected
-dt_treeview.c line 835   struct treeview_field *ef = &(sw->tree->fields[i + 1]);
-
-Error   : undefined identifier 'ef'
-dt_treeview.c line 836   if (ef->flags & TREE_FLAG_SEARCHABLE) {
-
-Error   : ';' expected
-dt_treeview.c line 837   if (strcasestr(entry->fields[i].value.data,
-
-Error   : ';' expected
-dt_treeview.c line 838   sw->text) != NULL) {
-
-Error   : undefined identifier 'matched'
-dt_treeview.c line 839   matched = true;
-
-Error   : illegal use of keyword
-dt_treeview.c line 840   break;
-
-Error   : declaration syntax error
-dt_treeview.c line 842   }
-
-Error   : declaration syntax error
-dt_treeview.c line 843   }
-
-Error   : declaration syntax error
-dt_treeview.c line 845   if (!matched && strcasestr(n->text.data, sw->text) != NULL) {
-
-Error   : illegal function definition
-dt_treeview.c line 846   matched = true;
-
-Error   : identifier expected
-dt_treeview.c line 847   }
-
-Error   : illegal function definition
-dt_treeview.c line 849   if (matched) {
-
-Error   : ';' expected
-dt_treeview.c line 850   n->flags |= TV_NFLAGS_MATCHED;
-
-Error   : illegal function definition
-dt_treeview.c line 851   sw->window_height += n->height;
-
-Error   : identifier expected
-dt_treeview.c line 852   } else {
-
-Error   : pointer/array required
-dt_treeview.c line 853   n->flags &= ~TV_NFLAGS_MATCHED;
-
-Error   : declaration syntax error
-dt_treeview.c line 856   return NSERROR_OK;
-
-Error   : declaration syntax error
-dt_treeview.c line 857   }
-
 Error   : illegal implicit conversion from 'struct plot_font_style' to
 'struct lwc_string_s *const *'
-dt_treeview.c line 2001   .text = text,
+dt_treeview.c line 2004   .text = text,
 
 Error   : expression syntax error
-dt_treeview.c line 2269   for (struct treeview_node *n = node;
+dt_treeview.c line 2272   for (struct treeview_node *n = node;
 
 Error   : undefined identifier 'n'
-dt_treeview.c line 2270   (n != NULL) && (n->flags & TV_NFLAGS_EXPANDED);
+dt_treeview.c line 2273   (n != NULL) && (n->flags & TV_NFLAGS_EXPANDED);
 
 Error   : undefined identifier 'n'
-dt_treeview.c line 2271   n = n->parent) {
+dt_treeview.c line 2274   n = n->parent) {
 
 Error   : ';' expected
-dt_treeview.c line 2272   n->height += additional_height_entries +
+dt_treeview.c line 2275   n->height += additional_height_entries +
 
 Error   : declaration syntax error
-dt_treeview.c line 2276   if (tree->search.search &&
+dt_treeview.c line 2279   if (tree->search.search &&
 
 Error   : declaration syntax error
-dt_treeview.c line 2277   node->type == TREE_NODE_ENTRY &&
+dt_treeview.c line 2280   node->type == TREE_NODE_ENTRY &&
 
 Error   : declaration syntax error
-dt_treeview.c line 2278   node->flags & TV_NFLAGS_MATCHED) {
+dt_treeview.c line 2281   node->flags & TV_NFLAGS_MATCHED) {
 
 Error   : declaration syntax error
-dt_treeview.c line 2279   tree->search.height += additional_height_entries;
+dt_treeview.c line 2282   tree->search.height += additional_height_entries;
 
 Error   : declaration syntax error
-dt_treeview.c line 2280   }
+dt_treeview.c line 2283   }
 
 Error   : declaration syntax error
-dt_treeview.c line 2283   if (additional_height_entries + additional_height_folders != 0) {
+dt_treeview.c line 2286   if (additional_height_entries + additional_height_folders != 0) {
 
 Error   : declaration syntax error
-dt_treeview.c line 2284   treeview__cw_update_size(tree, -1,
+dt_treeview.c line 2287   treeview__cw_update_size(tree, -1,
 
 Error   : ';' expected
-dt_treeview.c line 2285   treeview__get_display_height(tree));
-
-Error   : identifier expected
-dt_treeview.c line 2286   }
-
-Error   : illegal function definition
-dt_treeview.c line 2288   return NSERROR_OK;
+dt_treeview.c line 2288   treeview__get_display_height(tree));
 
 Error   : identifier expected
 dt_treeview.c line 2289   }
 
 Error   : illegal function definition
-dt_treeview.c line 2294   {
-
-Error   : illegal function definition
-dt_treeview.c line 2295   nserror res;
-
-Error   : illegal function definition
-dt_treeview.c line 2297   res = treeview_node_expand_internal(tree, node);
-
-Error   : declaration syntax error
-dt_treeview.c line 2298   nslog_log( "dt_treeview.c", "",  2298, "Expanding!")
+dt_treeview.c line 2291   return NSERROR_OK;
 
 Error   : identifier expected
-dt_treeview.c line 2299   if (res == NSERROR_OK) {
+dt_treeview.c line 2292   }
 
 Error   : illegal function definition
-dt_treeview.c line 2301   treeview__redraw_from_node(tree, node);
+dt_treeview.c line 2297   {
+
+Error   : illegal function definition
+dt_treeview.c line 2298   nserror res;
+
+Error   : illegal function definition
+dt_treeview.c line 2300   res = treeview_node_expand_internal(tree, node);
 
 Error   : declaration syntax error
-dt_treeview.c line 2302   nslog_log( "dt_treeview.c", "",  2302, "Expanded!")
+dt_treeview.c line 2301   nslog_log( "dt_treeview.c", "",  2301, "Expanding!")
 
 Error   : identifier expected
-dt_treeview.c line 2303   }
+dt_treeview.c line 2302   if (res == NSERROR_OK) {
 
 Error   : illegal function definition
-dt_treeview.c line 2305   return res;
+dt_treeview.c line 2304   treeview__redraw_from_node(tree, node);
+
+Error   : declaration syntax error
+dt_treeview.c line 2305   nslog_log( "dt_treeview.c", "",  2305, "Expanded!")
 
 Error   : identifier expected
 dt_treeview.c line 2306   }
 
 Error   : illegal function definition
-dt_treeview.c line 2312   struct treeview_contract_data {
+dt_treeview.c line 2308   return res;
+
+Error   : identifier expected
+dt_treeview.c line 2309   }
+
+Error   : illegal function definition
+dt_treeview.c line 2315   struct treeview_contract_data {
 
 Error   : object 'tree' redefined
-dt_treeview.c line 2313   treeview *tree;
+dt_treeview.c line 2316   treeview *tree;
 
 Error   : illegal function definition
-dt_treeview.c line 2314   bool only_entries;
+dt_treeview.c line 2317   bool only_entries;
 
 Error   : identifier expected
-dt_treeview.c line 2315   };
+dt_treeview.c line 2318   };
 
 Error   : illegal function definition
-dt_treeview.c line 2326   static nserror treeview_node_contract_cb(treeview_node *n, void *ctx, bool *end)
+dt_treeview.c line 2329   static nserror treeview_node_contract_cb(treeview_node *n, void *ctx, bool *end)
 
 Error   : illegal function definition
-dt_treeview.c line 2327   {
+dt_treeview.c line 2330   {
 
 Error   : illegal function definition
-dt_treeview.c line 2328   struct treeview_contract_data *data = ctx;
+dt_treeview.c line 2331   struct treeview_contract_data *data = ctx;
 
 Error   : illegal function definition
-dt_treeview.c line 2329   int h_reduction_folder = 0;
+dt_treeview.c line 2332   int h_reduction_folder = 0;
 
 Error   : illegal function definition
-dt_treeview.c line 2330   int h_reduction_entry = 0;
+dt_treeview.c line 2333   int h_reduction_entry = 0;
 
 Error   : ')' expected
-dt_treeview.c line 2332   assert(n != NULL);
+dt_treeview.c line 2335   assert(n != NULL);
 
 Error   : ')' expected
-dt_treeview.c line 2333   assert(n->type != TREE_NODE_ROOT);
+dt_treeview.c line 2336   assert(n->type != TREE_NODE_ROOT);
 
 Error   : illegal function definition
-dt_treeview.c line 2335   n->flags &= ~TV_NFLAGS_SELECTED;
+dt_treeview.c line 2338   n->flags &= ~TV_NFLAGS_SELECTED;
 
 Error   : identifier expected
-dt_treeview.c line 2337   if ((n->flags & TV_NFLAGS_EXPANDED) == false ||
+dt_treeview.c line 2340   if ((n->flags & TV_NFLAGS_EXPANDED) == false ||
 
 Error   : ')' expected
-dt_treeview.c line 2338   (n->type == TREE_NODE_FOLDER && data->only_entries)) {
+dt_treeview.c line 2341   (n->type == TREE_NODE_FOLDER && data->only_entries)) {
 
 Error   : identifier expected
-dt_treeview.c line 2340   return NSERROR_OK;
+dt_treeview.c line 2343   return NSERROR_OK;
 
 Error   : identifier expected
-dt_treeview.c line 2341   }
+dt_treeview.c line 2344   }
 
 Error   : ')' expected
-dt_treeview.c line 2344   switch (n->type) {
+dt_treeview.c line 2347   switch (n->type) {
 
 Error   : identifier expected
-dt_treeview.c line 2345   case TREE_NODE_FOLDER:
+dt_treeview.c line 2348   case TREE_NODE_FOLDER:
 
 Error   : illegal function definition
-dt_treeview.c line 2346   h_reduction_folder = n->height - tree_g.line_height;
+dt_treeview.c line 2349   h_reduction_folder = n->height - tree_g.line_height;
 
 Error   : identifier expected
-dt_treeview.c line 2347   break;
+dt_treeview.c line 2350   break;
 
 Error   : identifier expected
-dt_treeview.c line 2349   case TREE_NODE_ENTRY:
+dt_treeview.c line 2352   case TREE_NODE_ENTRY:
 
 Error   : illegal function definition
-dt_treeview.c line 2350   h_reduction_entry = n->height - tree_g.line_height;
-
-Error   : identifier expected
-dt_treeview.c line 2351   break;
-
-Error   : identifier expected
-dt_treeview.c line 2353   default:
+dt_treeview.c line 2353   h_reduction_entry = n->height - tree_g.line_height;
 
 Error   : identifier expected
 dt_treeview.c line 2354   break;
 
 Error   : identifier expected
-dt_treeview.c line 2355   }
+dt_treeview.c line 2356   default:
+
+Error   : identifier expected
+dt_treeview.c line 2357   break;
+
+Error   : identifier expected
+dt_treeview.c line 2358   }
 
 Error   : ')' expected
-dt_treeview.c line 2358   assert(h_reduction_folder + h_reduction_entry >= 0);
+dt_treeview.c line 2361   assert(h_reduction_folder + h_reduction_entry >= 0);
 
 Error   : identifier expected
-dt_treeview.c line 2359   for (struct treeview_node *node = n;
+dt_treeview.c line 2362   for (struct treeview_node *node = n;
 
 Error   : ')' expected
-dt_treeview.c line 2360   (node != NULL) && (node->flags & TV_NFLAGS_EXPANDED);
+dt_treeview.c line 2363   (node != NULL) && (node->flags & TV_NFLAGS_EXPANDED);
 
 Error   : illegal function definition
-dt_treeview.c line 2361   node = node->parent) {
+dt_treeview.c line 2364   node = node->parent) {
 
 Error   : illegal function definition
-dt_treeview.c line 2362   node->height -= h_reduction_folder + h_reduction_entry;
+dt_treeview.c line 2365   node->height -= h_reduction_folder + h_reduction_entry;
 
 Error   : identifier expected
-dt_treeview.c line 2363   }
+dt_treeview.c line 2366   }
 
 Error   : ')' expected
-dt_treeview.c line 2365   if (data->tree->search.search) {
+dt_treeview.c line 2368   if (data->tree->search.search) {
 
 Error   : illegal function definition
-dt_treeview.c line 2366   data->tree->search.height -= h_reduction_entry;
+dt_treeview.c line 2369   data->tree->search.height -= h_reduction_entry;
 
 Error   : identifier expected
-dt_treeview.c line 2367   }
+dt_treeview.c line 2370   }
 
 Error   : identifier expected
-dt_treeview.c line 2369   n->flags ^= TV_NFLAGS_EXPANDED;
+dt_treeview.c line 2372   n->flags ^= TV_NFLAGS_EXPANDED;
 
 Error   : identifier expected
-dt_treeview.c line 2371   return NSERROR_OK;
+dt_treeview.c line 2374   return NSERROR_OK;
 
 Error   : identifier expected
-dt_treeview.c line 2372   }
+dt_treeview.c line 2375   }
 
 Error   : illegal function definition
-dt_treeview.c line 2384   {
+dt_treeview.c line 2387   {
 
 Error   : illegal use of incomplete struct/union/class 'struct treeview_contract_data'
-dt_treeview.c line 2385   struct treeview_contract_data data;
+dt_treeview.c line 2388   struct treeview_contract_data data;
 
 Error   : illegal function definition
-dt_treeview.c line 2386   bool selected;
+dt_treeview.c line 2389   bool selected;
 
 Error   : ')' expected
-dt_treeview.c line 2387   assert(node != NULL);
+dt_treeview.c line 2390   assert(node != NULL);
 
 Error   : identifier expected
-dt_treeview.c line 2389   if ((node->flags & TV_NFLAGS_EXPANDED) == false) {
+dt_treeview.c line 2392   if ((node->flags & TV_NFLAGS_EXPANDED) == false) {
 
 Error   : declaration syntax error
-dt_treeview.c line 2391   nslog_log( "dt_treeview.c", "",  2391, "Tried to contract a contracted node.")
+dt_treeview.c line 2394   nslog_log( "dt_treeview.c", "",  2394, "Tried to contract a contracted node.")
 
 Error   : identifier expected
-dt_treeview.c line 2392   return NSERROR_OK;
+dt_treeview.c line 2395   return NSERROR_OK;
 
 Error   : identifier expected
-dt_treeview.c line 2393   }
+dt_treeview.c line 2396   }
 
 Error   : identifier expected
-dt_treeview.c line 2395   data.tree = tree;
+dt_treeview.c line 2398   data.tree = tree;
 
 Error   : illegal function definition
-dt_treeview.c line 2396   data.only_entries = false;
+dt_treeview.c line 2399   data.only_entries = false;
 
 Error   : illegal function definition
-dt_treeview.c line 2397   selected = node->flags & TV_NFLAGS_SELECTED;
+dt_treeview.c line 2400   selected = node->flags & TV_NFLAGS_SELECTED;
 
 Error   : declaration syntax error
-dt_treeview.c line 2401   0L
+dt_treeview.c line 2404   0L
 
 Error   : declaration syntax error
-dt_treeview.c line 2404   treeview_node_contract_cb(node, &data, false);
+dt_treeview.c line 2407   treeview_node_contract_cb(node, &data, false);
+
+Error   : identifier expected
+dt_treeview.c line 2409   if (selected)
+
+Error   : illegal function definition
+dt_treeview.c line 2410   node->flags |= TV_NFLAGS_SELECTED;
+
+Error   : declaration syntax error
+dt_treeview.c line 2413   treeview__cw_update_size(tree, -1, treeview__get_display_height(tree));
+
+Error   : identifier expected
+dt_treeview.c line 2415   return NSERROR_OK;
+
+Error   : identifier expected
+dt_treeview.c line 2416   }
+
+Error   : illegal function definition
+dt_treeview.c line 2421   {
+
+Error   : illegal function definition
+dt_treeview.c line 2422   nserror res;
+
+Error   : ')' expected
+dt_treeview.c line 2424   assert(tree != NULL);
+
+Error   : illegal function definition
+dt_treeview.c line 2426   res = treeview_node_contract_internal(tree, node);
+
+Error   : declaration syntax error
+dt_treeview.c line 2427   nslog_log( "dt_treeview.c", "",  2427, "Contracting!")
+
+Error   : identifier expected
+dt_treeview.c line 2428   if (res == NSERROR_OK) {
+
+Error   : illegal function definition
+dt_treeview.c line 2430   treeview__redraw_from_node(tree, node);
+
+Error   : declaration syntax error
+dt_treeview.c line 2431   nslog_log( "dt_treeview.c", "",  2431, "Contracted!")
+
+Error   : identifier expected
+dt_treeview.c line 2432   }
+
+Error   : illegal function definition
+dt_treeview.c line 2434   return res;
+
+Error   : identifier expected
+dt_treeview.c line 2435   }
+
+Error   : illegal function definition
+dt_treeview.c line 2440   {
+
+Error   : illegal function definition
+dt_treeview.c line 2441   int search_height = treeview__get_search_height(tree);
+
+Error   : illegal use of incomplete struct/union/class 'struct treeview_contract_data'
+dt_treeview.c line 2442   struct treeview_contract_data data;
+
+Error   : illegal function definition
+dt_treeview.c line 2443   bool selected;
+
+Error   : illegal function definition
+dt_treeview.c line 2444   treeview_node *n;
+
+Error   : illegal function definition
+dt_treeview.c line 2445   struct rect r;
+
+Error   : ')' expected
+dt_treeview.c line 2447   assert(tree != NULL);
 
 Could not find or load the file �dump.c� for target �MacSurf� for project �MacSurf�.
 
@@ -1157,1680 +1031,4 @@ flex.c line 164   css_fixed shrink_num = short_none ? 0 : INTTOFIX(1);
 
 Error   : undefined identifier 'shrink_num'
 flex.c line 165   error = css__stylesheet_style_append(shrink_style, shrink_num);
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-form.c line 1009   c = strstr(temp, "UTF-8");
-
-Error   : illegal constant expression
-frames.c line 334   int widths[bw->cols][bw->rows];
-
-Error   : illegal constant expression
-frames.c line 335   int heights[bw->cols][bw->rows];
-
-Could not find or load the file �generics.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : expression syntax error
-hashmap.c line 235   for (uint32_t bucket = 0;
-
-Error   : undefined identifier 'bucket'
-hashmap.c line 236   bucket < hashmap->bucket_count;
-
-Error   : undefined identifier 'bucket'
-hashmap.c line 237   bucket++) {
-
-Error   : expression syntax error
-hashmap.c line 238   for (hashmap_entry_t *entry = hashmap->buckets[bucket];
-
-Error   : undefined identifier 'entry'
-hashmap.c line 239   entry != NULL;
-
-Error   : undefined identifier 'entry'
-hashmap.c line 240   entry = entry->next) {
-
-Error   : ';' expected
-hashmap.c line 242   if (cb(entry->key, entry->value, ctx))
-
-Error   : declaration syntax error
-hashmap.c line 247   return false;
-
-Error   : declaration syntax error
-hashmap.c line 248   }
-
-Could not find or load the file �hints.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : illegal return value in void/constructor/destructor function
-html.c line 1667   return html__set_file_gadget_filename(hlcache_handle_get_content(hl),
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-imagemap.c line 396   char *val = strtok((char *)dom_string_data(coords), ",");
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-imagemap.c line 419   val = strtok(NULL, ",");
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-imagemap.c line 438   val = strtok(NULL, ",");
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-imagemap.c line 448   val = strtok(NULL, ",");
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-imagemap.c line 472   val = strtok(NULL, ",");
-
-Could not find or load the file �internal.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : undefined identifier 'strncmp'
-libwapcaplet.c line 148   strncmp, (lwc_memcpy)memcpy);
-
-Error   : illegal function definition
-ns_time.h line 39   int nsc_sntimet(char *str, size_t size, time_t *timep);
-
-Error   : illegal function definition
-ns_time.h line 51   nserror nsc_snptimet(const char *str, size_t size, time_t *timep);
-
-Error   : illegal function definition
-ns_time.h line 73   nserror nsc_strntimet(const char *str, size_t size, time_t *timep);
-
-Error   : ')' expected
-ns_time.h line 81   const char *rfc1123_date(time_t t);
-
-Error   : illegal function definition
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 24   typedef struct http_cache_control http_cache_control;
-
-Error   : illegal function definition
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 36   http_cache_control **result);
-
-Error   : ')' expected
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 43   void http_cache_control_destroy(http_cache_control *victim);
-
-Error   : ')' expected
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 51   bool http_cache_control_has_max_age(http_cache_control *cc);
-
-Error   : ')' expected
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 59   uint32_t http_cache_control_max_age(http_cache_control *cc);
-
-Error   : ')' expected
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 67   bool http_cache_control_no_cache(http_cache_control *cc);
-
-Error   : ')' expected
-(included from:
- http.h:30
- llcache.c:49)
-cache-control.h line 75   bool http_cache_control_no_store(http_cache_control *cc);
-
-Error   : illegal function definition
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 26   typedef struct http_parameter http_parameter;
-
-Error   : ')' expected
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 37   nserror http_parameter_list_find_item(const http_parameter *list,
-
-Error   : ';' expected
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 38   lwc_string *name, lwc_string **value);
-
-Error   : illegal function definition
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 48   const http_parameter *http_parameter_list_iterate(const http_parameter *cur,
-
-Error   : ';' expected
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 49   lwc_string **name, lwc_string **value);
-
-Error   : ')' expected
-(included from:
- content-disposition.h:24
- http.h:31
- llcache.c:49)
-parameter.h line 56   void http_parameter_list_destroy(http_parameter *list);
-
-Error   : declaration syntax error
-(included from:
- http.h:31
- llcache.c:49)
-content-disposition.h line 28   http_parameter *parameters;
-
-Error   : identifier expected
-(included from:
- http.h:31
- llcache.c:49)
-content-disposition.h line 29   } http_content_disposition;
-
-Error   : illegal function definition
-(included from:
- http.h:31
- llcache.c:49)
-content-disposition.h line 40   http_content_disposition **result);
-
-Error   : ')' expected
-(included from:
- http.h:31
- llcache.c:49)
-content-disposition.h line 47   void http_content_disposition_destroy(http_content_disposition *victim);
-
-Error   : declaration syntax error
-(included from:
- http.h:32
- llcache.c:49)
-content-type.h line 28   http_parameter *parameters;
-
-Error   : identifier expected
-(included from:
- http.h:32
- llcache.c:49)
-content-type.h line 29   } http_content_type;
-
-Error   : illegal function definition
-(included from:
- http.h:32
- llcache.c:49)
-content-type.h line 40   http_content_type **result);
-
-Error   : ')' expected
-(included from:
- http.h:32
- llcache.c:49)
-content-type.h line 47   void http_content_type_destroy(http_content_type *victim);
-
-Error   : illegal function definition
-(included from:
- http.h:33
- llcache.c:49)
-strict-transport-security.h line 24   typedef struct http_strict_transport_security http_strict_transport_security;
-
-Error   : illegal function definition
-(included from:
- http.h:33
- llcache.c:49)
-strict-transport-security.h line 36   http_strict_transport_security **result);
-
-Error   : ')' expected
-(included from:
- http.h:33
- llcache.c:49)
-strict-transport-security.h line 44   http_strict_transport_security *victim);
-
-Error   : ')' expected
-(included from:
- http.h:33
- llcache.c:49)
-strict-transport-security.h line 53   http_strict_transport_security *sts);
-
-Error   : ')' expected
-(included from:
- http.h:33
- llcache.c:49)
-strict-transport-security.h line 62   http_strict_transport_security *sts);
-
-Error   : illegal function definition
-(included from:
- www-authenticate.h:24
- http.h:34
- llcache.c:49)
-challenge.h line 26   typedef struct http_challenge http_challenge;
-
-Error   : illegal function definition
-(included from:
- www-authenticate.h:24
- http.h:34
- llcache.c:49)
-challenge.h line 36   const http_challenge *http_challenge_list_iterate(const http_challenge *cur,
-
-Error   : ';' expected
-(included from:
- www-authenticate.h:24
- http.h:34
- llcache.c:49)
-challenge.h line 37   lwc_string **scheme, http_parameter **parameters);
-
-Error   : ')' expected
-(included from:
- www-authenticate.h:24
- http.h:34
- llcache.c:49)
-challenge.h line 44   void http_challenge_list_destroy(http_challenge *list);
-
-Error   : declaration syntax error
-(included from:
- http.h:34
- llcache.c:49)
-www-authenticate.h line 27   http_challenge *challenges;
-
-Error   : identifier expected
-(included from:
- http.h:34
- llcache.c:49)
-www-authenticate.h line 28   } http_www_authenticate;
-
-Error   : illegal function definition
-(included from:
- http.h:34
- llcache.c:49)
-www-authenticate.h line 39   http_www_authenticate **result);
-
-Error   : ')' expected
-(included from:
- http.h:34
- llcache.c:49)
-www-authenticate.h line 46   void http_www_authenticate_destroy(http_www_authenticate *victim);
-
-Error   : illegal function definition
-(included from:
- options.h:34
- nsoption.h:59
- llcache.c:50)
-types.h line 37   typedef uint32_t colour;
-
-Error   : illegal function definition
-(included from:
- options.h:34
- nsoption.h:59
- llcache.c:50)
-types.h line 45   } rect;
-
-Error   : identifier expected
-nsoption.h line 90   OPTION_HTTP_PROXY_AUTH_NTLM = 2 };
-
-Error   : identifier expected
-nsoption.h line 110   };
-
-Error   : declaration syntax error
-nsoption.h line 122   colour c;
-
-Error   : illegal function definition
-nsoption.h line 123   } value;
-
-Error   : identifier expected
-nsoption.h line 124   };
-
-Error   : identifier expected
-nsoption.h line 155   };
-
-Error   : illegal function definition
-nsoption.h line 166   extern struct nsoption_s *nsoptions;
-
-Error   : illegal function definition
-nsoption.h line 172   extern struct nsoption_s *nsoptions_default;
-
-Error   : illegal function definition
-nsoption.h line 178   typedef nserror(nsoption_set_default_t)(struct nsoption_s *defaults);
-
-Error   : illegal function definition
-nsoption.h line 184   typedef size_t(nsoption_generate_cb)(struct nsoption_s *option, void *ctx);
-
-Error   : identifier expected
-nsoption.h line 195   };
-
-Error   : ')' expected
-nsoption.h line 207   nserror nsoption_init(nsoption_set_default_t *set_default, struct nsoption_s **popts, struct nsoption_s **pdefs);
-
-Error   : illegal function definition
-nsoption.h line 219   nserror nsoption_finalise(struct nsoption_s *opts, struct nsoption_s *defs);
-
-Error   : illegal function definition
-nsoption.h line 229   nserror nsoption_read(const char *path, struct nsoption_s *opts);
-
-Error   : ')' expected
-nsoption.h line 244   nserror nsoption_generate(nsoption_generate_cb *cb, void *ctx, enum nsoption_generate_flags flags, struct nsoption_s *opts, st
-
-Error   : illegal function definition
-nsoption.h line 258   ption_write(const char *path, struct nsoption_s *opts, struct nsoption_s *defs);
-
-Error   : illegal function definition
-nsoption.h line 268   nserror nsoption_dump(FILE *outf, struct nsoption_s *opts);
-
-Error   : illegal function definition
-nsoption.h line 279   nserror nsoption_commandline(int *pargc, char **argv, struct nsoption_s *opts);
-
-Error   : illegal function definition
-nsoption.h line 299   n_snoptionf(char *string, size_t size, enum nsoption_e option, const char *fmt);
-
-Error   : illegal function definition
-nsoption.h line 373   ion_set_tbl_charp(struct nsoption_s *opts, enum nsoption_e option_idx, char *s);
-
-Error   : identifier expected
-misc.h line 28   struct form_control;
-
-Error   : identifier expected
-misc.h line 29   struct gui_window;
-
-Error   : identifier expected
-misc.h line 30   struct cert_chain;
-
-Error   : identifier expected
-misc.h line 31   struct nsurl;
-
-Error   : identifier expected
-misc.h line 127   };
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 30   struct gui_misc_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 31   struct gui_window_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 32   struct gui_download_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 33   struct gui_clipboard_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 34   struct gui_fetch_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 35   struct gui_file_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 36   struct gui_utf8_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 37   struct gui_search_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 38   struct gui_search_web_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 39   struct gui_llcache_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 40   struct gui_bitmap_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 41   struct gui_layout_table;
-
-Error   : identifier expected
-(included from:
- gui_internal.h:30
- llcache.c:52)
-gui_table.h line 164   };
-
-Error   : illegal function definition
-gui_internal.h line 35   extern struct netsurf_table *guit;
-
-Error   : illegal function definition
-(included from:
- cerrno:18
- errno.h:17
- mac_inet.h:13
- inet.h:54
- fetch.h:30
- llcache.c:54)
-cerrno.mac.h line 82   _MSL_IMP_EXP_C _MSL_TLS extern short __MacOSErrNo;  /*- mm 010411 -*/ /*- mm 010412 -*/ /*- mm 010621 -*/ /*- cc 011128 -*/
-
-Error   : illegal function definition
-(included from:
- errno.h:17
- mac_inet.h:13
- inet.h:54
- fetch.h:30
- llcache.c:54)
-cerrno line 91   _MSL_IMP_EXP_C _MSL_TLS extern int errno; /*- cc 011128 -*/
-
-Error   : illegal function definition
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 38   typedef uint32_t in_addr_t;
-
-Error   : declaration syntax error
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 42   in_addr_t s_addr;
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 43   };
-
-Error   : illegal use of incomplete struct/union/class 'struct in_addr'
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 50   struct in_addr sin_addr;
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 52   };
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 59   };
-
-Error   : illegal function definition
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 61   typedef uint32_t socklen_t;
-
-Error   : illegal function definition
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 105   } fd_set;
-
-Error   : illegal function definition
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 117   static int socket(int domain, int type, int protocol)
-
-Error   : illegal function definition
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 118   {
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 119   (void)domain; (void)type; (void)protocol;
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 120   return -1;
-
-Error   : identifier expected
-(included from:
- inet.h:54
- fetch.h:30
- llcache.c:54)
-mac_inet.h line 121   }
-
-Error   : illegal function definition
-(included from:
- fetch.h:30
- llcache.c:54)
-inet.h line 73   int inet_aton(const char *cp, struct in_addr *inp);
-
-Error   : illegal function definition
-(included from:
- fetch.h:30
- llcache.c:54)
-inet.h line 77   int inet_pton(int af, const char *src, void *dst);
-
-Error   : illegal function definition
-(included from:
- fetch.h:31
- llcache.c:54)
-response-codes.h line 73   } http_response_code;
-
-Error   : identifier expected
-fetch.h line 35   struct content;
-
-Error   : identifier expected
-fetch.h line 36   struct fetch;
-
-Error   : identifier expected
-fetch.h line 37   struct ssl_cert_info;
-
-Error   : illegal implicit conversion from 'int' to
-'const char *'
-mac_file_io.c line 77   slash = strrchr(parent, '/');
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_bitmap.c:17)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_bitmap.c:17)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_download.c:16)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_download.c:16)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_fetch.c:24)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_fetch.c:24)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : illegal implicit conversion from 'int' to
-'const char *'
-macos9_fetch.c line 40   ext = strrchr(unix_path, '.');
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-macos9_fetch.c line 170   sep = strstr(buf, "\r\n\r\n");
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_font.c:23)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_font.c:23)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : declaration syntax error
-(included from:
- OpenTptInternet.h:21
- macos9_http_fetcher.c:46)
-OpenTransportProviders.h line 2333   FSSpec      modemScript;
-
-Error   : declaration syntax error
-(included from:
- OpenTptInternet.h:21
- macos9_http_fetcher.c:46)
-OpenTransportProviders.h line 2338   } RAConfigModem;
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-macos9_http_fetcher.c line 270   sep = strstr(c->buf, "\r\n\r\n");
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_utf8.c:16)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- macos9_utf8.c:16)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- main.c:31)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- main.c:31)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- misc.c:16)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- misc.c:16)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Error   : declaration syntax error
-(included from:
- urldb.h:29
- netsurf.c:44)
-url_db.h line 39   time_t last_visit; /**< Last visit time */
-
-Error   : declaration syntax error
-(included from:
- urldb.h:29
- netsurf.c:44)
-url_db.h line 41   };
-
-Error   : ';' expected
-(included from:
- urldb.h:30
- netsurf.c:44)
-cookie_db.h line 58   const time_t expires;      /**< Expiry timestamp, or 1 for session */
-
-Error   : ';' expected
-(included from:
- urldb.h:30
- netsurf.c:44)
-cookie_db.h line 59   const time_t last_used;      /**< Last used time */
-
-Error   : declaration syntax error
-(included from:
- urldb.h:30
- netsurf.c:44)
-cookie_db.h line 66   };
-
-Error   : declaration syntax error
-(included from:
- urldb.h:29
- ns_content.c:42)
-url_db.h line 39   time_t last_visit; /**< Last visit time */
-
-Error   : declaration syntax error
-(included from:
- urldb.h:29
- ns_content.c:42)
-url_db.h line 41   };
-
-Error   : ';' expected
-(included from:
- urldb.h:30
- ns_content.c:42)
-cookie_db.h line 58   const time_t expires;      /**< Expiry timestamp, or 1 for session */
-
-Error   : ';' expected
-(included from:
- urldb.h:30
- ns_content.c:42)
-cookie_db.h line 59   const time_t last_used;      /**< Last used time */
-
-Error   : declaration syntax error
-(included from:
- urldb.h:30
- ns_content.c:42)
-cookie_db.h line 66   };
-
-Error   : ',' expected
-nsoption.c line 118   if (sscanf(value, "%"SCNx32"", &rgbcolour) == 1) {
-
-Error   : illegal use of keyword
-nsoption.c line 123   break;
-
-Error   : illegal use of keyword
-nsoption.c line 125   case OPTION_STRING:
-
-Error   : illegal use of keyword
-nsoption.c line 136   break;
-
-Error   : illegal use of keyword
-nsoption.c line 138   default:
-
-Error   : ';' expected
-nsoption.c line 139   ret = false;
-
-Error   : illegal use of keyword
-nsoption.c line 140   break;
-
-Error   : declaration syntax error
-nsoption.c line 143   return ret;
-
-Error   : declaration syntax error
-nsoption.c line 144   }
-
-Error   : ',' expected
-nsoption.c line 372   "#%06"PRIX32
-
-Error   : ')' expected
-nsoption.c line 373   "</span> "
-
-Error   : ';' expected
-nsoption.c line 381   colour_to_bw_furthest(rgbcolour));
-
-Error   : illegal implicit conversion from 'int' to
-'char *'
-nsoption.c line 889   val = strchr(arg, '=');
-
-Could not find or load the file �nsurl.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �nsurl_parse.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : expression syntax error
-page-info.c line 335   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 335   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 335   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : ';' expected
-page-info.c line 336   struct page_info_entry *entry = pi->entries + i;
-
-Error   : expression syntax error
-page-info.c line 337   int padding;
-
-Error   : undefined identifier 'entry'
-page-info.c line 339   switch (entry->type) {
-
-Error   : ';' expected
-page-info.c line 340   case PAGE_INFO_ENTRY_TYPE_TEXT:
-
-Error   : undefined identifier 'entry'
-page-info.c line 342   &entry->u.text);
-
-Error   : undefined identifier 'i'
-page-info.c line 346   if (i == PI_ENTRY_DOMAIN) {
-
-Error   : undefined identifier 'entry'
-page-info.c line 347   entry->u.text.padding_bottom =
-
-Error   : ';' expected
-page-info.c line 348   entry->u.text.height * 3 / 2;
-
-Error   : illegal use of keyword
-page-info.c line 350   break;
-
-Error   : illegal use of keyword
-page-info.c line 352   case PAGE_INFO_ENTRY_TYPE_ITEM:
-
-Error   : undefined identifier 'entry'
-page-info.c line 354   &entry->u.item.item);
-
-Error   : undefined identifier 'entry'
-page-info.c line 359   &entry->u.item.detail);
-
-Error   : undefined identifier 'padding'
-page-info.c line 363   padding = entry->u.item.item.height / 4;
-
-Error   : undefined identifier 'entry'
-page-info.c line 364   entry->u.item.padding_top = padding;
-
-Error   : undefined identifier 'entry'
-page-info.c line 365   entry->u.item.padding_bottom = padding;
-
-Error   : illegal use of keyword
-page-info.c line 367   break;
-
-Error   : declaration syntax error
-page-info.c line 369   }
-
-Error   : declaration syntax error
-page-info.c line 371   pi->window_padding = pi->entries[PI_ENTRY_DOMAIN]
-
-Error   : declaration syntax error
-page-info.c line 372   .u.item.item.height / 2;
-
-Error   : declaration syntax error
-page-info.c line 374   return NSERROR_OK;
-
-Error   : declaration syntax error
-page-info.c line 375   }
-
-Error   : expression syntax error
-page-info.c line 498   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 498   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 498   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : ';' expected
-page-info.c line 499   struct page_info_entry *entry = pi->entries + i;
-
-Error   : undefined identifier 'i'
-page-info.c line 501   if (page_info__hide_entry(i, pi->scheme)) {
-
-Error   : illegal use of keyword
-page-info.c line 502   continue;
-
-Error   : undefined identifier 'entry'
-page-info.c line 505   switch (entry->type) {
-
-Error   : ';' expected
-page-info.c line 506   case PAGE_INFO_ENTRY_TYPE_TEXT:
-
-Error   : undefined identifier 'entry'
-page-info.c line 507   cur_y += entry->u.text.height;
-
-Error   : undefined identifier 'entry'
-page-info.c line 508   if (max_x < entry->u.text.width) {
-
-Error   : ';' expected
-page-info.c line 509   max_x = entry->u.text.width;
-
-Error   : declaration syntax error
-page-info.c line 511   cur_y += entry->u.text.padding_bottom;
-
-Error   : declaration syntax error
-page-info.c line 512   break;
-
-Error   : declaration syntax error
-page-info.c line 514   case PAGE_INFO_ENTRY_TYPE_ITEM:
-
-Error   : expression syntax error
-page-info.c line 515   {
-
-Error   : ';' expected
-page-info.c line 516   int full_width = entry->u.item.item.width +
-
-Error   : declaration syntax error
-page-info.c line 517   entry->u.item.detail.width;
-
-Error   : declaration syntax error
-page-info.c line 518   cur_y += entry->u.item.padding_top;
-
-Error   : declaration syntax error
-page-info.c line 519   cur_y += entry->u.item.item.height;
-
-Error   : declaration syntax error
-page-info.c line 520   if (max_x < full_width) {
-
-Error   : declaration syntax error
-page-info.c line 521   max_x = full_width;
-
-Error   : declaration syntax error
-page-info.c line 522   }
-
-Error   : declaration syntax error
-page-info.c line 523   cur_y += entry->u.item.padding_bottom;
-
-Error   : declaration syntax error
-page-info.c line 524   }
-
-Error   : declaration syntax error
-page-info.c line 525   break;
-
-Error   : declaration syntax error
-page-info.c line 526   }
-
-Error   : declaration syntax error
-page-info.c line 527   }
-
-Error   : declaration syntax error
-page-info.c line 528   cur_y += pi->window_padding;
-
-Error   : declaration syntax error
-page-info.c line 529   max_x += pi->window_padding * 2;
-
-Error   : declaration syntax error
-page-info.c line 531   pi->width = max_x;
-
-Error   : declaration syntax error
-page-info.c line 532   pi->height = cur_y;
-
-Error   : declaration syntax error
-page-info.c line 533   return guit->corewindow->set_extent(pi->cw_h, max_x, cur_y);
-
-Error   : identifier expected
-page-info.c line 534   }
-
-Error   : illegal function definition
-page-info.c line 540   {
-
-Error   : illegal function definition
-page-info.c line 542   nserror err;
-
-Error   : object 'pi' redefined
-page-info.c line 544   pi = calloc(1, sizeof(*pi));
-
-Error   : identifier expected
-page-info.c line 545   if (pi == NULL) {
-
-Error   : identifier expected
-page-info.c line 546   return NSERROR_NOMEM;
-
-Error   : identifier expected
-page-info.c line 547   }
-
-Error   : identifier expected
-page-info.c line 549   pi->cw_h = cw_h;
-
-Error   : ')' expected
-page-info.c line 551   memcpy(pi->entries, pi__entries, sizeof(pi__entries));
-
-Error   : illegal function definition
-page-info.c line 553   err = page_info__create_from_bw(pi, bw);
-
-Error   : identifier expected
-page-info.c line 554   if (err != NSERROR_OK) {
-
-Error   : illegal function definition
-page-info.c line 555   page_info_destroy(pi);
-
-Error   : identifier expected
-page-info.c line 556   return err;
-
-Error   : identifier expected
-page-info.c line 557   }
-
-Error   : identifier expected
-page-info.c line 559   err = page_info__layout(pi);
-
-Error   : identifier expected
-page-info.c line 560   if (err != NSERROR_OK) {
-
-Error   : illegal function definition
-page-info.c line 561   page_info_destroy(pi);
-
-Error   : identifier expected
-page-info.c line 562   return err;
-
-Error   : identifier expected
-page-info.c line 563   }
-
-Error   : illegal function definition
-page-info.c line 565   *pi_out = pi;
-
-Error   : identifier expected
-page-info.c line 566   return NSERROR_OK;
-
-Error   : identifier expected
-page-info.c line 567   }
-
-Error   : illegal function definition
-page-info.c line 571   {
-
-Error   : identifier expected
-page-info.c line 572   do { lwc_string *_lwc_s = (pi->domain); if (_lwc_s !=  0L) { _lwc_s->refcnt--; if ((_lwc_s->refcnt == 0) || ((_lwc_s->refcnt =
-
-Error   : declaration syntax error
-page-info.c line 572   cnt == 1) && (_lwc_s->insensitive == _lwc_s))) lwc_string_destroy(_lwc_s); } } while (0)
-
-Error   : identifier 'free(void *)' redeclared
-was declared as: 'void (void *)'
-now declared as: 'int (...)'
-page-info.c line 573   free(pi);
-
-Error   : identifier expected
-page-info.c line 574   return NSERROR_OK;
-
-Error   : identifier expected
-page-info.c line 575   }
-
-Error   : illegal function definition
-page-info.c line 579   {
-
-Error   : illegal function definition
-page-info.c line 580   nserror res;
-
-Error   : identifier expected
-page-info.c line 582   do { lwc_string *_lwc_s = (pgi->domain); if (_lwc_s !=  0L) { _lwc_s->refcnt--; if ((_lwc_s->refcnt == 0) || ((_lwc_s->refcnt 
-
-Error   : declaration syntax error
-page-info.c line 582   cnt == 1) && (_lwc_s->insensitive == _lwc_s))) lwc_string_destroy(_lwc_s); } } while (0)
-
-Error   : declaration syntax error
-page-info.c line 584   res = page_info__create_from_bw(pgi, bw);
-
-Error   : declaration syntax error
-page-info.c line 585   if (res == NSERROR_OK) {
-
-Error   : declaration syntax error
-page-info.c line 586   res = page_info__layout(pgi);
-
-Error   : declaration syntax error
-page-info.c line 587   }
-
-Error   : declaration syntax error
-page-info.c line 589   return res;
-
-Error   : declaration syntax error
-page-info.c line 590   }
-
-Error   : expression syntax error
-page-info.c line 646   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 646   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : undefined identifier 'i'
-page-info.c line 646   for (unsigned i = 0; i < PI_ENTRY__COUNT; i++) {
-
-Error   : ';' expected
-page-info.c line 647   const struct page_info_entry *entry = pi->entries + i;
-
-Error   : expression syntax error
-page-info.c line 648   int cur_x = x + pi->window_padding;
-
-Error   : undefined identifier 'i'
-page-info.c line 650   if (page_info__hide_entry(i, pi->scheme)) {
-
-Could not find or load the file �parameter.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- plotters.c:21)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- plotters.c:21)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Could not find or load the file �primitives.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : expression syntax error
-redraw.c line 999   nserror res;
-
-Error   : expression syntax error
-redraw.c line 1000   struct rect rect;
-
-Error   : ';' expected
-redraw.c line 1002   for (c = box->next;
-
-Error   : ';' expected
-redraw.c line 1004   c = c->next) {
-
-Error   : ';' expected
-redraw.c line 1005   if (c->type != BOX_TEXT) {
-
-Error   : illegal use of keyword
-redraw.c line 1006   continue;
-
-Error   : declaration syntax error
-redraw.c line 1008   rect.x0 = (x + c->x) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1009   rect.y0 = (y + c->y + c->height * ratio) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1010   rect.x1 = (x + c->x + c->width) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1011   rect.y1 = (y + c->y + c->height * ratio) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1012   res = ctx->plot->line(ctx, &plot_style_box, &rect);
-
-Error   : identifier expected
-redraw.c line 1013   if (res != NSERROR_OK) {
-
-Error   : identifier expected
-redraw.c line 1014   return false;
-
-Error   : identifier expected
-redraw.c line 1015   }
-
-Error   : identifier expected
-redraw.c line 1016   }
-
-Error   : identifier expected
-redraw.c line 1017   1
-
-Error   : identifier expected
-redraw.c line 1018   }
-
-Error   : illegal function definition
-redraw.c line 1041   {
-
-Error   : illegal function definition
-redraw.c line 1042   struct box *c;
-
-Error   : illegal function definition
-redraw.c line 1043   nserror res;
-
-Error   : illegal function definition
-redraw.c line 1044   struct rect rect;
-
-Error   : illegal function definition
-redraw.c line 1047   plot_style_t plot_style_box = {
-
-Error   : ';' expected
-redraw.c line 1050   };
-
-Error   : declaration syntax error
-redraw.c line 1051   plot_style_box.stroke_colour = colour;
-
-Error   : ';' expected
-redraw.c line 1054   for (c = box->children; c; c = c->next) {
-
-Error   : declaration syntax error
-redraw.c line 1055   if (c->type == BOX_TEXT) {
-
-Error   : declaration syntax error
-redraw.c line 1056   rect.x0 = (x + c->x) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1057   rect.y0 = (y + c->y + c->height * ratio) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1058   rect.x1 = (x + c->x + c->width) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1059   rect.y1 = (y + c->y + c->height * ratio) * scale;
-
-Error   : declaration syntax error
-redraw.c line 1060   res = ctx->plot->line(ctx, &plot_style_box, &rect);
-
-Error   : identifier expected
-redraw.c line 1061   if (res != NSERROR_OK) {
-
-Error   : identifier expected
-redraw.c line 1062   return false;
-
-Error   : identifier expected
-redraw.c line 1063   }
-
-Error   : identifier expected
-redraw.c line 1064   } else if ((c->type == BOX_INLINE_CONTAINER) || (c->type == BOX_BLOCK)) {
-
-Error   : identifier expected
-redraw.c line 1065   if (!html_redraw_text_decoration_block(c,
-
-Error   : illegal function definition
-redraw.c line 1066   x + c->x, y + c->y,
-
-Error   : illegal function definition
-redraw.c line 1067   scale, colour, ratio, ctx))
-
-Error   : ';' expected
-redraw.c line 1068   return false;
-
-Error   : identifier expected
-redraw.c line 1069   }
-
-Error   : identifier expected
-redraw.c line 1070   }
-
-Error   : identifier expected
-redraw.c line 1071   1
-
-Error   : identifier expected
-redraw.c line 1072   }
-
-Error   : illegal function definition
-redraw.c line 1090   {
-
-Error   : illegal function definition
-redraw.c line 1091   static const enum css_text_decoration_e decoration[] = {
-
-Error   : ';' expected
-redraw.c line 1093   CSS_TEXT_DECORATION_LINE_THROUGH };
-
-Error   : ')' expected
-redraw.c line 1099   css_computed_color(box->style, &col);
-
-Error   : illegal function definition
-redraw.c line 1100   fgcol = nscss_color_to_ns(col);
-
-Error   : identifier expected
-redraw.c line 1103   if (html_redraw_printing == false)
-
-Error   : ';' expected
-redraw.c line 1104   fgcol = blend_colour(background_colour, fgcol);
-
-Error   : identifier expected
-redraw.c line 1106   if (box->type == BOX_INLINE) {
-
-Error   : identifier expected
-redraw.c line 1107   if (!box->inline_end)
-
-Error   : ';' expected
-redraw.c line 1108   return true;
-
-Error   : identifier expected
-redraw.c line 1109   for (i = 0; i != NOF_ELEMENTS(decoration); i++)
-
-Error   : ';' expected
-redraw.c line 1110   if (css_computed_text_decoration(box->style) &
-
-Error   : illegal constant expression
-redraw.c line 1111   decoration[i])
-
-Error   : ')' expected
-redraw.c line 1112   if (!html_redraw_text_decoration_inline(box,
-
-Error   : illegal function definition
-redraw.c line 1113   x_parent, y_parent, scale,
-
-Error   : illegal function definition
-redraw.c line 1114   fgcol, line_ratio[i], ctx))
-
-Error   : ';' expected
-redraw.c line 1115   return false;
-
-Error   : identifier expected
-redraw.c line 1116   } else {
-
-Error   : undefined identifier 'decoration'
-redraw.c line 1117   (sizeof(decoration)/sizeof(*(decoration)))
-
-Error   : pointer/array required
-redraw.c line 1118   if (css_computed_text_decoration(box->style) &
-
-Error   : undefined identifier 'decoration'
-redraw.c line 1119   decoration[i])
-
-Error   : undefined identifier 'x_parent'
-redraw.c line 1121   x_parent + box->x,
-
-Error   : ')' expected
-redraw.c line 1122   y_parent + box->y,
-
-Error   : undefined identifier 'ctx'
-redraw.c line 1124   fgcol, line_ratio[i], ctx))
-
-Error   : ';' expected
-redraw.c line 1125   0
-
-Error   : declaration syntax error
-redraw.c line 1128   return true;
-
-Error   : declaration syntax error
-redraw.c line 1129   }
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- schedule.c:18)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- schedule.c:18)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Could not find or load the file �strict-transport-security.c� for target �MacSurf� for project �MacSurf�.
-
-Could not find or load the file �time.c� for target �MacSurf� for project �MacSurf�.
-
-Error   : illegal function definition
-ns_time.h line 39   int nsc_sntimet(char *str, size_t size, time_t *timep);
-
-Error   : illegal function definition
-ns_time.h line 51   nserror nsc_snptimet(const char *str, size_t size, time_t *timep);
-
-Error   : illegal function definition
-ns_time.h line 73   nserror nsc_strntimet(const char *str, size_t size, time_t *timep);
-
-Error   : ')' expected
-ns_time.h line 81   const char *rfc1123_date(time_t t);
-
-Error   : illegal function definition
-nsurl.h line 32   typedef struct nsurl nsurl;
-
-Error   : identifier expected
-nsurl.h line 43   };
-
-Error   : illegal function definition
-nsurl.h line 59   } nsurl_component;
-
-Error   : illegal function definition
-nsurl.h line 74   nserror nsurl_create(const char * const url_s, nsurl **url);
-
-Error   : illegal function definition
-nsurl.h line 85   nsurl *nsurl_ref(nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 95   void nsurl_unref(nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 107   bool nsurl_compare(const nsurl *url1, const nsurl *url2, nsurl_component parts);
-
-Error   : ')' expected
-nsurl.h line 132   nserror nsurl_get(const nsurl *url, nsurl_component parts,
-
-Error   : identifier expected
-nsurl.h line 133   char **url_s, size_t *url_l);
-
-Error   : ')' expected
-nsurl.h line 156   lwc_string *nsurl_get_component(const nsurl *url, nsurl_component part);
-
-Error   : ')' expected
-nsurl.h line 165   enum nsurl_scheme_type nsurl_get_scheme_type(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 186   bool nsurl_has_component(const nsurl *url, nsurl_component part);
-
-Error   : ')' expected
-nsurl.h line 200   const char *nsurl_access(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 218   const char *nsurl_access_log(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 236   nserror nsurl_get_utf8(const nsurl *url, char **url_s, size_t *url_l);
-
-Error   : ')' expected
-nsurl.h line 250   const char *nsurl_access_leaf(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 261   size_t nsurl_length(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 270   uint32_t nsurl_hash(const nsurl *url);
-
-Error   : ')' expected
-nsurl.h line 286   nserror nsurl_join(const nsurl *base, const char *rel, nsurl **joined);
-
-Error   : ')' expected
-nsurl.h line 301   nserror nsurl_defragment(const nsurl *url, nsurl **no_frag);
-
-Error   : ')' expected
-nsurl.h line 319   nserror nsurl_refragment(const nsurl *url, lwc_string *frag, nsurl **new_url);
-
-Error   : ')' expected
-nsurl.h line 340   nserror nsurl_replace_query(const nsurl *url, const char *query,
-
-Error   : illegal function definition
-nsurl.h line 341   nsurl **new_url);
-
-Error   : ')' expected
-nsurl.h line 359   nserror nsurl_replace_scheme(const nsurl *url, lwc_string *scheme,
-
-Error   : illegal function definition
-nsurl.h line 360   nsurl **new_url);
-
-Error   : ')' expected
-nsurl.h line 373   nserror nsurl_nice(const nsurl *url, char **result, bool remove_extensions);
-
-Error   : ')' expected
-nsurl.h line 390   nserror nsurl_parent(const nsurl *url, nsurl **new_url);
-
-Error   : ')' expected
-nsurl.h line 400   void nsurl_dump(const nsurl *url);
-
-Error   : illegal function definition
-ascii.h line 40   static inline bool ascii_is_space(char c)
-
-Error   : illegal function definition
-ascii.h line 41   {
-
-Error   : identifier expected
-ascii.h line 42   return (c == ' '  || c == '\t' ||
-
-Error   : illegal function definition
-ascii.h line 43   c == '\n' || c == '\v' ||
-
-Error   : illegal function definition
-ascii.h line 44   c == '\f' || c == '\r');
-
-Error   : identifier expected
-ascii.h line 45   }
-
-Error   : illegal function definition
-ascii.h line 54   {
-
-Error   : identifier expected
-ascii.h line 55   return (c >= 'a' && c <= 'z');
-
-Error   : identifier expected
-ascii.h line 56   }
-
-Error   : illegal function definition
-ascii.h line 65   {
-
-Error   : identifier expected
-ascii.h line 66   return (c >= 'A' && c <= 'Z');
-
-Error   : identifier expected
-ascii.h line 67   }
-
-Error   : illegal function definition
-ascii.h line 76   {
-
-Error   : identifier expected
-ascii.h line 77   return (ascii_is_alpha_lower(c) || ascii_is_alpha_upper(c));
-
-Error   : identifier expected
-ascii.h line 78   }
-
-Error   : illegal function definition
-ascii.h line 87   {
-
-Error   : identifier expected
-ascii.h line 88   return (c >= '0' && c <= '9');
-
-Error   : identifier expected
-ascii.h line 89   }
-
-Error   : illegal function definition
-ascii.h line 98   {
-
-Error   : identifier expected
-ascii.h line 99   return (c == '-' || c == '+');
-
-Error   : identifier expected
-ascii.h line 100   }
-
-Error   : illegal function definition
-ascii.h line 109   {
-
-Error   : identifier expected
-ascii.h line 110   return (ascii_is_alpha(c) || ascii_is_digit(c));
-
-Error   : identifier expected
-ascii.h line 111   }
-
-Error   : illegal function definition
-ascii.h line 120   {
-
-Error   : identifier expected
-ascii.h line 121   return (c >= 'a' && c <= 'f');
-
-Error   : identifier expected
-ascii.h line 122   }
-
-Error   : illegal function definition
-ascii.h line 131   {
-
-Error   : identifier expected
-ascii.h line 132   return (ascii_is_digit(c) || ascii_is_af_lower(c));
-
-Error   : identifier expected
-ascii.h line 133   }
-
-Error   : illegal function definition
-ascii.h line 142   {
-
-Error   : identifier expected
-ascii.h line 143   return (c >= 'A' && c <= 'F');
-
-Error   : identifier expected
-ascii.h line 144   }
-
-Error   : illegal function definition
-ascii.h line 153   {
-
-Error   : identifier expected
-ascii.h line 154   return (ascii_is_digit(c) || ascii_is_af_upper(c));
-
-Error   : identifier expected
-ascii.h line 155   }
-
-Error   : illegal function definition
-ascii.h line 164   {
-
-Error   : identifier expected
-ascii.h line 165   return (ascii_is_digit(c) ||
-
-Error   : illegal function definition
-ascii.h line 166   ascii_is_af_upper(c) ||
-
-Error   : illegal function definition
-ascii.h line 167   ascii_is_af_lower(c));
-
-Error   : identifier expected
-ascii.h line 168   }
-
-Error   : illegal function definition
-ascii.h line 177   {
-
-Error   : identifier expected
-ascii.h line 178   if (ascii_is_digit(c)) {
-
-Error   : identifier expected
-ascii.h line 179   return c - '0';
-
-Error   : identifier expected
-ascii.h line 180   } else if (ascii_is_af_lower(c)) {
-
-Error   : identifier expected
-ascii.h line 181   return c - 'a' + 10;
-
-Error   : identifier expected
-ascii.h line 182   } else if (ascii_is_af_upper(c)) {
-
-Error   : identifier expected
-ascii.h line 183   return c - 'A' + 10;
-
-Error   : identifier expected
-ascii.h line 184   }
-
-Error   : identifier expected
-ascii.h line 187   return -256;
-
-Error   : identifier expected
-ascii.h line 188   }
-
-Error   : illegal function definition
-ascii.h line 199   {
-
-Error   : identifier expected
-ascii.h line 200   return 16 * ascii_hex_to_value(c1) + ascii_hex_to_value(c2);
-
-Error   : identifier expected
-ascii.h line 201   }
-
-Error   : illegal function definition
-ascii.h line 213   {
-
-Error   : identifier expected
-ascii.h line 214   return (ascii_is_alpha_upper(c)) ? (c + 'a' - 'A') : c;
-
-Error   : identifier expected
-ascii.h line 215   }
-
-Error   : illegal function definition
-ascii.h line 227   {
-
-Error   : identifier expected
-ascii.h line 228   return (ascii_is_alpha_lower(c)) ? (c + 'A' - 'a') : c;
-
-Error   : identifier expected
-ascii.h line 229   }
-
-Error   : illegal function definition
-ascii.h line 238   {
-
-Error   : illegal function definition
-ascii.h line 239   size_t count = 0;
-
-Error   : identifier expected
-ascii.h line 240   while (ascii_is_alpha_lower(*(str++))) {
-
-Error   : illegal function definition
-ascii.h line 241   count++;
-
-Error   : identifier expected
-ascii.h line 242   }
-
-Error   : illegal function definition
-ascii.h line 243   return count;
-
-Error   : identifier expected
-ascii.h line 244   }
-
-Error   : illegal function definition
-ascii.h line 253   {
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- window.c:21)
-MacWindows.h line 3861   AliasHandle   alias);
-
-Error   : illegal function definition
-(included from:
- macos9.h:10
- window.c:21)
-MacWindows.h line 3875   AliasHandle *  alias);
-
-Could not find or load the file �www-authenticate.c� for target �MacSurf� for project �MacSurf�.
 

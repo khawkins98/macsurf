@@ -16,9 +16,35 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-/* POSIX type foundation. <time.h> is safe now that NetSurf's
- * utils/time.h was renamed to utils/ns_time.h. */
-#include <time.h>
+/* POSIX type foundation.
+ * Do NOT use #include <time.h> — CW8 may not find MSL's version
+ * reliably through the access paths. Provide time_t and struct tm
+ * manually. */
+#ifndef _TIME_T
+#define _TIME_T
+typedef long time_t;
+#endif
+
+/* struct tm — needed by localtime(), strftime() etc. */
+#ifndef _STRUCT_TM
+#define _STRUCT_TM
+struct tm {
+	int tm_sec;
+	int tm_min;
+	int tm_hour;
+	int tm_mday;
+	int tm_mon;
+	int tm_year;
+	int tm_wday;
+	int tm_yday;
+	int tm_isdst;
+};
+extern struct tm *localtime(const time_t *);
+extern struct tm *gmtime(const time_t *);
+extern time_t mktime(struct tm *);
+extern size_t strftime(char *, size_t, const char *, const struct tm *);
+extern time_t time(time_t *);
+#endif
 
 #ifndef _MODE_T
 #define _MODE_T
