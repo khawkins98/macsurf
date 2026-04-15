@@ -37,41 +37,14 @@
 #include "duktape.h"
 #include "macsurf_js.h"
 
-/* Forward declarations for libdom public API.  Avoid pulling in the
- * internal src/ headers — they're the ones that break C89. */
-struct dom_document;
-struct dom_element;
-struct dom_node;
-struct dom_string;
-typedef struct dom_element dom_element;
-typedef struct dom_document dom_document;
-typedef struct dom_node dom_node;
-typedef struct dom_string dom_string;
-
-typedef unsigned int dom_exception;
-#define DOM_NO_ERR 0
-
-extern dom_exception dom_string_create(const unsigned char *ptr, size_t len,
-		dom_string **str);
-extern dom_exception dom_string_unref(dom_string *str);
-extern const char *dom_string_data(const dom_string *str);
-extern size_t dom_string_length(const dom_string *str);
-
-extern dom_exception dom_document_get_element_by_id(dom_document *doc,
-		dom_string *id, dom_element **element);
-extern dom_exception dom_document_create_element(dom_document *doc,
-		dom_string *tag_name, dom_element **element);
-
-extern dom_exception dom_element_get_tag_name(dom_element *el, dom_string **name);
-extern dom_exception dom_element_get_attribute(dom_element *el,
-		dom_string *name, dom_string **value);
-extern dom_exception dom_element_set_attribute(dom_element *el,
-		dom_string *name, dom_string *value);
-
-extern dom_exception dom_node_append_child(dom_node *parent,
-		dom_node *new_child, dom_node **result);
-extern dom_exception dom_node_unref(dom_node *node);
-extern dom_exception dom_node_ref(dom_node *node);
+/* Pull the real libdom public headers.  These contain `static inline`
+ * helpers (dom_string_unref, dom_node_ref/unref) which the prefix's
+ * `#define inline` neutralises into `static`, so each TU gets its own
+ * out-of-line copy and the linker is satisfied. */
+#include <dom/core/string.h>
+#include <dom/core/node.h>
+#include <dom/core/element.h>
+#include <dom/core/document.h>
 
 /* ----------------------------------------------------------------- */
 /* Current document — set by the html handler on page load.          */
