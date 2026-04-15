@@ -65,48 +65,39 @@
 /*
  *  MacSurf — Mac OS 9 PowerPC + CodeWarrior 8 overrides.
  *
- *  These force-defines run before Duktape's platform detection so that
- *  the later `#if !defined(X) #define X ...` guards skip. `#undef`s that
- *  must come AFTER stock defaults are placed near end-of-file.
- *
- *  Spec: docs/macsurf-javascript-plan.md Phase 0.
+ *  Top of file defines only DUK_F_HAVE_INTTYPES skip helpers that have
+ *  to land before stock platform detection.  The bulk of the overrides
+ *  live at the END of this file (after the stock defaults are set) and
+ *  use #undef + #define so we can override values stock declares
+ *  unconditionally.  Spec: docs/macsurf-javascript-plan.md Phase 0.
  */
 #if defined(__MACOS9__) || defined(__MWERKS__)
-#define DUK_USE_OS_STRING                   "macos9"
-#define DUK_USE_ARCH_STRING                 "ppc32"
-#define DUK_USE_COMPILER_STRING             "codewarrior8"
-
-/* PowerPC big-endian: integers AND IEEE doubles are BE. Stock detection
- * handles DUK_USE_INTEGER_BE / DUK_USE_DOUBLE_BE automatically from
- * DUK_USE_BYTEORDER 3 (setting them by hand is a removed config option
- * in Duktape 2.x and triggers an #error). */
-#define DUK_USE_BYTEORDER                   3
-
-/* 32-bit pointers — enables packed 8-byte duk_tval (smaller, faster). */
-#define DUK_USE_PACKED_TVAL
-
-/* PPC wants 4-byte alignment minimum; 8 is safe for doubles. */
-#define DUK_USE_ALIGN_BY                    8
-
-/* setjmp is Duktape's default longjmp mechanism; no flag to set in 2.x
- * (DUK_USE_SETJMP is a removed config option). C89 setjmp.h is used. */
-
-/* CW8 has no `inline` keyword and no `__attribute__`. Make Duktape's
- * inline hints no-ops. Linkage macros (DUK_EXTERNAL / INTERNAL / LOCAL)
- * are left to Duktape's own detection — its fallback path treats this
- * compiler as "unknown" and uses sensible C89 defaults. */
-#define DUK_INLINE
-#define DUK_ALWAYS_INLINE
-#define DUK_NOINLINE
-
-/* Conservative stack recursion limits — OS 9 cooperative threads have
- * a limited stack and we do NOT want Duktape to blow it. */
-#define DUK_USE_NATIVE_CALL_RECLIMIT        128
-#define DUK_USE_ECMASCRIPT_CALL_RECLIMIT    256
-
-/* No preemptive threads on OS 9. */
-#undef  DUK_USE_PTHREAD_API
-#endif /* __MACOS9__ || __MWERKS__ */
+/* CW8 has no C99 <stdint.h> with the least/fast/max types Duktape's
+ * type detection block typedefs around line 1710.  Provide them here
+ * as plain typedefs BEFORE the stock detection runs, so its
+ * `typedef uint_least8_t duk_uint_least8_t;` line resolves cleanly. */
+#ifndef MACSURF_C99_INTTYPES_PROVIDED
+#define MACSURF_C99_INTTYPES_PROVIDED
+typedef unsigned char       uint_least8_t;
+typedef signed char         int_least8_t;
+typedef unsigned short      uint_least16_t;
+typedef signed short        int_least16_t;
+typedef unsigned long       uint_least32_t;
+typedef signed long         int_least32_t;
+typedef unsigned long long  uint_least64_t;
+typedef signed long long    int_least64_t;
+typedef unsigned char       uint_fast8_t;
+typedef signed char         int_fast8_t;
+typedef unsigned short      uint_fast16_t;
+typedef signed short        int_fast16_t;
+typedef unsigned long       uint_fast32_t;
+typedef signed long         int_fast32_t;
+typedef unsigned long long  uint_fast64_t;
+typedef signed long long    int_fast64_t;
+typedef unsigned long long  uintmax_t;
+typedef signed long long    intmax_t;
+#endif /* MACSURF_C99_INTTYPES_PROVIDED */
+#endif
 
 /*
  *  Intermediate helper defines
@@ -3823,12 +3814,61 @@ typedef struct duk_hthread duk_context;
 #endif  /* defined(DUK_USE_BYTEORDER) */
 
 /*
- *  MacSurf — post-detection overrides. Things that stock Duktape
- *  detection defines by default which we want off on Mac OS 9.
+ *  MacSurf — post-detection overrides.  This block runs AFTER stock
+ *  Duktape platform detection has set defaults, so every value here
+ *  is paired #undef + #define to win unconditionally.
  */
 #if defined(__MACOS9__) || defined(__MWERKS__)
+
+#undef  DUK_USE_OS_STRING
+#define DUK_USE_OS_STRING                   "macos9"
+#undef  DUK_USE_ARCH_STRING
+#define DUK_USE_ARCH_STRING                 "ppc32"
+#undef  DUK_USE_COMPILER_STRING
+#define DUK_USE_COMPILER_STRING             "codewarrior8"
+
+/* PowerPC big-endian: stock detection derives INTEGER_BE / DOUBLE_BE
+ * from BYTEORDER 3 automatically — those are removed config options
+ * in Duktape 2.x and setting them by hand triggers an #error. */
+#undef  DUK_USE_BYTEORDER
+#define DUK_USE_BYTEORDER                   3
+
+/* 32-bit pointers — enables packed 8-byte duk_tval (smaller, faster). */
+#ifndef DUK_USE_PACKED_TVAL
+#define DUK_USE_PACKED_TVAL
+#endif
+
+/* PPC wants 4-byte alignment minimum; 8 is safe for doubles. */
+#undef  DUK_USE_ALIGN_BY
+#define DUK_USE_ALIGN_BY                    8
+
+/* CW8 has no `inline` keyword and no `__attribute__`.  Make Duktape's
+ * inline hints no-ops; the optimiser still picks where to inline. */
+#undef  DUK_INLINE
+#define DUK_INLINE
+#undef  DUK_ALWAYS_INLINE
+#define DUK_ALWAYS_INLINE
+#undef  DUK_NOINLINE
+#define DUK_NOINLINE
+
+/* Conservative stack recursion limits — OS 9 cooperative threads have
+ * a limited stack and we do NOT want Duktape to blow it. */
+#undef  DUK_USE_NATIVE_CALL_RECLIMIT
+#define DUK_USE_NATIVE_CALL_RECLIMIT        128
+#undef  DUK_USE_ECMASCRIPT_CALL_RECLIMIT
+#define DUK_USE_ECMASCRIPT_CALL_RECLIMIT    256
+
+/* No preemptive threads on OS 9. */
+#undef  DUK_USE_PTHREAD_API
+
+/* Drop optional features that pull large libc surfaces. */
 #undef  DUK_USE_FILE_IO
 #undef  DUK_USE_DEBUG
+
+/* duk_uint_least*_t etc. are typedef'd by stock duk_config.h around
+ * line 1710 from the C99 stdint names we pre-supplied at the top of
+ * this file. */
+
 #endif /* __MACOS9__ || __MWERKS__ */
 
 #endif  /* DUK_CONFIG_H_INCLUDED */
