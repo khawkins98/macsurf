@@ -488,6 +488,13 @@ macsurf_console_log(duk_context *duk)
 /* ----------------------------------------------------------------- */
 
 #ifdef __MWERKS__
+/* Forward-declare AliasHandle before MacWindows.h gets pulled in by
+ * Dialogs.h — same workaround as macos9.h.  Some CW8 Universal
+ * Interfaces versions don't pull AliasHandle in via Aliases.h. */
+#include <Files.h>
+struct AliasRecord;
+typedef struct AliasRecord **AliasHandle;
+#include <Aliases.h>
 #include <Dialogs.h>
 static duk_ret_t
 macsurf_alert(duk_context *duk)
