@@ -104,6 +104,17 @@ element_finalizer(duk_context *duk)
 	return 0;
 }
 
+/* Forward decls for helpers defined later in this TU. */
+static duk_ret_t macsurf_getTagName(duk_context *duk);
+static duk_ret_t macsurf_getInnerHTML(duk_context *duk);
+static duk_ret_t macsurf_setInnerHTML(duk_context *duk);
+static duk_ret_t macsurf_getAttribute(duk_context *duk);
+static duk_ret_t macsurf_setAttribute(duk_context *duk);
+static duk_ret_t macsurf_appendChild(duk_context *duk);
+static duk_ret_t macsurf_addEventListener(duk_context *duk);
+static void wrapper_register(duk_context *duk, dom_element *el,
+		duk_idx_t wrapper_idx);
+
 void
 macsurf_push_element(duk_context *duk, dom_element *el)
 {
@@ -122,8 +133,33 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	duk_push_object(duk);
 	duk_put_prop_string(duk, -2, "__listeners");
 
+	/* DOM methods on the element wrapper. */
+	duk_push_c_function(duk, macsurf_getTagName, 0);
+	duk_put_prop_string(duk, -2, "tagName");
+	duk_push_c_function(duk, macsurf_getAttribute, 1);
+	duk_put_prop_string(duk, -2, "getAttribute");
+	duk_push_c_function(duk, macsurf_setAttribute, 2);
+	duk_put_prop_string(duk, -2, "setAttribute");
+	duk_push_c_function(duk, macsurf_appendChild, 1);
+	duk_put_prop_string(duk, -2, "appendChild");
+	duk_push_c_function(duk, macsurf_addEventListener, 3);
+	duk_put_prop_string(duk, -2, "addEventListener");
+
+	/* innerHTML accessor. */
+	duk_push_string(duk, "innerHTML");
+	duk_push_c_function(duk, macsurf_getInnerHTML, 0);
+	duk_push_c_function(duk, macsurf_setInnerHTML, 1);
+	duk_def_prop(duk, -4,
+			DUK_DEFPROP_HAVE_GETTER | DUK_DEFPROP_HAVE_SETTER |
+			DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE |
+			DUK_DEFPROP_HAVE_CONFIGURABLE | DUK_DEFPROP_CONFIGURABLE);
+
 	duk_push_c_function(duk, element_finalizer, 1);
 	duk_set_finalizer(duk, -2);
+
+	/* Register the wrapper in the pointer-keyed stash so
+	 * dispatch_event can find it from a raw dom_element*. */
+	wrapper_register(duk, el, duk_get_top_index(duk));
 }
 
 static dom_element *
@@ -571,18 +607,206 @@ macsurf_js_setup_globals(duk_context *duk)
 }
 
 /* ----------------------------------------------------------------- */
-/* Event dispatch (stage 9 skeleton)                                  */
+/* Event dispatch                                                     */
+/*                                                                    */
+/* Stage 9 implementation:                                            */
+/*   1. Inline on<event> handlers:                                    */
+/*      Read the element's `on<type>` attribute via libdom and        */
+/*      duk_peval_lstring it.  Backwards-compatible with classic      */
+/*      "<button onclick='alert(1)'>" markup, which is exactly what   */
+/*      pre-2010 sites use heavily.                                   */
+/*   2. addEventListener-registered handlers:                         */
+/*      Stored in __listeners[type] = [fn, fn, ...] on the wrapper.   */
+/*      We pcall each in order.  Errors per-handler are isolated.     */
+/*                                                                    */
+/* Returns true iff at least one handler was invoked successfully.    */
 /* ----------------------------------------------------------------- */
+
+#define MACSURF_JS_WRAPPER_STASH "macsurf_el_wrappers"
+
+static void
+wrapper_stash_key(char *buf, size_t buflen, void *p)
+{
+	/* Use the pointer's hex form as a stash key.  Stable for the
+	 * pointer's lifetime; dom_element addresses don't move. */
+	unsigned long v = (unsigned long)p;
+	if (buflen >= 11) {
+		buf[0] = '0'; buf[1] = 'x';
+		{
+			int i;
+			for (i = 9; i >= 2; i--) {
+				int nyb = (int)(v & 0xF);
+				buf[i] = (char)(nyb < 10 ? '0' + nyb : 'a' + nyb - 10);
+				v >>= 4;
+			}
+		}
+		buf[10] = '\0';
+	} else if (buflen > 0) {
+		buf[0] = '\0';
+	}
+}
+
+static void
+wrapper_register(duk_context *duk, dom_element *el, duk_idx_t wrapper_idx)
+{
+	char key[12];
+	wrapper_stash_key(key, sizeof(key), el);
+
+	duk_push_global_stash(duk);
+	if (duk_get_prop_string(duk, -1, MACSURF_JS_WRAPPER_STASH) == 0) {
+		duk_pop(duk);
+		duk_push_object(duk);
+		duk_dup_top(duk);
+		duk_put_prop_string(duk, -3, MACSURF_JS_WRAPPER_STASH);
+	}
+	duk_dup(duk, wrapper_idx);
+	duk_put_prop_string(duk, -2, key);
+	duk_pop_2(duk);
+}
+
+static bool
+wrapper_lookup_push(duk_context *duk, dom_element *el)
+{
+	char key[12];
+	wrapper_stash_key(key, sizeof(key), el);
+
+	duk_push_global_stash(duk);
+	if (duk_get_prop_string(duk, -1, MACSURF_JS_WRAPPER_STASH) == 0) {
+		duk_pop_2(duk);
+		return false;
+	}
+	if (duk_get_prop_string(duk, -1, key) == 0) {
+		duk_pop_3(duk);
+		return false;
+	}
+	duk_remove(duk, -2); /* the wrappers stash */
+	duk_remove(duk, -2); /* the global stash */
+	return true;
+}
 
 bool
 macsurf_js_dispatch_event(struct jscontext *ctx,
 		struct dom_element *el, const char *event_type)
 {
-	/* TODO stage 9: resolve el -> JS wrapper from a C-side hash,
-	 * read __listeners[event_type], call each handler.
-	 *
-	 * For now, inline handlers are evaluated via the attribute
-	 * value when the click lands (see plotters.c). */
-	(void)ctx; (void)el; (void)event_type;
-	return false;
+	dom_string *attr_name = NULL;
+	dom_string *attr_val  = NULL;
+	char attr_buf[32];
+	size_t et_len;
+	bool fired = false;
+
+	if (ctx == NULL || ctx->duk == NULL || el == NULL ||
+	    event_type == NULL) {
+		return false;
+	}
+
+	/* --- 1. Inline on<type> handler from attribute. --- */
+	et_len = strlen(event_type);
+	if (et_len + 2 + 1 <= sizeof(attr_buf)) {
+		attr_buf[0] = 'o'; attr_buf[1] = 'n';
+		memcpy(attr_buf + 2, event_type, et_len);
+		attr_buf[2 + et_len] = '\0';
+
+		if (dom_string_create((const unsigned char *)attr_buf,
+				et_len + 2, &attr_name) == DOM_NO_ERR &&
+		    attr_name != NULL) {
+			if (dom_element_get_attribute(el, attr_name,
+					&attr_val) == DOM_NO_ERR &&
+			    attr_val != NULL) {
+				if (duk_peval_lstring(ctx->duk,
+						dom_string_data(attr_val),
+						dom_string_length(attr_val))
+						== 0) {
+					fired = true;
+				} else {
+					nslog_log(__FILE__, "", __LINE__,
+						"inline %s handler error: %s",
+						event_type,
+						duk_safe_to_string(ctx->duk, -1));
+				}
+				duk_pop(ctx->duk);
+				dom_string_unref(attr_val);
+			}
+			dom_string_unref(attr_name);
+		}
+	}
+
+	/* --- 2. addEventListener handlers from wrapper.__listeners. --- */
+	if (wrapper_lookup_push(ctx->duk, el)) {
+		if (duk_get_prop_string(ctx->duk, -1, "__listeners") &&
+		    duk_get_prop_string(ctx->duk, -1, event_type) &&
+		    duk_is_array(ctx->duk, -1)) {
+
+			duk_size_t len = duk_get_length(ctx->duk, -1);
+			duk_size_t i;
+			for (i = 0; i < len; i++) {
+				duk_get_prop_index(ctx->duk, -1, (duk_uarridx_t)i);
+				if (duk_is_callable(ctx->duk, -1)) {
+					duk_dup(ctx->duk, -4); /* this = wrapper */
+					if (duk_pcall_method(ctx->duk, 0) == 0) {
+						fired = true;
+					}
+				}
+				duk_pop(ctx->duk);
+			}
+			duk_pop(ctx->duk);  /* listeners[type] */
+			duk_pop(ctx->duk);  /* __listeners */
+		} else {
+			/* unwind whatever we pushed */
+			duk_pop(ctx->duk);
+			duk_pop(ctx->duk);
+		}
+		duk_pop(ctx->duk);          /* wrapper */
+	}
+
+	return fired;
+}
+
+/* ----------------------------------------------------------------- */
+/* element.addEventListener                                           */
+/* ----------------------------------------------------------------- */
+
+static duk_ret_t
+macsurf_addEventListener(duk_context *duk)
+{
+	const char *type;
+
+	if (!duk_is_string(duk, 0) || !duk_is_function(duk, 1)) {
+		return 0;
+	}
+	type = duk_get_string(duk, 0);
+
+	duk_push_this(duk);
+	if (duk_get_prop_string(duk, -1, "__listeners") == 0) {
+		duk_pop(duk);
+		duk_push_object(duk);
+		duk_dup_top(duk);
+		duk_put_prop_string(duk, -3, "__listeners");
+	}
+	/* stack: ... this listeners */
+	if (duk_get_prop_string(duk, -1, type) == 0 ||
+	    !duk_is_array(duk, -1)) {
+		duk_pop(duk);
+		duk_push_array(duk);
+		duk_dup_top(duk);
+		duk_put_prop_string(duk, -3, type);
+	}
+	/* stack: ... this listeners arr */
+	{
+		duk_size_t len = duk_get_length(duk, -1);
+		duk_dup(duk, 1);
+		duk_put_prop_index(duk, -2, (duk_uarridx_t)len);
+	}
+	duk_pop_3(duk);
+	return 0;
+}
+
+/* Re-register macsurf_push_element to also store the wrapper in the
+ * pointer-keyed stash so dispatch_event can find it later.  This is a
+ * thin wrapper around the stage-4 helper; we forward-declared above. */
+void
+macsurf_register_element_wrapper(duk_context *duk, dom_element *el,
+		duk_idx_t wrapper_idx)
+{
+	if (duk == NULL || el == NULL) return;
+	wrapper_register(duk, el, wrapper_idx);
 }
