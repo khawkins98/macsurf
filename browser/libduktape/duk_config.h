@@ -63,6 +63,44 @@
 #define DUK_CONFIG_H_INCLUDED
 
 /*
+ *  MacSurf — Mac OS 9 PowerPC + CodeWarrior 8 overrides.
+ *
+ *  These force-defines run before Duktape's platform detection so that
+ *  the later `#if !defined(X) #define X ...` guards skip. `#undef`s that
+ *  must come AFTER stock defaults are placed near end-of-file.
+ *
+ *  Spec: docs/macsurf-javascript-plan.md Phase 0.
+ */
+#if defined(__MACOS9__) || defined(__MWERKS__)
+#define DUK_USE_OS_STRING                   "macos9"
+#define DUK_USE_ARCH_STRING                 "ppc32"
+#define DUK_USE_COMPILER_STRING             "codewarrior8"
+
+/* PowerPC big-endian: integers AND IEEE doubles are BE. Stock detection
+ * handles DUK_USE_INTEGER_BE / DUK_USE_DOUBLE_BE automatically from
+ * DUK_USE_BYTEORDER 3 (setting them by hand is a removed config option
+ * in Duktape 2.x and triggers an #error). */
+#define DUK_USE_BYTEORDER                   3
+
+/* 32-bit pointers — enables packed 8-byte duk_tval (smaller, faster). */
+#define DUK_USE_PACKED_TVAL
+
+/* PPC wants 4-byte alignment minimum; 8 is safe for doubles. */
+#define DUK_USE_ALIGN_BY                    8
+
+/* setjmp is Duktape's default longjmp mechanism; no flag to set in 2.x
+ * (DUK_USE_SETJMP is a removed config option). C89 setjmp.h is used. */
+
+/* Conservative stack recursion limits — OS 9 cooperative threads have
+ * a limited stack and we do NOT want Duktape to blow it. */
+#define DUK_USE_NATIVE_CALL_RECLIMIT        128
+#define DUK_USE_ECMASCRIPT_CALL_RECLIMIT    256
+
+/* No preemptive threads on OS 9. */
+#undef  DUK_USE_PTHREAD_API
+#endif /* __MACOS9__ || __MWERKS__ */
+
+/*
  *  Intermediate helper defines
  */
 
@@ -3775,5 +3813,14 @@ typedef struct duk_hthread duk_context;
 #else
 #error unsupported: byte order detection failed
 #endif  /* defined(DUK_USE_BYTEORDER) */
+
+/*
+ *  MacSurf — post-detection overrides. Things that stock Duktape
+ *  detection defines by default which we want off on Mac OS 9.
+ */
+#if defined(__MACOS9__) || defined(__MWERKS__)
+#undef  DUK_USE_FILE_IO
+#undef  DUK_USE_DEBUG
+#endif /* __MACOS9__ || __MWERKS__ */
 
 #endif  /* DUK_CONFIG_H_INCLUDED */
