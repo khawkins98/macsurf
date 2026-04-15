@@ -41,6 +41,10 @@ bool macsurf_js_exec(struct jscontext *ctx, const char *src, size_t srclen);
 void macsurf_js_pump(struct jscontext *ctx);
 bool macsurf_js_smoketest(struct jscontext *ctx);
 
+/* Pump every live jsheap once.  Called from the main event loop after
+ * WaitNextEvent so timer callbacks fire even when no script is running. */
+void macsurf_js_pump_all(void);
+
 /* Fatal handler — passed to duk_create_heap; never calls exit/abort. */
 void macsurf_js_fatal(void *udata, const char *msg);
 

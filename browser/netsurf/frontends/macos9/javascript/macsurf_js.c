@@ -29,8 +29,22 @@
  * tags.  We alias both to our own struct.  NetSurf never dereferences
  * them — only passes pointers around — so this is safe.
  */
-struct jsheap   { struct jscontext ctx; };
+struct jsheap   { struct jscontext ctx; struct jsheap *next; };
 struct jsthread { struct jscontext ctx; };
+
+/* All live heaps form a singly-linked list so the main event loop can
+ * pump every page's timers in one pass without juggling per-window
+ * pointers.  Heads at the head of the list. */
+static struct jsheap *macsurf_js_heaps = NULL;
+
+void
+macsurf_js_pump_all(void)
+{
+	struct jsheap *h;
+	for (h = macsurf_js_heaps; h != NULL; h = h->next) {
+		macsurf_js_pump(&h->ctx);
+	}
+}
 
 /* ----------------------------------------------------------------- */
 /* Lifecycle                                                          */
@@ -214,6 +228,10 @@ js_newheap(int timeout, jsheap **heap)
 	 * lands in the debug log on every JS-enabled page load. */
 	(void)macsurf_js_smoketest(&h->ctx);
 
+	/* Register on the global heap list for pump_all(). */
+	h->next = macsurf_js_heaps;
+	macsurf_js_heaps = h;
+
 	*heap = h;
 	return NSERROR_OK;
 }
@@ -221,9 +239,19 @@ js_newheap(int timeout, jsheap **heap)
 void
 js_destroyheap(jsheap *heap)
 {
+	struct jsheap **pp;
+
 	if (heap == NULL) {
 		return;
 	}
+
+	/* Unlink from heaps list. */
+	pp = &macsurf_js_heaps;
+	while (*pp != NULL) {
+		if (*pp == heap) { *pp = heap->next; break; }
+		pp = &(*pp)->next;
+	}
+
 	if (heap->ctx.duk != NULL) {
 		duk_destroy_heap(heap->ctx.duk);
 		heap->ctx.duk = NULL;

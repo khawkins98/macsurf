@@ -154,10 +154,51 @@ typedef unsigned char (nslog_ensure_t)(FILE *fptr);
 #define restrict
 #endif
 
+/* _ALIGNED — GCC alignment attribute macro used in libcss stylesheet.h
+ * (appears as "} _ALIGNED;" after a struct). Without this define, CW8
+ * parses it as a global variable of the anonymous struct type, which
+ * creates a multiply-defined symbol in every TU that includes the header. */
+#ifndef _ALIGNED
+#define _ALIGNED
+#endif
+
+/* UNUSED / N_ELEMENTS — defined per-library in utils.h files, but on the
+ * shared CW8 access paths the wrong utils.h often wins. Define globally
+ * so every TU has them regardless. */
+#ifndef UNUSED
+#define UNUSED(x) ((void)(x))
+#endif
+#ifndef N_ELEMENTS
+#define N_ELEMENTS(x) (sizeof((x)) / sizeof((x)[0]))
+#endif
+
+/* MSL's <assert.h> ends up referencing an __assertion_failed symbol that's
+ * not available in the Carbon MSL build. Replace assert() globally with a
+ * no-op so every TU compiles and links without needing MSL's debug hooks. */
+#ifndef NDEBUG
+#define NDEBUG 1
+#endif
+#define _ASSERT_H_
+#define __ASSERT_H__
+#define assert(x) ((void)0)
+
 /* isascii — not in MSL */
 #ifndef isascii
 #define isascii(c) ((unsigned)(c) <= 0x7F)
 #endif
+
+/* MSL string.h may be shadowed by utils/string.h on access paths —
+ * forward-declare the standard string routines we rely on so callers
+ * don't default them to int(). */
+extern char *strtok(char *, const char *);
+extern char *strchr(const char *, int);
+extern char *strrchr(const char *, int);
+extern char *strstr(const char *, const char *);
+extern char *strcpy(char *, const char *);
+extern char *strncpy(char *, const char *, size_t);
+extern char *strcat(char *, const char *);
+extern char *strncat(char *, const char *, size_t);
+extern char *strdup(const char *);
 
 /* --- Additional build defines --- */
 
@@ -165,8 +206,14 @@ typedef unsigned char (nslog_ensure_t)(FILE *fptr);
 #define __MACOS9__ 1
 #endif
 
-#ifndef WITHOUT_DUKTAPE
-#define WITHOUT_DUKTAPE 1
+/* JavaScript tiered strategy (per CLAUDE.md):
+ *   - Base tier builds with WITH_DUKTAPE active; Duktape is linked
+ *     in and NetSurf's js_thread API is backed by macsurf_js.c.
+ *   - To compile out JS entirely, flip the sense here: #define
+ *     WITHOUT_DUKTAPE 1 and remove WITH_DUKTAPE. The js_stub.c stubs
+ *     still exist on disk and will resolve the js_* symbols. */
+#ifndef WITH_DUKTAPE
+#define WITH_DUKTAPE 1
 #endif
 
 /* libparserutils: disable iconv-based input filter (no iconv on OS 9).
