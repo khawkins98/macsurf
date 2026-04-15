@@ -91,6 +91,14 @@
 /* setjmp is Duktape's default longjmp mechanism; no flag to set in 2.x
  * (DUK_USE_SETJMP is a removed config option). C89 setjmp.h is used. */
 
+/* CW8 has no `inline` keyword and no `__attribute__`. Make Duktape's
+ * inline hints no-ops. Linkage macros (DUK_EXTERNAL / INTERNAL / LOCAL)
+ * are left to Duktape's own detection — its fallback path treats this
+ * compiler as "unknown" and uses sensible C89 defaults. */
+#define DUK_INLINE
+#define DUK_ALWAYS_INLINE
+#define DUK_NOINLINE
+
 /* Conservative stack recursion limits — OS 9 cooperative threads have
  * a limited stack and we do NOT want Duktape to blow it. */
 #define DUK_USE_NATIVE_CALL_RECLIMIT        128
