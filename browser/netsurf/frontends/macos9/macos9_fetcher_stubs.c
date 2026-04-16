@@ -126,45 +126,48 @@ static void
 stub_poll(lwc_string *scheme)
 {
 	struct stub_fetch_ctx *ctx;
-	struct stub_fetch_ctx *next;
 	fetch_msg msg;
+	int safety;
 
 	(void)scheme;
-	if (stub_ring == NULL) return;
 
-	ctx = stub_ring;
-	do {
-		next = ctx->r_next;
-		if (ctx->started && !ctx->aborted) {
-			/* Send a minimal successful response with
-			 * Content-Type header so the content handler
-			 * knows what to do with it. */
-			{
-				static const char ct[] =
-					"Content-Type: text/css";
-				msg.type = FETCH_HEADER;
-				msg.data.header_or_data.buf =
-					(const uint8_t *)ct;
-				msg.data.header_or_data.len =
-					sizeof(ct) - 1;
-				fetch_send_callback(&msg, ctx->parent);
-			}
-			/* Minimal CSS body — a single newline so llcache
-			 * considers the response non-empty and fires
-			 * the completion callback. */
-			{
-				static const unsigned char minimal_css[] = "\n";
-				msg.type = FETCH_DATA;
-				msg.data.header_or_data.buf = minimal_css;
-				msg.data.header_or_data.len = 1;
-				fetch_send_callback(&msg, ctx->parent);
-			}
-			msg.type = FETCH_FINISHED;
-			fetch_send_callback(&msg, ctx->parent);
-			return;
+	/* Process ALL pending stub fetches in one pass — not just one.
+	 * The HTML handler starts multiple stylesheet fetches and they
+	 * ALL need to complete before conversion can begin. */
+	safety = 0;
+	while (stub_ring != NULL && safety < 32) {
+		ctx = stub_ring;
+		safety++;
+
+		if (!ctx->started || ctx->aborted) {
+			/* Skip non-started entries — move head forward. */
+			if (ctx->r_next == ctx) break;
+			stub_ring = ctx->r_next;
+			continue;
 		}
-		ctx = next;
-	} while (ctx != stub_ring);
+
+		/* Send Content-Type header. */
+		{
+			static const char ct[] = "Content-Type: text/css";
+			msg.type = FETCH_HEADER;
+			msg.data.header_or_data.buf = (const uint8_t *)ct;
+			msg.data.header_or_data.len = sizeof(ct) - 1;
+			fetch_send_callback(&msg, ctx->parent);
+		}
+		/* Minimal CSS body. */
+		{
+			static const unsigned char css[] = "\n";
+			msg.type = FETCH_DATA;
+			msg.data.header_or_data.buf = css;
+			msg.data.header_or_data.len = 1;
+			fetch_send_callback(&msg, ctx->parent);
+		}
+		/* Complete. */
+		msg.type = FETCH_FINISHED;
+		fetch_send_callback(&msg, ctx->parent);
+		/* fetch_send_callback may have freed ctx and modified
+		 * stub_ring. Loop re-checks stub_ring at top. */
+	}
 }
 
 static const struct fetcher_operation_table stub_ops = {
