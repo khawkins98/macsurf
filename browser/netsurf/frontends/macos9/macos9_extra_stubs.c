@@ -92,15 +92,9 @@ nserror image_cache_init(const struct image_cache_parameters *p)
 /* dom_hubbub_parser_* stubs removed — v0.3 adds the real
  * dom_parser.c now that internal headers are C89-clean. */
 
-/* --- NetSurf fetcher registration stubs.
- * Only the macos9 HTTP/proxy fetcher is wired; about:/resource:/file:/
- * data:/javascript: are no-ops so fetcher_init() in fetch.c links. */
-
-nserror fetch_about_register(void)      { return NSERROR_OK; }
-nserror fetch_resource_register(void)   { return NSERROR_OK; }
-nserror fetch_file_register(void)       { return NSERROR_OK; }
-nserror fetch_data_register(void)       { return NSERROR_OK; }
-nserror fetch_javascript_register(void) { return NSERROR_OK; }
+/* Fetcher registration stubs moved to macos9_fetcher_stubs.c which
+ * provides real (minimal) fetcher implementations that register with
+ * the fetcher system and fire completion callbacks. */
 
 /* --- nsutils stubs. base64 encode/decode are real-but-minimal; the
  * URL variants and decode_alloc just return BAD_INPUT. nsu_getmonotonic_ms
