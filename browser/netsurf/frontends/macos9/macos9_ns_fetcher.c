@@ -24,6 +24,7 @@
 #include "content/fetchers.h"
 
 #ifdef __MACOS9__
+#include <Files.h>
 #include <OpenTransport.h>
 #include <OpenTptInternet.h>
 #include <Threads.h>
