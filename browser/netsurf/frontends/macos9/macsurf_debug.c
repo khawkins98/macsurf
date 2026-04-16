@@ -13,6 +13,10 @@
 #include <string.h>
 
 #ifdef __MACOS9__
+#include <Files.h>
+struct AliasRecord;
+typedef struct AliasRecord **AliasHandle;
+#include <Aliases.h>
 #include <MacWindows.h>
 
 void
