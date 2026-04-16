@@ -35,7 +35,9 @@
 #include "utils/log.h"
 
 /* squashes unused variable compiler warnings */
+#ifndef UNUSED
 #define UNUSED(x) ((x)=(x))
+#endif
 
 /* BMP entry sizes */
 #define BMP_FILE_HEADER_SIZE 14
