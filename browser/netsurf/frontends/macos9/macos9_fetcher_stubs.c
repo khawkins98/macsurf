@@ -149,12 +149,14 @@ stub_poll(lwc_string *scheme)
 					sizeof(ct) - 1;
 				fetch_send_callback(&msg, ctx->parent);
 			}
-			/* Empty body. */
+			/* Minimal CSS body — a single newline so llcache
+			 * considers the response non-empty and fires
+			 * the completion callback. */
 			{
-				static const unsigned char empty = 0;
+				static const unsigned char minimal_css[] = "\n";
 				msg.type = FETCH_DATA;
-				msg.data.header_or_data.buf = &empty;
-				msg.data.header_or_data.len = 0;
+				msg.data.header_or_data.buf = minimal_css;
+				msg.data.header_or_data.len = 1;
 				fetch_send_callback(&msg, ctx->parent);
 			}
 			msg.type = FETCH_FINISHED;
