@@ -37,14 +37,60 @@
 #include "duktape.h"
 #include "macsurf_js.h"
 
-/* Pull the real libdom public headers.  These contain `static inline`
- * helpers (dom_string_unref, dom_node_ref/unref) which the prefix's
- * `#define inline` neutralises into `static`, so each TU gets its own
- * out-of-line copy and the linker is satisfied. */
-#include <dom/core/string.h>
-#include <dom/core/node.h>
-#include <dom/core/element.h>
-#include <dom/core/document.h>
+/*
+ * libdom is in the source tree but not all the implementation .c files
+ * are in the CW8 project file list, and the public header relies on
+ * static-inline helpers that CW8 doesn't always emit out-of-line bodies
+ * for.  Until the full libdom binding lands (deferred — see
+ * dom_parser.c port note in the moonshot plan), we provide local
+ * forward decls + no-op stubs in this TU so the JS DOM bindings
+ * compile, link, and gracefully return null when no document is set.
+ */
+
+struct dom_document;
+struct dom_element;
+struct dom_node;
+struct dom_string;
+typedef struct dom_element  dom_element;
+typedef struct dom_document dom_document;
+typedef struct dom_node     dom_node;
+typedef struct dom_string   dom_string;
+
+typedef int dom_exception;
+#define DOM_NO_ERR 0
+
+/* Local stubs — lifecycle and accessors all no-op or return null.
+ * Marked static so they don't conflict with any real libdom symbols
+ * if those ever land in the project. */
+static dom_exception dom_string_create(const unsigned char *ptr, size_t len,
+		dom_string **str)
+{ (void)ptr; (void)len; if (str) *str = NULL; return DOM_NO_ERR; }
+static void dom_string_unref(dom_string *str) { (void)str; }
+static const char *dom_string_data(const dom_string *str)
+{ (void)str; return ""; }
+static size_t dom_string_length(const dom_string *str)
+{ (void)str; return 0; }
+
+static void dom_node_ref(dom_node *node)   { (void)node; }
+static void dom_node_unref(dom_node *node) { (void)node; }
+
+static dom_exception dom_document_get_element_by_id(dom_document *doc,
+		dom_string *id, dom_element **element)
+{ (void)doc; (void)id; if (element) *element = NULL; return DOM_NO_ERR; }
+static dom_exception dom_document_create_element(dom_document *doc,
+		dom_string *tag_name, dom_element **element)
+{ (void)doc; (void)tag_name; if (element) *element = NULL; return DOM_NO_ERR; }
+static dom_exception dom_element_get_tag_name(dom_element *el, dom_string **name)
+{ (void)el; if (name) *name = NULL; return DOM_NO_ERR; }
+static dom_exception dom_element_get_attribute(dom_element *el,
+		dom_string *name, dom_string **value)
+{ (void)el; (void)name; if (value) *value = NULL; return DOM_NO_ERR; }
+static dom_exception dom_element_set_attribute(dom_element *el,
+		dom_string *name, dom_string *value)
+{ (void)el; (void)name; (void)value; return DOM_NO_ERR; }
+static dom_exception dom_node_append_child(dom_node *parent,
+		dom_node *new_child, dom_node **result)
+{ (void)parent; (void)new_child; if (result) *result = NULL; return DOM_NO_ERR; }
 
 /* ----------------------------------------------------------------- */
 /* Current document — set by the html handler on page load.          */
