@@ -61,6 +61,10 @@ dom_exception dom_node_copy_impl(struct dom_node_internal *old,
 
 /* ---- element.h functions ---- */
 
+/* Undefine the macro so we can reference the vtable field directly
+ * without triggering the macro that remaps it to our _impl name. */
+#undef dom_element_parse_attribute
+
 dom_exception dom_element_parse_attribute_impl(dom_element *ele,
 		dom_string *name, dom_string *value, dom_string **parsed)
 {
