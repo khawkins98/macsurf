@@ -8,7 +8,7 @@
 #ifndef dom_internal_core_nodelist_h_
 #define dom_internal_core_nodelist_h_
 
-#include <stdbool.h>
+/* stdbool.h removed for CW8 C89 -- prefix provides bool */
 
 #include <dom/core/nodelist.h>
 

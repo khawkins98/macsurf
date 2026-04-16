@@ -89,56 +89,8 @@ struct image_cache_parameters;
 nserror image_cache_init(const struct image_cache_parameters *p)
 { (void)p; return NSERROR_OK; }
 
-/* --- libdom hubbub binding stubs. The real dom_parser.c transitively
- * pulls in libdom's internal headers (event_target.h, node.h, list.h,
- * string.h …) which use static inline and other C99 forms that CW8
- * cannot parse. Provide no-op stubs so the link resolves; HTML parsing
- * is deferred until those headers are C89-cleaned. */
-
-#include "dom/bindings/hubbub/parser.h"
-
-dom_hubbub_error dom_hubbub_parser_create(dom_hubbub_parser_params *params,
-		dom_hubbub_parser **parser, dom_document **document)
-{
-	(void)params;
-	if (parser != NULL)   *parser = NULL;
-	if (document != NULL) *document = NULL;
-	return DOM_HUBBUB_NOMEM;
-}
-
-dom_hubbub_error dom_hubbub_fragment_parser_create(dom_hubbub_parser_params *params,
-		dom_document *document, dom_hubbub_parser **parser,
-		dom_document_fragment **fragment)
-{
-	(void)params; (void)document;
-	if (parser != NULL)   *parser = NULL;
-	if (fragment != NULL) *fragment = NULL;
-	return DOM_HUBBUB_NOMEM;
-}
-
-void dom_hubbub_parser_destroy(dom_hubbub_parser *parser) { (void)parser; }
-
-dom_hubbub_error dom_hubbub_parser_parse_chunk(dom_hubbub_parser *parser,
-		const uint8_t *data, size_t len)
-{ (void)parser; (void)data; (void)len; return DOM_HUBBUB_OK; }
-
-dom_hubbub_error dom_hubbub_parser_insert_chunk(dom_hubbub_parser *parser,
-		const uint8_t *data, size_t length)
-{ (void)parser; (void)data; (void)length; return DOM_HUBBUB_OK; }
-
-dom_hubbub_error dom_hubbub_parser_completed(dom_hubbub_parser *parser)
-{ (void)parser; return DOM_HUBBUB_OK; }
-
-const char *dom_hubbub_parser_get_encoding(dom_hubbub_parser *parser,
-		dom_hubbub_encoding_source *source)
-{
-	(void)parser;
-	if (source != NULL) *source = DOM_HUBBUB_ENCODING_SOURCE_HEADER;
-	return "UTF-8";
-}
-
-dom_hubbub_error dom_hubbub_parser_pause(dom_hubbub_parser *parser, bool pause)
-{ (void)parser; (void)pause; return DOM_HUBBUB_OK; }
+/* dom_hubbub_parser_* stubs removed — v0.3 adds the real
+ * dom_parser.c now that internal headers are C89-clean. */
 
 /* --- NetSurf fetcher registration stubs.
  * Only the macos9 HTTP/proxy fetcher is wired; about:/resource:/file:/
