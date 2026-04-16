@@ -12,14 +12,20 @@ No consumer browser has ever done this before. Classic IE 5.x shipped JScript 5,
 
 ## The Machine
 
-**Power Macintosh G3 Minitower (Beige)**
-- Processor: PowerPC 750 (G3)
-- RAM: 192 MB
-- OS: Mac OS 9.1
+**Power Macintosh G3 Minitower (Beige), Machine ID 510**
+- Processor: PowerPC G4 at 400 MHz (Sonnet upgrade card — the beige G3 never shipped with a G4)
+- RAM: 192 MB (32 MB + 32 MB + 128 MB DIMMs in slots J3/J4/J5)
+- Video Memory: 6 MB
+- External L2 Cache: Not installed
+- Startup Drive: "Back40" (Internal ATA)
+- OS: Mac OS 9.1 (US)
+- CarbonLib: 1.6
+- QuickTime: 6.0.3
+- Virtual Memory: 193 MB (on Back40)
+- Network: 10.42.0.204 via Ethernet built-in
 - Compiler: Metrowerks CodeWarrior 8 Pro (8.3 update)
-- Display: 1024x768, millions of colors
 
-This is the development machine. Every line of code was compiled on it. Every screenshot was captured from it. Every benchmark was measured on it. There is no emulator in this story.
+This is Gary Hansen's machine with an aftermarket Sonnet G4 processor upgrade installed — a pretty sweet find. The Sonnet Processor Upgrade 1.4.5 extension is active in the System Folder. Every line of code was compiled on it. Every screenshot was captured from it. Every benchmark was measured on it. There is no emulator in this story. System profile generated live from the machine on April 15, 2026 at 8:47 PM.
 
 ---
 
@@ -80,7 +86,7 @@ The development partner. The MacSurf codebase — frontend, library ports, build
 
 ## The Benchmarks
 
-Measured on the Power Macintosh G3, Mac OS 9.1, 192 MB RAM.
+Measured on the Power Macintosh G3 Minitower with Sonnet G4 400 MHz upgrade, Mac OS 9.1, 192 MB RAM.
 Duktape 2.7.0, DUK_USE_NATIVE_CALL_RECLIMIT 128.
 
 | Test | Result | Time |
