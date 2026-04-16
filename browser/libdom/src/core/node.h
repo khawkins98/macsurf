@@ -8,8 +8,6 @@
 #ifndef dom_internal_core_node_h_
 #define dom_internal_core_node_h_
 
-#include <stdbool.h>
-
 #include <libwapcaplet/libwapcaplet.h>
 
 #include <dom/core/node.h>
@@ -244,20 +242,12 @@ dom_exception _dom_node_copy(struct dom_node_internal *old,
 	_dom_node_copy
 
 
-/* The destroy API should be used inside DOM module */
-static inline void dom_node_destroy(struct dom_node_internal *node)
-{
-	((dom_node_protect_vtable *) node->vtable)->destroy(node);
-}
-#define dom_node_destroy(n) dom_node_destroy((dom_node_internal *) (n))
-
-/* Copy the Node old to new */
-static inline dom_exception dom_node_copy(struct dom_node_internal *old, 
-		struct dom_node_internal **copy)
-{
-	return ((dom_node_protect_vtable *) old->vtable)->copy(old, copy);
-}
-#define dom_node_copy(o,c) dom_node_copy((dom_node_internal *) (o), \
+/* MacSurf: bodies in libdom_c89_helpers.c */
+extern void dom_node_destroy_impl(struct dom_node_internal *node);
+extern dom_exception dom_node_copy_impl(struct dom_node_internal *old,
+		struct dom_node_internal **copy);
+#define dom_node_destroy(n) dom_node_destroy_impl((dom_node_internal *) (n))
+#define dom_node_copy(o,c) dom_node_copy_impl((dom_node_internal *) (o), \
 		(dom_node_internal **) (c))
 
 /* Following are some helper functions */

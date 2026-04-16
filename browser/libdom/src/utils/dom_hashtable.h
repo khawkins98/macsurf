@@ -9,7 +9,7 @@
 #ifndef dom_utils_hashtable_h_
 #define dom_utils_hashtable_h_
 
-#include <stdbool.h>
+/* stdbool.h removed for CW8 C89 -- prefix provides bool */
 #include <dom/functypes.h>
 
 typedef struct dom_hash_table dom_hash_table;

@@ -8,7 +8,7 @@
 #ifndef dom_internal_core_element_h_
 #define dom_internal_core_element_h_
 
-#include <stdbool.h>
+/* stdbool.h removed for CW8 C89 — prefix provides bool */
 
 #include <dom/core/element.h>
 
@@ -201,16 +201,10 @@ struct dom_element_protected_vtable {
 
 typedef struct dom_element_protected_vtable dom_element_protected_vtable;
 
-/* Parse the attribute's value */
-static inline dom_exception dom_element_parse_attribute(dom_element *ele,
-		dom_string *name, dom_string *value,
-		dom_string **parsed)
-{
-	struct dom_node_internal *node = (struct dom_node_internal *) ele;
-	return ((dom_element_protected_vtable *) node->vtable)->
-			dom_element_parse_attribute(ele, name, value, parsed);
-}
-#define dom_element_parse_attribute(e, n, v, p) dom_element_parse_attribute( \
+/* MacSurf: body in libdom_c89_helpers.c */
+extern dom_exception dom_element_parse_attribute_impl(dom_element *ele,
+		dom_string *name, dom_string *value, dom_string **parsed);
+#define dom_element_parse_attribute(e, n, v, p) dom_element_parse_attribute_impl( \
 		(dom_element *) (e), (dom_string *) (n), \
 		(dom_string *) (v), (dom_string **) (p))
 

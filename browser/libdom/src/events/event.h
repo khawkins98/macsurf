@@ -62,11 +62,9 @@ dom_exception _dom_event_initialise(dom_event *evt);
 void _dom_event_finalise(dom_event *evt);
 
 
-static inline void dom_event_destroy(dom_event *evt)
-{
-	evt->vtable->destroy(evt);
-}
-#define dom_event_destroy(e) dom_event_destroy((dom_event *) (e))
+/* MacSurf: body in libdom_c89_helpers.c */
+extern void dom_event_destroy_impl(dom_event *evt);
+#define dom_event_destroy(e) dom_event_destroy_impl((dom_event *) (e))
 
 #endif
 
