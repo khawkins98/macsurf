@@ -169,7 +169,23 @@ An ASCII Mandelbrot set, 40x20 characters, 80 iterations per pixel, computed ent
 
 **Macintosh Garden (macintoshgarden.org)** — The indispensable archive of Classic Mac software. CodeWarrior 8, ResEdit, system software, extensions, utilities — if it ran on a classic Mac and you needed it, Macintosh Garden had it. This project would not have been possible without the preservation work of that community.
 
-**Gary Hansen (RIP)** — The Power Macintosh G3 Minitower that MacSurf was built on was Gary's machine. Every screenshot, every benchmark, every late-night debugging session happened on hardware that outlived its original owner. Gary's G3 is still compiling code and rendering fractals in 2026. This project is dedicated to his memory.
+**Gary Hansen (1947–2002)**
+
+![Gary Hansen](photos/gary.jpeg)
+
+![Gary and Kaija](photos/garykaija.jpeg)
+
+![Gary the mechanic](photos/gary-mechanic.jpg)
+
+![Gary's reflection in chrome](photos/gary-reflection.jpg)
+
+Gary Hansen was a communications lifer who rode every wave the industry threw at him. He started shooting photos and filing stories for the New Ulm Daily Journal at thirteen, landed at the Associated Press by twenty-one — covering Nixon, Bobby Kennedy, and McGovern out of the Pierre, SD bureau — and by the mid-'80s had pivoted hard into the desktop publishing revolution, training thousands of employees at shops like 3M, Honeywell, and General Mills on the Mac tools that were rewriting the rules of print. He called himself "the quintessential Renaissance Man of communications," and the resume backed it up.
+
+By the mid-'90s Gary had founded Digital Concepts Corporation out of his home in Edina, Minnesota, building websites, managing hosting, and doing print design and photography for a stable of clients. He ran four browsers simultaneously for cross-browser testing, kept nearly 1,700 bookmarks organized across them, and was an early adopter of everything from PageMaker to cable internet to Napster. His Power Mac G3 — upgraded with a Sonnet Encore G4 processor because stock specs were never quite enough — was the nerve center for all of it.
+
+Outside the screen, Gary was a private pilot, a certified SCUBA diver, a chess tactician, and a deeply committed motorcycle guy. He served on the board of the Minnesota Motorcycle Riders Association, designed their Freedom Review newsletter in PageMaker, lobbied for rider legislation, and eventually signed on as General Manager at Easyriders of Minneapolis — submitting a brutally honest five-page application that noted, among his weaknesses, "no tattoos."
+
+He was a father who named every password after his daughter Kaija, a husband to Deb, and a guy who helped everyone around him get online, get a resume typed, or get a computer set up. He was 55 when he died in September 2002. The G3 that powers this browser was part of his world — and this project is a small way of keeping that machine, and the curiosity behind it, running.
 
 **The Classic Mac community** — Everyone keeping these machines alive, sharing knowledge about CarbonLib, Universal Interfaces, and the art of writing software for an OS that Apple abandoned 24 years ago.
 
