@@ -404,7 +404,18 @@ static nserror hlcache_migrate_ctx(hlcache_retrieval_ctx *ctx,
 		/* Ensure caller knows we need data */
 		error = NSERROR_NEED_DATA;
 	} else {
-		MS_LOG("migrate type UNACCEPTABLE");
+		if (effective_type != NULL) {
+			const char *tbuf = lwc_string_data(effective_type);
+			size_t tlen = lwc_string_length(effective_type);
+			char stackbuf[64];
+			if (tlen > 60) tlen = 60;
+			memcpy(stackbuf, tbuf, tlen);
+			stackbuf[tlen] = '\0';
+			macsurf_debug_log_str("unaccept", stackbuf);
+		} else {
+			MS_LOG("unaccept (null type)");
+		}
+		macsurf_debug_log_int("accept mask", (long)ctx->accepted_types);
 		/* Unacceptable type: report error */
 		if (ctx->handle->cb != NULL) {
 			hlcache_event hlevent;
