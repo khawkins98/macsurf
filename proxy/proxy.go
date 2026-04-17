@@ -12,6 +12,14 @@ type Proxy struct {
 	Auth *Credentials
 }
 
+// redirectClient follows up to 10 redirects server-side. MacSurf cannot
+// follow HTTPS redirects on its own (no TLS on the browser side), so the
+// proxy resolves them and returns the final content.
+var redirectClient = &http.Client{
+	Transport: http.DefaultTransport,
+	Timeout:   60 * time.Second,
+}
+
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.Auth != nil && !p.Auth.Check(r) {
 		w.Header().Set("Proxy-Authenticate", `Basic realm="macsurf-proxy"`)
@@ -41,7 +49,7 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	outReq.Header.Del("Proxy-Authorization")
 	outReq.Header.Del("Proxy-Connection")
 
-	resp, err := http.DefaultTransport.RoundTrip(outReq)
+	resp, err := redirectClient.Do(outReq)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
