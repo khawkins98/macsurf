@@ -58,6 +58,9 @@
 #include "desktop/gui_internal.h"
 
 #include "html/html.h"#include "macsurf_debug.h"
+
+long macos9_html_bytes_processed = 0;
+
 #include "html/private.h"
 #include "html/dom_event.h"
 #include "html/css.h"
@@ -740,6 +743,7 @@ html_process_data(struct content *c, const char *data, unsigned int size)
 	nserror err = NSERROR_OK; /* assume its all going to be ok */
 
 	MS_LOG("html process data");
+	macos9_html_bytes_processed += size;
 	dom_ret = dom_hubbub_parser_parse_chunk(html->parser,
 					      (const uint8_t *) data,
 					      size);
