@@ -67,6 +67,10 @@
 
 bool html_redraw_debug = false;
 
+/* Diagnostic counters */
+long macos9_html_redraw_text_box_calls = 0;
+long macos9_text_redraw_plot_calls = 0;
+
 /**
  * Determine if a box has a background that needs drawing
  *
@@ -338,6 +342,7 @@ text_redraw(const char *utf8_text,
 	}
 
 	if (!highlighted) {
+		macos9_text_redraw_plot_calls++;
 		res = ctx->plot->text(ctx,
 				      &plot_fstyle,
 				      x,
@@ -1151,6 +1156,8 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 {
 	bool excluded = (box->object != NULL);
 	plot_font_style_t fstyle;
+
+	macos9_html_redraw_text_box_calls++;
 
 	font_plot_style_from_css(&html->unit_len_ctx, box->style, &fstyle);
 	fstyle.background = current_background_color;
