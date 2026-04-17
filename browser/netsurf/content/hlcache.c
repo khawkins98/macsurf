@@ -404,8 +404,9 @@ static nserror hlcache_migrate_ctx(hlcache_retrieval_ctx *ctx,
 		/* Ensure caller knows we need data */
 		error = NSERROR_NEED_DATA;
 	} else {
-		/* Silenced: favicon / image fetches get rejected here because
-		 * image handlers are gated out in v0.3. Expected, not a bug. */
+		static long unaccept_count = 0;
+		unaccept_count++;
+		macsurf_debug_log_int("unaccept #", unaccept_count);
 		/* Unacceptable type: report error */
 		if (ctx->handle->cb != NULL) {
 			hlcache_event hlevent;
