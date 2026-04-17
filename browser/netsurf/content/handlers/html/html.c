@@ -819,10 +819,8 @@ bool html_can_begin_conversion(html_content *htmlc)
 
 	/* Cannot begin conversion if we're still fetching stuff */
 	macsurf_debug_log_int("active fetches", (long)htmlc->base.active);
-	/* MacSurf HACK: skip stylesheet wait to test render pipeline */
-	htmlc->base.active = 0;
-	/* if (htmlc->base.active != 0)
-		return false; */
+	if (htmlc->base.active != 0)
+		return false;
 
 	for (i = 0; i != htmlc->stylesheet_count; i++) {
 		/* Cannot begin conversion if the stylesheets are modified */

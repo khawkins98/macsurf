@@ -154,12 +154,30 @@ stub_poll(lwc_string *scheme)
 			msg.data.header_or_data.len = sizeof(ct) - 1;
 			fetch_send_callback(&msg, ctx->parent);
 		}
-		/* Minimal CSS body. */
+		/* Minimal NetSurf-compatible default CSS so the box tree
+		 * has display values for basic elements. */
 		{
-			static const unsigned char css[] = "\n";
+			static const unsigned char css[] =
+				"html,body,div,p,h1,h2,h3,h4,h5,h6,"
+				"ul,ol,li,table,tr,form,fieldset,"
+				"header,footer,nav,section,article,"
+				"aside,main,blockquote,pre,hr"
+				"{display:block}"
+				"html{color:#000;background:#fff}"
+				"body{margin:8px}"
+				"h1{font-size:2em;margin:.67em 0}"
+				"h2{font-size:1.5em;margin:.75em 0}"
+				"h3{font-size:1.17em;margin:.83em 0}"
+				"p{margin:1em 0}"
+				"b,strong{font-weight:bold}"
+				"i,em{font-style:italic}"
+				"a{color:#00f;text-decoration:underline}"
+				"td,th{display:table-cell}"
+				"table{display:table}"
+				"tr{display:table-row}";
 			msg.type = FETCH_DATA;
 			msg.data.header_or_data.buf = css;
-			msg.data.header_or_data.len = 1;
+			msg.data.header_or_data.len = sizeof(css) - 1;
 			fetch_send_callback(&msg, ctx->parent);
 		}
 		/* Complete. */
