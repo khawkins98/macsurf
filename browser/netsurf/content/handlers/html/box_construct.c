@@ -49,6 +49,9 @@
 #include "html/box_normalise.h"
 #include "html/form_internal.h"
 
+/* Diagnostic: count text boxes constructed during DOM->box conversion. */
+long macos9_box_text_created = 0;
+
 /**
  * Context for box tree construction
  */
@@ -1063,6 +1066,7 @@ static bool box_construct_text(struct box_construct_ctx *ctx)
 		}
 
 		box->type = BOX_TEXT;
+		macos9_box_text_created++;
 
 		box->text = talloc_strdup(ctx->bctx, text);
 		free(text);
@@ -1182,6 +1186,7 @@ static bool box_construct_text(struct box_construct_ctx *ctx)
 			}
 
 			box->type = BOX_TEXT;
+		macos9_box_text_created++;
 
 			box->text = talloc_strdup(ctx->bctx, current);
 			if (box->text == NULL) {
