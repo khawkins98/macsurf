@@ -269,6 +269,14 @@ extern char *strdup(const char *);
 #define PATH_MAX 256
 #endif
 
+/* --- Diagnostic: hand-constructed box tree render test ---
+ * When defined, main.c calls macsurf_render_test() right after the
+ * browser window is created. Purpose is to isolate the renderer
+ * from box construction. Remove this define for normal builds. */
+#ifndef MACSURF_RENDER_TEST
+#define MACSURF_RENDER_TEST 1
+#endif
+
 #ifndef NETSURF_BUILTIN_LOG_FILTER
 #define NETSURF_BUILTIN_LOG_FILTER "level:WARNING"
 #endif
