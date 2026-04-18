@@ -5198,12 +5198,33 @@ layout_get_box_bbox(
 		int *desc_x0, int *desc_y0,
 		int *desc_x1, int *desc_y1)
 {
-	*desc_x0 = -box->border[LEFT].width;
-	*desc_y0 = -box->border[TOP].width;
-	*desc_x1 = box->padding[LEFT] + box->width + box->padding[RIGHT] +
-			box->border[RIGHT].width;
-	*desc_y1 = box->padding[TOP] + box->height + box->padding[BOTTOM] +
-			box->border[BOTTOM].width;
+	/* Sanity-clamp each border-width before using it to form the box's
+	 * descendant bbox. Upstream css_unit_len2device_px can return huge
+	 * garbage values when the computed style / unit_len_ctx is incompletely
+	 * initialised, which then produces things like descendant_y0 =
+	 * -39845888 and tricks the render walker's clip test. */
+	{
+		int bl = box->border[LEFT].width;
+		int bt = box->border[TOP].width;
+		int br = box->border[RIGHT].width;
+		int bb = box->border[BOTTOM].width;
+		int pl = box->padding[LEFT];
+		int pt = box->padding[TOP];
+		int pr = box->padding[RIGHT];
+		int pb = box->padding[BOTTOM];
+		if (bl < 0 || bl > 1000) bl = 0;
+		if (bt < 0 || bt > 1000) bt = 0;
+		if (br < 0 || br > 1000) br = 0;
+		if (bb < 0 || bb > 1000) bb = 0;
+		if (pl < 0 || pl > 10000) pl = 0;
+		if (pt < 0 || pt > 10000) pt = 0;
+		if (pr < 0 || pr > 10000) pr = 0;
+		if (pb < 0 || pb > 10000) pb = 0;
+		*desc_x0 = -bl;
+		*desc_y0 = -bt;
+		*desc_x1 = pl + box->width + pr + br;
+		*desc_y1 = pt + box->height + pb + bb;
+	}
 
 	/* To stop the top of text getting clipped when css line-height is
 	 * reduced, we increase the top of the descendant bbox. */
