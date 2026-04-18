@@ -99,7 +99,7 @@ box_create(css_select_results *styles,
 	unsigned int i;
 	struct box *box;
 
-	box = talloc(context, struct box);
+	box = talloc_zero(context, struct box);
 	if (!box) {
 		return 0;
 	}
