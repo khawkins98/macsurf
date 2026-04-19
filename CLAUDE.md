@@ -224,16 +224,27 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - `duk_config.h` is hand-crafted for Mac OS 9 PPC CW8: `DUK_USE_BYTEORDER=3`, `DUK_USE_PACKED_TVAL`, `DUK_USE_ALIGN_BY=8`, `DUK_USE_NATIVE_CALL_RECLIMIT=128`.
 - JS glue files live in [browser/netsurf/frontends/macos9/javascript/](browser/netsurf/frontends/macos9/javascript/).
 
+## Browser Chrome
+
+- Pixel-based scrolling operates on `content_get_height()`, not the v0.1 text-line model.
+- Address bar routes through `browser_window_navigate` with `nsurl_create` URL normalization (prepends `http://` if no scheme).
+- Back, Forward, Reload, Home buttons wired to real NetSurf navigation APIs.
+- Status bar displays NetSurf status messages and hovered link URLs.
+- Title bar auto-updates via `gui_window_set_title` from page content.
+- Window resize triggers `browser_window_schedule_reformat` via a deferred flag pattern to prevent re-entrant layout.
+- `MACSURF_HOME_URL` defined in `macsurf_config.h`.
+- v0.1 fallback path (`strip_html` + direct `DrawText`) has been removed. Full NetSurf pipeline is the only rendering path.
+
 ## Rendering Pipeline (v0.3 in progress)
 
 - HTTP fetcher registered for `http:` and `https:` schemes via OT proxy at `116.202.231.103:8765`.
-- Current blocker: `htmlc->base.active` stays at 2 — the stylesheet loading chain is not completing.
-- Root causes identified:
-  - Resource fetcher serves empty CSS.
-  - Scheduler pump is not called frequently enough.
-  - `no_backing_store` returns `NSERROR_OK` on store operations, corrupting llcache state.
-- Fix plan documented in [docs/macsurf-v03-render-plan.md](docs/macsurf-v03-render-plan.md).
-- v0.3 target: real HTML rendering with styled text, colors, fonts, and layout via the full NetSurf pipeline.
+- Resource fetcher serves real CSS content for `resource:default.css`, `resource:internal.css`, `resource:quirks.css`.
+- `no_backing_store.c` returns `NSERROR_NOT_IMPLEMENTED` from store and fetch.
+- Scheduler pump calls `fetch_poll()` every event-loop pass when fetches are pending.
+- Full NetSurf pipeline executes: fetch → parse → CSS cascade → layout → plot.
+- Real HTML rendering proven — "Hello from MacSurf v0.3" confirmed on G3 hardware with styled text on colored background via full pipeline.
+- Current blocker: `css_select_style` returns `CSS_NOMEM` on element 380 when loading real pages. Investigation pending — first probe is `FreeMem()` / `MaxBlock()` in `cssh_select.c` to determine whether this is real OOM, heap fragmentation, or libcss internal allocation bug.
+- v0.3 remaining: resolve CSS_NOMEM, verify chrome acceptance criteria (URL input, navigation, resize, scroll).
 
 ## Build State
 
@@ -242,12 +253,6 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-
-## Known Issues
-
-- `no_backing_store.c` must return `NSERROR_NOT_IMPLEMENTED` from both store and fetch — currently returns `NSERROR_OK`, which corrupts llcache.
-- Resource fetcher must serve real content for `resource:default.css`, `resource:internal.css`, and `resource:quirks.css`.
-- Scheduler pump must call `fetch_poll()` on every event-loop pass when fetches are pending, not only when Mac events are present.
 
 ## Docs
 
@@ -265,5 +270,21 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - **CW8 C89:** no `inline`, no `//` comments, no variadic macros, no forward enum declarations, no C99 designated initializers, no `for (int i...)`. All variables at the top of their enclosing block.
 - **CW8 PPC miscompiles `long long` / `int64_t` multiply-by-constant.** `(long long)a * small_const` writes `a >> log2(const)` into the high word instead of the correct `(a*const) >> 32`. Confirmed on real hardware via probe G (fixes113): `(long long)131072 * 1024LL` produced hi=128, lo=134217728 — full product 549,890,031,616 instead of 134,217,728. This broke every FDIV/FMUL in libcss for weeks and masqueraded as a layout bug. **Mitigation:** route 64-bit fixed-point math through `double` under `#ifdef __MWERKS__`. PPC has a hardware FPU and IEEE 754's 52-bit mantissa covers every int32 fixed-point intermediate. See [browser/netsurf/include/libcss/fpmath.h](browser/netsurf/include/libcss/fpmath.h) (fixes114) for the reference pattern. Pure int32 multiplies and divides are fine — the miscompile is specifically the 64-bit shift-multiply path. **Any code doing `int64_t` or `long long` fixed-point math on CW8 PPC is suspect** and needs the same treatment or a confirmation that operands stay small enough that the miscompilation is harmless (e.g. `INTTOFIX(128)` happened to work because `128 >> 10 = 0`, which is the correct hi word by coincidence).
 - **Mac CR line endings** are required for all `.c` / `.h` / `.r` files in the project. Convert with `sed 's/$/\r/' | tr -d '\n'` before packaging.
-- **TextEdit (`TENew` / `TEDispose`) crashes with dsMemWZErr** on a fresh window because `GetWRefCon` returns garbage. Use direct `DrawString`/`DrawText` inside `BeginUpdate`/`EndUpdate` instead.
+- **TextEdit (`TENew` / `TEDispose`) crashes with dsMemWZErr if WRefCon is not initialized before the first call.** The crash happens because `GetWRefCon` returns garbage on a fresh window and TextEdit dereferences it. Safe pattern: `SetPort(window)` then `SetWRefCon(window, 0)` (or to a valid struct pointer) before calling `TENew`. Once this is set, TextEdit is fully usable for the URL field and other text input widgets.
 - **`kWindowStandardHandlerAttribute`** intercepts update events and leaves windows blank. Do not pass it to `CreateNewWindow`.
+- **Synchronous `browser_window_schedule_reformat` during resize causes infinite layout loops.** Never call reformat directly from the grow box handler. Instead set a `needs_reformat` flag on `struct macsurf_window` and handle it in the next `nullEvent` pass. Add a `reformat_in_progress` re-entrancy guard that logs and returns if a reformat call arrives while one is already running.
+- **TextEdit field activation requires explicit `TEActivate` on window activation and `TEIdle` on every `nullEvent` pass** for the caret to blink and the field to accept keystrokes. `TEKey` must be gated by a `url_field_active` flag so Return and Escape don't accidentally route as typed characters.
+
+## CLAUDE.md Maintenance
+
+**This file must be kept current. It falls out of date fast when not actively maintained, and stale context causes agents to repeat solved problems.**
+
+Update CLAUDE.md as part of every round that changes project state:
+
+- When a blocker is resolved, remove it from "Known Issues" or "Current Blocker" immediately
+- When a new class of bug is identified (like CW8 PPC `long long` miscompile), add it to "Known Gotchas" with the concrete reference pattern
+- When a new subsystem lands (JS engine, chrome, image handlers), add a top-level section for it
+- When a file count or project structure changes materially, update the "Project File List" section
+- When the build state advances (v0.2 → v0.3 etc.), update the "Build State" section
+
+The goal is that any new agent reading CLAUDE.md at the start of a session has an accurate picture of where the project actually stands — not where it was three rounds ago. If the file has drifted from reality, fix it before doing any new work.
