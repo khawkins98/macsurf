@@ -20,6 +20,22 @@ void macsurf_debug_set_title(const char *msg);
 void macsurf_debug_log_int(const char *label, long value);
 void macsurf_debug_log_str(const char *label, const char *value);
 
+/* Sticky variants: bypass the global title lock to set the title, then
+ * re-engage the lock so subsequent non-force MS_LOG / log_int calls are
+ * no-ops. Used by diagnostic probes that would otherwise be overwritten
+ * by downstream pipeline logging (e.g. the redraw counter). */
+void macsurf_debug_set_title_force(const char *msg);
+void macsurf_debug_log_int_force(const char *label, long value);
+
+/* Probe-accumulating variants: append to a persistent probe buffer and
+ * sticky-set the window title to the accumulated text. Lets multiple
+ * probes (across files / pipeline stages) contribute to one visible
+ * title string, rather than overwriting each other. */
+void macsurf_debug_probe_append(const char *msg);
+void macsurf_debug_probe_append_int(const char *label, long value);
+
+#define MS_LOG_STICKY(msg)   macsurf_debug_set_title_force(msg)
+
 #else
 
 #define MS_LOG(msg)
@@ -27,6 +43,11 @@ void macsurf_debug_log_str(const char *label, const char *value);
 #define MS_ASSERT(cond, msg)
 #define macsurf_debug_log_int(label, value)
 #define macsurf_debug_log_str(label, value)
+#define macsurf_debug_set_title_force(msg)
+#define macsurf_debug_log_int_force(label, value)
+#define macsurf_debug_probe_append(msg)
+#define macsurf_debug_probe_append_int(label, value)
+#define MS_LOG_STICKY(msg)
 
 #endif
 #endif

@@ -2673,26 +2673,22 @@ static int line_height(
 
 	if (lhtype == CSS_LINE_HEIGHT_NUMBER ||
 			lhunit == CSS_UNIT_PCT) {
-		/* Probe 3: fire once, log fixed-point input and output of
-		 * css_unit_len2device_px to localise PPC fixed-point math
+		/* Probe 3: fire once, sticky. Log fixed-point input and output
+		 * of css_unit_len2device_px to localise PPC fixed-point math
 		 * failures (matches Classilla's documented OS 9 layout
-		 * breakage class). */
+		 * breakage class). The last _force call wins and sticks. */
 		{
 			static int probe3_fired = 0;
 			if (probe3_fired == 0) {
 				probe3_fired = 1;
-				MS_LOG("probe3:unit convert in");
-				macsurf_debug_log_int("p3 in lhvalue",
+				macsurf_debug_probe_append_int("p3in",
 						(long)lhvalue);
-				macsurf_debug_log_int("p3 in unit",
-						(long)CSS_UNIT_EM);
 				line_height = css_unit_len2device_px(style,
 						unit_len_ctx, lhvalue,
 						CSS_UNIT_EM);
-				MS_LOG("probe3:unit convert out");
-				macsurf_debug_log_int("p3 out raw",
+				macsurf_debug_probe_append_int("p3raw",
 						(long)line_height);
-				macsurf_debug_log_int("p3 out px",
+				macsurf_debug_probe_append_int("p3px",
 						(long)FIXTOINT(line_height));
 			} else {
 				line_height = css_unit_len2device_px(style,
