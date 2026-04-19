@@ -1269,6 +1269,10 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 	bool convert_children;
 	uint32_t num_processed = 0;
 	const uint32_t max_processed_before_yield = 10;
+	static long cvt_call_count = 0;
+	static long cvt_elems_total = 0;
+
+	cvt_call_count++;
 
 	do {
 		convert_children = true;
@@ -1318,6 +1322,12 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 			/* Conversion complete */
 			struct box root;
 
+			/* PROBE C1: conversion complete - call count + total elems. */
+			macsurf_debug_probe_append(" C1 done calls=");
+			macsurf_debug_probe_append_int("", cvt_call_count);
+			macsurf_debug_probe_append(" el=");
+			macsurf_debug_probe_append_int("", cvt_elems_total + (long)num_processed);
+
 			memset(&root, 0, sizeof(root));
 
 			root.type = BOX_BLOCK;
@@ -1340,7 +1350,18 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 			free(ctx);
 			return;
 		}
-	} while (++num_processed < max_processed_before_yield);
+		num_processed++;
+	} while (num_processed < max_processed_before_yield);
+
+	cvt_elems_total += (long)num_processed;
+
+	/* PROBE C2: yielding - only first few calls to keep title readable. */
+	if (cvt_call_count <= 3) {
+		macsurf_debug_probe_append(" C2 yield calls=");
+		macsurf_debug_probe_append_int("", cvt_call_count);
+		macsurf_debug_probe_append(" tot=");
+		macsurf_debug_probe_append_int("", cvt_elems_total);
+	}
 
 	/* More work to do: schedule a continuation */
 	guit->misc->schedule(0, (void *)convert_xml_to_box, ctx);
