@@ -62,6 +62,53 @@ css_subtract_fixed(const css_fixed x, const css_fixed y) {
 	return res;
 }
 
+#ifdef __MWERKS__
+/* CW8 PPC miscompiles `(int64_t)a * small_const`: the 64-bit
+ * multiply-by-constant codegen writes `a >> log2(const)` into
+ * the high word instead of the correct `(a*const) >> 32`.
+ * Confirmed via probe G (fixes113) showing `(long long)131072
+ * * 1024LL` produces hi=128, lo=134217728 — full product
+ * 549,890,031,616 instead of 134,217,728. Route the three
+ * fpmath operations that rely on int64 intermediates through
+ * `double` instead — PPC's FPU handles this natively, and 52
+ * bits of mantissa comfortably covers every int32 product we
+ * need. */
+static inline css_fixed
+css_divide_fixed(const css_fixed x, const css_fixed y) {
+	double dd = ((double)x * 1024.0) / (double)y;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+
+static inline css_fixed
+css_multiply_fixed(const css_fixed x, const css_fixed y) {
+	double dd = ((double)x * (double)y) / 1024.0;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+
+static inline css_fixed
+css_int_to_fixed(const int a) {
+	double dd = (double)a * 1024.0;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+#else
 static inline css_fixed
 css_divide_fixed(const css_fixed x, const css_fixed y) {
 	int64_t xx = ((int64_t)x * (1 << CSS_RADIX_POINT)) / y;
@@ -100,6 +147,7 @@ css_int_to_fixed(const int a) {
 
 	return xx;
 }
+#endif
 
 static inline css_fixed
 css_float_to_fixed(const float a) {
