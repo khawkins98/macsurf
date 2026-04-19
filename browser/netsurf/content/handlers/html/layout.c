@@ -5549,6 +5549,12 @@ bool layout_document(html_content *content, int width, int height)
 			width, height, nsurl_access(content_get_url(
 					&content->base)));
 
+	/* PROBE L1: layout_document entry - root box dims as we get them. */
+	macsurf_debug_probe_append(" L1 dw=");
+	macsurf_debug_probe_append_int("", (long)doc->width);
+	macsurf_debug_probe_append(" dh=");
+	macsurf_debug_probe_append_int("", (long)doc->height);
+
 	layout_minmax_block(doc, font_func, content);
 
 	layout_block_find_dimensions(&content->unit_len_ctx,
@@ -5563,7 +5569,19 @@ bool layout_document(html_content *content, int width, int height)
 	}
 	doc->width = width;
 
+	/* PROBE L2: just before layout_block_context - width assigned. */
+	macsurf_debug_probe_append(" L2 w=");
+	macsurf_debug_probe_append_int("", (long)doc->width);
+
 	ret = layout_block_context(doc, height, content);
+
+	/* PROBE L3: layout_block_context return + post-context root dims. */
+	macsurf_debug_probe_append(" L3 ret=");
+	macsurf_debug_probe_append_int("", (long)ret);
+	macsurf_debug_probe_append(" dw=");
+	macsurf_debug_probe_append_int("", (long)doc->width);
+	macsurf_debug_probe_append(" dh=");
+	macsurf_debug_probe_append_int("", (long)doc->height);
 
 	/* make <html> and <body> fill available height */
 	if (doc->y + doc->padding[TOP] + doc->height + doc->padding[BOTTOM] +
@@ -5588,6 +5606,16 @@ bool layout_document(html_content *content, int width, int height)
 	layout_position_relative(&content->unit_len_ctx, doc, doc, 0, 0);
 
 	layout_calculate_descendant_bboxes(&content->unit_len_ctx, doc);
+
+	/* PROBE L4: final root dims + descendant bbox at layout_document exit. */
+	macsurf_debug_probe_append(" L4 dw=");
+	macsurf_debug_probe_append_int("", (long)doc->width);
+	macsurf_debug_probe_append(" dh=");
+	macsurf_debug_probe_append_int("", (long)doc->height);
+	macsurf_debug_probe_append(" dx1=");
+	macsurf_debug_probe_append_int("", (long)doc->descendant_x1);
+	macsurf_debug_probe_append(" dy1=");
+	macsurf_debug_probe_append_int("", (long)doc->descendant_y1);
 
 	return ret;
 }
