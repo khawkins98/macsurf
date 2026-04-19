@@ -485,6 +485,14 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 	dom_exception err;
 	struct box_construct_props props;
 	const css_computed_style *root_style = NULL;
+	static long bce_call_count = 0;
+
+	bce_call_count++;
+	/* PROBE E1: first 6 box_construct_element entries (root + first 5 kids). */
+	if (bce_call_count <= 6) {
+		macsurf_debug_probe_append(" E1 n=");
+		macsurf_debug_probe_append_int("", bce_call_count);
+	}
 
 	assert(ctx->n != NULL);
 
