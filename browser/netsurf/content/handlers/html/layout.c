@@ -2673,28 +2673,103 @@ static int line_height(
 
 	if (lhtype == CSS_LINE_HEIGHT_NUMBER ||
 			lhunit == CSS_UNIT_PCT) {
-		/* Probe 3: fire once, sticky. Log fixed-point input and output
-		 * of css_unit_len2device_px to localise PPC fixed-point math
-		 * failures (matches Classilla's documented OS 9 layout
-		 * breakage class). The last _force call wins and sticks. */
+		/* Probes A/B/C/D: single-fire diagnostic to localise the
+		 * LONG_MIN return from css_unit_len2device_px. A logs the
+		 * real ctx contents + length; B tests 32-bit long multiply;
+		 * C tests long long intermediate; D calls the conversion
+		 * with hardcoded sane inputs on a stack-built ctx. Output
+		 * order in the title buffer: A B C D. */
 		{
-			static int probe3_fired = 0;
-			if (probe3_fired == 0) {
-				probe3_fired = 1;
-				macsurf_debug_probe_append_int("p3in",
-						(long)lhvalue);
-				line_height = css_unit_len2device_px(style,
-						unit_len_ctx, lhvalue,
+			static int probes_fired = 0;
+			if (probes_fired == 0) {
+				probes_fired = 1;
+
+				/* Probe A: input sanity. */
+				macsurf_debug_probe_append_int("Adpi",
+					(long)unit_len_ctx->device_dpi);
+				macsurf_debug_probe_append_int("Afsd",
+					(long)unit_len_ctx->font_size_default);
+				macsurf_debug_probe_append_int("Afsm",
+					(long)unit_len_ctx->font_size_minimum);
+				macsurf_debug_probe_append_int("Avw",
+					(long)unit_len_ctx->viewport_width);
+				macsurf_debug_probe_append_int("Avh",
+					(long)unit_len_ctx->viewport_height);
+				macsurf_debug_probe_append_int("Aroot",
+					unit_len_ctx->root_style != NULL
+						? 1L : 0L);
+				macsurf_debug_probe_append_int("Alen",
+					(long)lhvalue);
+				macsurf_debug_probe_append_int("Aunit",
+					(long)CSS_UNIT_EM);
+
+				/* Probe B: scalar fixed-point multiply. */
+				{
+					long a_b;
+					long b_b;
+					long direct_product;
+					long product_shifted;
+					a_b = 16384L;
+					b_b = 92160L;
+					direct_product = a_b * b_b;
+					product_shifted = (a_b * b_b) >> 10;
+					macsurf_debug_probe_append_int("Ba",
+						a_b);
+					macsurf_debug_probe_append_int("Bb",
+						b_b);
+					macsurf_debug_probe_append_int("Bprod",
+						direct_product);
+					macsurf_debug_probe_append_int(
+						"Bshifted",
+						product_shifted);
+				}
+
+				/* Probe C: 64-bit intermediate multiply. */
+				{
+					long a_c;
+					long b_c;
+					long long wide;
+					long narrowed;
+					a_c = 16384L;
+					b_c = 92160L;
+					wide = (long long)a_c *
+						(long long)b_c;
+					narrowed = (long)(wide >> 10);
+					macsurf_debug_probe_append_int(
+						"Cwide_lo",
+						(long)(wide & 0xFFFFFFFFLL));
+					macsurf_debug_probe_append_int(
+						"Cwide_hi",
+						(long)(wide >> 32));
+					macsurf_debug_probe_append_int(
+						"Cnarrowed", narrowed);
+				}
+
+				/* Probe D: conversion call with hardcoded
+				 * sane inputs on a stack-built ctx. */
+				{
+					css_unit_ctx test_ctx;
+					css_fixed test_out;
+					memset(&test_ctx, 0,
+						sizeof(test_ctx));
+					test_ctx.viewport_width = 600L << 10;
+					test_ctx.viewport_height = 400L << 10;
+					test_ctx.device_dpi = 90L << 10;
+					test_ctx.font_size_default =
+						16L << 10;
+					test_ctx.font_size_minimum =
+						8L << 10;
+					test_ctx.root_style = NULL;
+					test_out = css_unit_len2device_px(
+						NULL, &test_ctx, 1147,
 						CSS_UNIT_EM);
-				macsurf_debug_probe_append_int("p3raw",
-						(long)line_height);
-				macsurf_debug_probe_append_int("p3px",
-						(long)FIXTOINT(line_height));
-			} else {
-				line_height = css_unit_len2device_px(style,
-						unit_len_ctx, lhvalue,
-						CSS_UNIT_EM);
+					macsurf_debug_probe_append_int("Dout",
+						(long)test_out);
+				}
 			}
+			line_height = css_unit_len2device_px(style,
+					unit_len_ctx, lhvalue,
+					CSS_UNIT_EM);
 		}
 
 		if (lhtype != CSS_LINE_HEIGHT_NUMBER)
