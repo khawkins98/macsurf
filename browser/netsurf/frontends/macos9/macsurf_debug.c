@@ -19,6 +19,12 @@
  * clobbering the probe output. */
 static int g_title_locked = 0;
 
+int
+macsurf_debug_title_is_locked(void)
+{
+	return g_title_locked;
+}
+
 /* Probe accumulator: each macsurf_debug_probe_append call extends this
  * buffer with its message and re-asserts the title so all probe output
  * from across the pipeline remains visible as one concatenated string. */

@@ -27,6 +27,12 @@ void macsurf_debug_log_str(const char *label, const char *value);
 void macsurf_debug_set_title_force(const char *msg);
 void macsurf_debug_log_int_force(const char *label, long value);
 
+/* Predicate: non-zero when a probe has latched the title. Non-debug
+ * title-setting paths (e.g. macos9_window_set_title pushing the page
+ * title / URL via SetWTitle) should consult this and skip the update
+ * so probe output stays visible. */
+int  macsurf_debug_title_is_locked(void);
+
 /* Probe-accumulating variants: append to a persistent probe buffer and
  * sticky-set the window title to the accumulated text. Lets multiple
  * probes (across files / pipeline stages) contribute to one visible
@@ -47,6 +53,7 @@ void macsurf_debug_probe_append_int(const char *label, long value);
 #define macsurf_debug_log_int_force(label, value)
 #define macsurf_debug_probe_append(msg)
 #define macsurf_debug_probe_append_int(label, value)
+#define macsurf_debug_title_is_locked() 0
 #define MS_LOG_STICKY(msg)
 
 #endif
