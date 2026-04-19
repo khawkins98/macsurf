@@ -235,24 +235,27 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - `MACSURF_HOME_URL` defined in `macsurf_config.h`.
 - v0.1 fallback path (`strip_html` + direct `DrawText`) has been removed. Full NetSurf pipeline is the only rendering path.
 
-## Rendering Pipeline (v0.3 in progress)
+## Rendering Pipeline (v0.3 — first real page rendered)
 
 - HTTP fetcher registered for `http:` and `https:` schemes via OT proxy at `116.202.231.103:8765`.
-- Resource fetcher serves real CSS content for `resource:default.css`, `resource:internal.css`, `resource:quirks.css`.
+- Resource fetcher serves real CSS content for `resource:default.css`, `resource:internal.css`, `resource:quirks.css` (`macos9_fetcher_stubs.c`).
 - `no_backing_store.c` returns `NSERROR_NOT_IMPLEMENTED` from store and fetch.
-- Scheduler pump calls `fetch_poll()` every event-loop pass when fetches are pending.
+- Event-loop sleep shortens to 1 tick while any fetcher is active (`macos9_fetching || macos9_stub_fetcher_active() || macos9_http_fetcher_active()`) so NetSurf's fetcher ring progresses via `fetch_send_callback` continuations every pass. There is **no** explicit `fetch_poll()` call — an earlier CLAUDE.md draft misdescribed this.
 - Full NetSurf pipeline executes: fetch → parse → CSS cascade → layout → plot.
-- Real HTML rendering proven — "Hello from MacSurf v0.3" confirmed on G3 hardware with styled text on colored background via full pipeline.
-- Current blocker: `css_select_style` returns `CSS_NOMEM` on element 380 when loading real pages. Investigation pending — first probe is `FreeMem()` / `MaxBlock()` in `cssh_select.c` to determine whether this is real OOM, heap fragmentation, or libcss internal allocation bug.
-- v0.3 remaining: resolve CSS_NOMEM, verify chrome acceptance criteria (URL input, navigation, resize, scroll).
+- **First live web page rendered on G3 hardware (2026-04-19)**: `http://mac.mp.ls/` (MacTrove) loaded end-to-end — toolbar + URL bar + real HTML (headings, body text, navigation items, image placeholder boxes). Layout still rough (text overlap, odd positioning) but fetch/parse/cascade/layout/plot chain confirmed on real content.
+- CSS_NOMEM blocker resolved by raising Carbon partition (`MWProject_PPC_size` 4096 → 16384, `MWProject_PPC_minsize` 2048 → 8192). Root cause was real heap exhaustion — libcss calls `malloc`/`calloc` directly with no NetSurf wrapper, so "OOM in libcss" meant the OS heap was actually exhausted. See [docs/research/state-survey-2026-04-18.md](docs/research/state-survey-2026-04-18.md) §2 and §7.
+- v0.3 remaining: verify the seven chrome acceptance criteria against real pages (URL input on initial window, navigation, resize, scroll, Back/Forward, status bar, title bar), test apple.com as second real-page target, tune layout quality (text overlap, positioning), implement `plot_bitmap` for real images.
 
 ## Build State
 
-- MacSurf v0.2 is stable — loads plain text pages, JS executes, OT networking works.
+- MacSurf v0.3 renders real live web pages on G3 hardware. First confirmed page: MacTrove (`http://mac.mp.ls/`), 2026-04-19, via the full NetSurf pipeline.
+- v0.2 baseline (plain text, JS, OT networking) remains stable.
 - CW8 project file is [browser/netsurf/frontends/macos9/MacSurf.mcp](browser/netsurf/frontends/macos9/MacSurf.mcp).
+- Carbon partition: **16 MB preferred / 8 MB minimum** (`MWProject_PPC_size` / `MWProject_PPC_minsize`). Anything smaller starves libcss and triggers CSS_NOMEM mid-cascade on real pages.
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
+- Last shipped fix zip: **fixes115** (strip fpmath A/D/E/p1/p2 probes from `layout.c` and `box_construct.c` now that the CW8 PPC long-long investigation is closed and the title bar needs to show real page titles).
 
 ## Docs
 
@@ -268,6 +271,7 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - **Including `<OpenTransport.h>` is safe** now that `kWindowStandardHandlerAttribute` has been removed from `CreateNewWindow`. An earlier crash that seemed like it was caused by including the header was actually the window-attribute bug manifesting later.
 - **No `'carb'` resource → OTClientLib crash at a fixed address.** If the same instruction crashes every time somewhere inside OTClientLib, the cause is almost always that the binary is not a recognized Carbon fragment. Add `'carb'` before debugging anything else.
 - **CW8 C89:** no `inline`, no `//` comments, no variadic macros, no forward enum declarations, no C99 designated initializers, no `for (int i...)`. All variables at the top of their enclosing block.
+- **Carbon partition must be at least 16 MB preferred.** Set in CW8 under "PPC PEF" → Application Heap Size / Minimum Heap Size (`MWProject_PPC_size` / `MWProject_PPC_minsize` in the `.mcp` XML). A 4 MB partition (the CW8 default) runs out mid-CSS-cascade on a moderately-sized real page — `css_select_style` returns `CSS_NOMEM` somewhere around element 380. libcss allocates via raw `malloc`/`calloc` with no NetSurf wrapper, so OOM in libcss really does mean OS-heap exhaustion. Classilla's default is 32 MB; 16 MB is MacSurf's floor. See [docs/research/state-survey-2026-04-18.md](docs/research/state-survey-2026-04-18.md) §2.
 - **CW8 PPC miscompiles `long long` / `int64_t` multiply-by-constant.** `(long long)a * small_const` writes `a >> log2(const)` into the high word instead of the correct `(a*const) >> 32`. Confirmed on real hardware via probe G (fixes113): `(long long)131072 * 1024LL` produced hi=128, lo=134217728 — full product 549,890,031,616 instead of 134,217,728. This broke every FDIV/FMUL in libcss for weeks and masqueraded as a layout bug. **Mitigation:** route 64-bit fixed-point math through `double` under `#ifdef __MWERKS__`. PPC has a hardware FPU and IEEE 754's 52-bit mantissa covers every int32 fixed-point intermediate. See [browser/netsurf/include/libcss/fpmath.h](browser/netsurf/include/libcss/fpmath.h) (fixes114) for the reference pattern. Pure int32 multiplies and divides are fine — the miscompile is specifically the 64-bit shift-multiply path. **Any code doing `int64_t` or `long long` fixed-point math on CW8 PPC is suspect** and needs the same treatment or a confirmation that operands stay small enough that the miscompilation is harmless (e.g. `INTTOFIX(128)` happened to work because `128 >> 10 = 0`, which is the correct hi word by coincidence).
 - **Mac CR line endings** are required for all `.c` / `.h` / `.r` files in the project. Convert with `sed 's/$/\r/' | tr -d '\n'` before packaging.
 - **TextEdit (`TENew` / `TEDispose`) crashes with dsMemWZErr if WRefCon is not initialized before the first call.** The crash happens because `GetWRefCon` returns garbage on a fresh window and TextEdit dereferences it. Safe pattern: `SetPort(window)` then `SetWRefCon(window, 0)` (or to a valid struct pointer) before calling `TENew`. Once this is set, TextEdit is fully usable for the URL field and other text input widgets.
