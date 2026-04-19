@@ -13,6 +13,8 @@
 #include "propget.h"
 #include "unit.h"
 
+#include "macsurf_debug.h"
+
 /**
  * Map viewport-relative length units to either vh or vw.
  *
@@ -347,6 +349,38 @@ css_fixed css_unit_len2device_px(
 			ctx->viewport_width,
 			unit,
 			ctx->pw);
+
+#ifdef MACSURF_DEBUG
+	/* Probe 4: fires once. Logs the unit_ctx inputs that drive the
+	 * fixed-point math and a direct sanity check on 64-bit multiply —
+	 * 65536 * 65536 should yield hi=1, lo=0 if long long / int64_t is
+	 * working on this CW8 build. If hi=0 lo=0 the multiply silently
+	 * truncates, confirming css_multiply_fixed is broken at the type
+	 * level. */
+	{
+		static int u_probed = 0;
+		if (u_probed == 0) {
+			int64_t sanity;
+			css_fixed ppu_after;
+			u_probed = 1;
+			macsurf_debug_probe_append_int("dpi",
+					(long)ctx->device_dpi);
+			macsurf_debug_probe_append_int("fsd",
+					(long)ctx->font_size_default);
+			macsurf_debug_probe_append_int("ppuA",
+					(long)px_per_unit);
+			ppu_after = css_unit_css2device_px(px_per_unit,
+					ctx->device_dpi);
+			macsurf_debug_probe_append_int("ppuB",
+					(long)ppu_after);
+			sanity = (int64_t)65536 * (int64_t)65536;
+			macsurf_debug_probe_append_int("s64lo",
+					(long)(sanity & 0xFFFFFFFF));
+			macsurf_debug_probe_append_int("s64hi",
+					(long)(sanity >> 32));
+		}
+	}
+#endif
 
 	px_per_unit = css_unit_css2device_px(px_per_unit, ctx->device_dpi);
 

@@ -56,17 +56,22 @@ probe_buf_append_long(long v)
 	char digits[12];
 	int di;
 	int i;
-	long val;
+	unsigned long uval;
 	int neg;
 
-	val = v;
 	neg = 0;
-	if (val < 0) { neg = 1; val = -val; }
+	if (v < 0) {
+		neg = 1;
+		/* Negate safely even for LONG_MIN (where -v overflows). */
+		uval = (unsigned long)(-(v + 1)) + 1UL;
+	} else {
+		uval = (unsigned long)v;
+	}
 	di = 0;
 	do {
-		digits[di++] = (char)('0' + (int)(val % 10));
-		val /= 10;
-	} while (val > 0 && di < 11);
+		digits[di++] = (char)('0' + (int)(uval % 10UL));
+		uval /= 10UL;
+	} while (uval > 0UL && di < 11);
 	if (neg) probe_buf_append_char('-');
 	for (i = di - 1; i >= 0; i--) {
 		probe_buf_append_char(digits[i]);
@@ -137,7 +142,7 @@ void
 macsurf_debug_log_int(const char *label, long value)
 {
 	char buf[128];
-	long v;
+	unsigned long uv;
 	int neg;
 	char digits[12];
 	int di;
@@ -153,14 +158,18 @@ macsurf_debug_log_int(const char *label, long value)
 	buf[len++] = ':';
 	buf[len++] = ' ';
 
-	v = value;
 	neg = 0;
-	if (v < 0) { neg = 1; v = -v; }
+	if (value < 0) {
+		neg = 1;
+		uv = (unsigned long)(-(value + 1)) + 1UL;
+	} else {
+		uv = (unsigned long)value;
+	}
 	di = 0;
 	do {
-		digits[di++] = (char)('0' + (int)(v % 10));
-		v /= 10;
-	} while (v > 0 && di < 11);
+		digits[di++] = (char)('0' + (int)(uv % 10UL));
+		uv /= 10UL;
+	} while (uv > 0UL && di < 11);
 	if (neg) digits[di++] = '-';
 	for (i = di - 1; i >= 0 && len < 126; i--)
 		buf[len++] = digits[i];
