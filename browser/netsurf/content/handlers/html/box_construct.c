@@ -249,6 +249,10 @@ box_extract_properties(dom_node *n, struct box_construct_props *props)
  * \param  n               node in xml tree
  * \return  the new style, or NULL on memory exhaustion
  */
+/* Sub-step tracker for box_get_style, probed via X1 when the caller
+ * sees a NULL return and fails. */
+long macsurf_bgs_step = 0;
+
 static css_select_results *
 box_get_style(html_content *c,
 	      const css_computed_style *parent_style,
@@ -260,14 +264,19 @@ box_get_style(html_content *c,
 	css_select_results *styles;
 	nscss_select_ctx ctx;
 
+	macsurf_bgs_step = 1;
+
 	/* Firstly, construct inline stylesheet, if any */
 	if (nsoption_bool(author_level_css)) {
 		dom_exception err;
 		err = dom_element_get_attribute(n, corestring_dom_style, &s);
 		if (err != DOM_NO_ERR) {
+			macsurf_bgs_step = 2; /* dom_element_get_attribute failed */
 			return NULL;
 		}
 	}
+
+	macsurf_bgs_step = 3;
 
 	if (s != NULL) {
 		inline_style = nscss_create_inline_style(
@@ -279,9 +288,13 @@ box_get_style(html_content *c,
 
 		dom_string_unref(s);
 
-		if (inline_style == NULL)
+		if (inline_style == NULL) {
+			macsurf_bgs_step = 4; /* nscss_create_inline_style failed */
 			return NULL;
+		}
 	}
+
+	macsurf_bgs_step = 5;
 
 	/* Populate selection context */
 	ctx.ctx = c->select_ctx;
@@ -291,9 +304,17 @@ box_get_style(html_content *c,
 	ctx.root_style = root_style;
 	ctx.parent_style = parent_style;
 
+	macsurf_bgs_step = 6;
+
 	/* Select style for element */
 	styles = nscss_get_style(&ctx, n, &c->media, &c->unit_len_ctx,
 			inline_style);
+
+	if (styles == NULL) {
+		macsurf_bgs_step = 7; /* nscss_get_style returned NULL */
+	} else {
+		macsurf_bgs_step = 8; /* success */
+	}
 
 	/* No longer need inline style */
 	if (inline_style != NULL)
@@ -1302,11 +1323,13 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 		assert(ctx->n != NULL);
 
 		if (box_construct_element(ctx, &convert_children) == false) {
-			/* PROBE X1: bce failed - element number + last waypoint reached. */
+			/* PROBE X1: bce failed - element + waypoint + bgs_step. */
 			macsurf_debug_probe_append(" X1 el=");
 			macsurf_debug_probe_append_int("", macsurf_bce_call_count);
 			macsurf_debug_probe_append(" way=");
 			macsurf_debug_probe_append_int("", macsurf_bce_waypoint);
+			macsurf_debug_probe_append(" bgs=");
+			macsurf_debug_probe_append_int("", macsurf_bgs_step);
 			ctx->cb(ctx->content, false);
 			dom_node_unref(ctx->n);
 			free(ctx);
