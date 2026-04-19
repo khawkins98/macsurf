@@ -249,10 +249,6 @@ box_extract_properties(dom_node *n, struct box_construct_props *props)
  * \param  n               node in xml tree
  * \return  the new style, or NULL on memory exhaustion
  */
-/* Sub-step tracker for box_get_style, probed via X1 when the caller
- * sees a NULL return and fails. */
-long macsurf_bgs_step = 0;
-
 static css_select_results *
 box_get_style(html_content *c,
 	      const css_computed_style *parent_style,
@@ -264,19 +260,14 @@ box_get_style(html_content *c,
 	css_select_results *styles;
 	nscss_select_ctx ctx;
 
-	macsurf_bgs_step = 1;
-
 	/* Firstly, construct inline stylesheet, if any */
 	if (nsoption_bool(author_level_css)) {
 		dom_exception err;
 		err = dom_element_get_attribute(n, corestring_dom_style, &s);
 		if (err != DOM_NO_ERR) {
-			macsurf_bgs_step = 2; /* dom_element_get_attribute failed */
 			return NULL;
 		}
 	}
-
-	macsurf_bgs_step = 3;
 
 	if (s != NULL) {
 		inline_style = nscss_create_inline_style(
@@ -288,13 +279,9 @@ box_get_style(html_content *c,
 
 		dom_string_unref(s);
 
-		if (inline_style == NULL) {
-			macsurf_bgs_step = 4; /* nscss_create_inline_style failed */
+		if (inline_style == NULL)
 			return NULL;
-		}
 	}
-
-	macsurf_bgs_step = 5;
 
 	/* Populate selection context */
 	ctx.ctx = c->select_ctx;
@@ -304,17 +291,9 @@ box_get_style(html_content *c,
 	ctx.root_style = root_style;
 	ctx.parent_style = parent_style;
 
-	macsurf_bgs_step = 6;
-
 	/* Select style for element */
 	styles = nscss_get_style(&ctx, n, &c->media, &c->unit_len_ctx,
 			inline_style);
-
-	if (styles == NULL) {
-		macsurf_bgs_step = 7; /* nscss_get_style returned NULL */
-	} else {
-		macsurf_bgs_step = 8; /* success */
-	}
 
 	/* No longer need inline style */
 	if (inline_style != NULL)
@@ -494,14 +473,6 @@ static inline bool box__containing_block_is_flex(
  * \param convert_children  Whether to convert children
  * \return  true on success, false on memory exhaustion
  */
-/* File-static waypoint for localizing box_construct_element failures.
- * Set at each major section; read by convert_xml_to_box's X1 probe when
- * box_construct_element returns false. */
-long macsurf_bce_waypoint = 0;
-long macsurf_bce_call_count = 0;
-
-#define BCE_WAY(n) do { macsurf_bce_waypoint = (n); } while (0)
-
 static bool
 box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 {
@@ -514,9 +485,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 	dom_exception err;
 	struct box_construct_props props;
 	const css_computed_style *root_style = NULL;
-
-	macsurf_bce_call_count++;
-	macsurf_bce_waypoint = 1;
 
 	assert(ctx->n != NULL);
 
@@ -533,13 +501,11 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		root_style = ctx->root_box->style;
 	}
 
-	BCE_WAY(2);
 	styles = box_get_style(ctx->content, props.parent_style, root_style,
 			ctx->n);
 	if (styles == NULL)
 		return false;
 
-	BCE_WAY(3);
 	/* Extract title attribute, if present */
 	err = dom_element_get_attribute(ctx->n, corestring_dom_title, &title0);
 	if (err != DOM_NO_ERR)
@@ -561,7 +527,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 			return false;
 	}
 
-	BCE_WAY(4);
 	/* Extract id attribute, if present */
 	err = dom_element_get_attribute(ctx->n, corestring_dom_id, &s);
 	if (err != DOM_NO_ERR)
@@ -575,7 +540,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		dom_string_unref(s);
 	}
 
-	BCE_WAY(5);
 	box = box_create(styles, styles->styles[CSS_PSEUDO_ELEMENT_NONE], false,
 			props.href, props.target, props.title, id,
 			ctx->bctx);
@@ -611,7 +575,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 	if (props.node_is_root)
 		ctx->root_box = box;
 
-	BCE_WAY(6);
 	/* Deal with colspan/rowspan */
 	err = dom_element_get_attribute(ctx->n, corestring_dom_colspan, &s);
 	if (err != DOM_NO_ERR)
@@ -641,7 +604,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		dom_string_unref(s);
 	}
 
-	BCE_WAY(7);
 	css_display = ns_computed_display_static(box->style);
 
 	/* Set box type from computed display */
@@ -681,7 +643,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		}
 	}
 
-	BCE_WAY(8);
 	if (convert_special_elements(ctx->n,
 				     ctx->content,
 				     box,
@@ -689,7 +650,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		return false;
 	}
 
-	BCE_WAY(9);
 	/* Handle the :before pseudo element */
 	if (!(box->flags & IS_REPLACED)) {
 		box_construct_generate(ctx->n, ctx->content, box,
@@ -719,7 +679,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		return true;
 	}
 
-	BCE_WAY(10);
 	/* Attach DOM node to box */
 	err = dom_node_set_user_data(ctx->n,
 			corestring_dom___ns_key_box_node_data, box, NULL,
@@ -754,7 +713,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		box_add_child(props.containing_block, props.inline_container);
 	}
 
-	BCE_WAY(11);
 	/* Kick off fetch for any background image */
 	if (css_computed_background_image(box->style, &bgimage_uri) ==
 			CSS_BACKGROUND_IMAGE_IMAGE && bgimage_uri != NULL &&
@@ -784,7 +742,6 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 	if (*convert_children)
 		box->flags |= CONVERT_CHILDREN;
 
-	BCE_WAY(12);
 	if (box->type == BOX_INLINE || box->type == BOX_BR ||
 			box->type == BOX_INLINE_FLEX ||
 			box->type == BOX_INLINE_BLOCK) {
@@ -1312,10 +1269,6 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 	bool convert_children;
 	uint32_t num_processed = 0;
 	const uint32_t max_processed_before_yield = 10;
-	static long cvt_call_count = 0;
-	static long cvt_elems_total = 0;
-
-	cvt_call_count++;
 
 	do {
 		convert_children = true;
@@ -1323,19 +1276,6 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 		assert(ctx->n != NULL);
 
 		if (box_construct_element(ctx, &convert_children) == false) {
-			/* PROBE X1: bce failed - el + waypoint + bgs + ngs. */
-			extern long macsurf_ngs_step;
-			extern long macsurf_ngs_last_error;
-			macsurf_debug_probe_append(" X1 el=");
-			macsurf_debug_probe_append_int("", macsurf_bce_call_count);
-			macsurf_debug_probe_append(" way=");
-			macsurf_debug_probe_append_int("", macsurf_bce_waypoint);
-			macsurf_debug_probe_append(" bgs=");
-			macsurf_debug_probe_append_int("", macsurf_bgs_step);
-			macsurf_debug_probe_append(" ngs=");
-			macsurf_debug_probe_append_int("", macsurf_ngs_step);
-			macsurf_debug_probe_append(" err=");
-			macsurf_debug_probe_append_int("", macsurf_ngs_last_error);
 			ctx->cb(ctx->content, false);
 			dom_node_unref(ctx->n);
 			free(ctx);
@@ -1350,8 +1290,6 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 
 			err = dom_node_get_node_type(next, &type);
 			if (err != DOM_NO_ERR) {
-				/* PROBE X2: dom_node_get_node_type failed. */
-				macsurf_debug_probe_append(" X2_dom_node_type_fail");
 				ctx->cb(ctx->content, false);
 				dom_node_unref(next);
 				free(ctx);
@@ -1364,8 +1302,6 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 			if (type == DOM_TEXT_NODE) {
 				ctx->n = next;
 				if (box_construct_text(ctx) == false) {
-					/* PROBE X3: box_construct_text failed. */
-					macsurf_debug_probe_append(" X3_text_fail");
 					ctx->cb(ctx->content, false);
 					dom_node_unref(ctx->n);
 					free(ctx);
@@ -1381,12 +1317,6 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 		if (next == NULL) {
 			/* Conversion complete */
 			struct box root;
-
-			/* PROBE C1: conversion complete - call count + total elems. */
-			macsurf_debug_probe_append(" C1 done calls=");
-			macsurf_debug_probe_append_int("", cvt_call_count);
-			macsurf_debug_probe_append(" el=");
-			macsurf_debug_probe_append_int("", cvt_elems_total + (long)num_processed);
 
 			memset(&root, 0, sizeof(root));
 
@@ -1410,18 +1340,7 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 			free(ctx);
 			return;
 		}
-		num_processed++;
-	} while (num_processed < max_processed_before_yield);
-
-	cvt_elems_total += (long)num_processed;
-
-	/* PROBE C2: yielding - only first few calls to keep title readable. */
-	if (cvt_call_count <= 3) {
-		macsurf_debug_probe_append(" C2 yield calls=");
-		macsurf_debug_probe_append_int("", cvt_call_count);
-		macsurf_debug_probe_append(" tot=");
-		macsurf_debug_probe_append_int("", cvt_elems_total);
-	}
+	} while (++num_processed < max_processed_before_yield);
 
 	/* More work to do: schedule a continuation */
 	guit->misc->schedule(0, (void *)convert_xml_to_box, ctx);
