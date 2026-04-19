@@ -12,6 +12,79 @@
 
 #include <string.h>
 
+/* Global lock flag: when non-zero, macsurf_debug_set_title and the
+ * log_int/log_str helpers become no-ops. The _force variants temporarily
+ * clear the lock so diagnostic probes can set the title, then re-engage
+ * it to prevent downstream callers (redraw counter, etc.) from
+ * clobbering the probe output. */
+static int g_title_locked = 0;
+
+/* Probe accumulator: each macsurf_debug_probe_append call extends this
+ * buffer with its message and re-asserts the title so all probe output
+ * from across the pipeline remains visible as one concatenated string. */
+static char g_probe_buf[256];
+static int  g_probe_len = 0;
+
+static void
+probe_buf_append_char(char c)
+{
+	if (g_probe_len < (int)sizeof(g_probe_buf) - 1) {
+		g_probe_buf[g_probe_len++] = c;
+		g_probe_buf[g_probe_len] = '\0';
+	}
+}
+
+static void
+probe_buf_append_str(const char *s)
+{
+	int i;
+	if (s == NULL) return;
+	for (i = 0; s[i] != '\0'; i++) {
+		probe_buf_append_char(s[i]);
+	}
+}
+
+static void
+probe_buf_append_long(long v)
+{
+	char digits[12];
+	int di;
+	int i;
+	long val;
+	int neg;
+
+	val = v;
+	neg = 0;
+	if (val < 0) { neg = 1; val = -val; }
+	di = 0;
+	do {
+		digits[di++] = (char)('0' + (int)(val % 10));
+		val /= 10;
+	} while (val > 0 && di < 11);
+	if (neg) probe_buf_append_char('-');
+	for (i = di - 1; i >= 0; i--) {
+		probe_buf_append_char(digits[i]);
+	}
+}
+
+void
+macsurf_debug_probe_append(const char *msg)
+{
+	if (g_probe_len > 0) probe_buf_append_char(' ');
+	probe_buf_append_str(msg);
+	macsurf_debug_set_title_force(g_probe_buf);
+}
+
+void
+macsurf_debug_probe_append_int(const char *label, long value)
+{
+	if (g_probe_len > 0) probe_buf_append_char(' ');
+	probe_buf_append_str(label);
+	probe_buf_append_char('=');
+	probe_buf_append_long(value);
+	macsurf_debug_set_title_force(g_probe_buf);
+}
+
 #ifdef __MACOS9__
 #include <Files.h>
 struct AliasRecord;
@@ -26,6 +99,8 @@ macsurf_debug_set_title(const char *msg)
 	unsigned char pstr[256];
 	size_t len;
 
+	if (g_title_locked) return;
+
 	w = FrontWindow();
 	if (w == NULL || msg == NULL) return;
 
@@ -34,6 +109,22 @@ macsurf_debug_set_title(const char *msg)
 	pstr[0] = (unsigned char)len;
 	memcpy(pstr + 1, msg, len);
 	SetWTitle(w, pstr);
+}
+
+void
+macsurf_debug_set_title_force(const char *msg)
+{
+	g_title_locked = 0;
+	macsurf_debug_set_title(msg);
+	g_title_locked = 1;
+}
+
+void
+macsurf_debug_log_int_force(const char *label, long value)
+{
+	g_title_locked = 0;
+	macsurf_debug_log_int(label, value);
+	g_title_locked = 1;
 }
 
 void
@@ -101,17 +192,34 @@ macsurf_debug_log_str(const char *label, const char *value)
 
 void macsurf_debug_set_title(const char *msg)
 {
+	if (g_title_locked) return;
 	fprintf(stderr, "MS_LOG: %s\n", msg != NULL ? msg : "(null)");
 }
 
 void macsurf_debug_log_int(const char *label, long value)
 {
+	if (g_title_locked) return;
 	fprintf(stderr, "MS_LOG: %s: %ld\n", label ? label : "?", value);
 }
 
 void macsurf_debug_log_str(const char *label, const char *value)
 {
+	if (g_title_locked) return;
 	fprintf(stderr, "MS_LOG: %s: %s\n", label ? label : "?", value ? value : "(null)");
+}
+
+void macsurf_debug_set_title_force(const char *msg)
+{
+	g_title_locked = 0;
+	macsurf_debug_set_title(msg);
+	g_title_locked = 1;
+}
+
+void macsurf_debug_log_int_force(const char *label, long value)
+{
+	g_title_locked = 0;
+	macsurf_debug_log_int(label, value);
+	g_title_locked = 1;
 }
 #endif
 #endif

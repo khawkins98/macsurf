@@ -546,25 +546,26 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 	if (box == NULL)
 		return false;
 
-	/* Diagnostic probes 1 + 2: fire once on the root element only, so the
-	 * window title shows the result of the first cascade result rather than
-	 * being overwritten hundreds of times during box construction. */
+	/* Diagnostic probes 1 + 2: fire once on the root element only. Uses
+	 * sticky _force variants so downstream MS_LOG calls (e.g. redraw
+	 * counter) cannot overwrite the probe output. The last _force call
+	 * wins and stays on the title bar. */
 	{
 		static int probe_fired = 0;
 		if (probe_fired == 0 && props.node_is_root) {
 			probe_fired = 1;
 			if (box->style == NULL) {
-				MS_LOG("probe1:NULL style");
+				macsurf_debug_probe_append("p1:NULL");
 			} else {
 				css_color probe_col;
 				uint8_t probe_rc;
 				probe_col = 0;
 				probe_rc = css_computed_color(box->style,
 						&probe_col);
-				MS_LOG("probe1:style OK");
-				macsurf_debug_log_int("probe2 rc",
+				macsurf_debug_probe_append("p1:OK");
+				macsurf_debug_probe_append_int("p2rc",
 						(long)probe_rc);
-				macsurf_debug_log_int("probe2 col",
+				macsurf_debug_probe_append_int("p2col",
 						(long)probe_col);
 			}
 		}
