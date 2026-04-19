@@ -1328,6 +1328,25 @@ bool html_redraw_box(const html_content *html, struct box *box,
 			box->descendant_x1 = box->descendant_x0 + 10000;
 		if (box->descendant_y1 <= box->descendant_y0)
 			box->descendant_y1 = box->descendant_y0 + 10000;
+
+		/* DIAGNOSTIC: when layout hasn't produced per-line y offsets
+		 * for text boxes (every text box in an inline container
+		 * stacks at y=0), synthesise a y based on sibling index so
+		 * content is legible. This is a stop-gap until the CSS
+		 * cascade -> layout pipeline is producing real coordinates;
+		 * remove once layout_inline_container works end-to-end. */
+		if (box->type == BOX_TEXT && box->y == 0 &&
+				box->parent != NULL) {
+			int sib_idx = 0;
+			struct box *s;
+			for (s = box->parent->children; s != NULL && s != box;
+					s = s->next) {
+				if (s->type == BOX_TEXT)
+					sib_idx++;
+			}
+			if (sib_idx > 0)
+				box->y = sib_idx * 18;
+		}
 	}
 
 	/* avoid trivial FP maths */
