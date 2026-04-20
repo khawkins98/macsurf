@@ -301,22 +301,33 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix: **fixes145** (probe-removal round — probe work done per user direction). fixes144's `wne` / `disp` probes confirmed `event->what = 6` (updateEvt) is the crashing dispatch — the wheel spin triggers an update event that enters our update handler, and somewhere inside `macos9_handle_update` a Toolbox call internally invokes `_RelString` on a `DEADBEF0` pointer. Exhaustive audit of MacSurf's own update-handler code found no uninitialized Pascal-string pointer: every struct is `calloc`'d, every Pascal-string write is bounded, every buffer is checked. **Hypothesis for fixes145 probe removal:** fixes143/144's probes called `macsurf_debug_set_title_force` → `SetWTitle(FrontWindow(), pstr)` on every non-null event — dozens of Memory Manager allocations per second. That churn may have been exhausting the title-handle region, leaving stale `DEADBEF0`-marked pointers in CarbonLib's cached state that the update handler's Toolbox calls (DrawControls' CDEFs, TEUpdate's Script Manager, DrawText's font cache) then dereferenced. Removing the probes removes the churn. Predecessors: fixes144 (wne/disp probes), fixes143 (distinct-kinds probe), fixes142 (scroll-bar hardening + one-shot sbar probe — kept, harmless), fixes141 (event-class whitelist — kept), fixes140 (wheel handler disable — kept). **Next fix ships as fixes146** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+- Last shipped fix: **fixes146** — two commits in one zip:
+  - **Commit A (shutdown ordering, high confidence):** App-quit crashes at illegal instruction `00000100`, LR=`3DF714CC` (typical OT/CFM fragment export address). Root cause: `main()` called `CloseOpenTransportInContext` **before** `netsurf_exit()`. `netsurf_exit` tears down browser_windows, fetchers, and hlcache entries — any of which may still hold OT endpoints whose cleanup calls `OTCloseProvider` / `OTRcvDisconnect`. With OT already closed, those calls jump through freed CFM exports. Fixed by swapping: `netsurf_exit()` first, then `CloseOpenTransport`. Also introduced `bool macos9_quitting` (extern in `macos9.h`, defined in `main.c`) set before teardown so re-entrant callbacks — scheduler, update handler — early-return before touching torn-down state.
+  - **Commit B (update-handler hardening, defensive only — Bug 1 not root-caused):** Wheel spin still crashes app at `1A23829E` with disassembly `A67C1A23 not.w #6691` — 68k-looking target, i.e. wild jump through a function pointer that wasn't a proper routine descriptor. Defensive changes: `if (macos9_quitting) return` guard at top of `macos9_handle_update`; explicit `gw->window == NULL` check; in `macos9_window_destroy`, null out `back_btn` / `forward_btn` / `reload_btn` / `home_btn` / `vscroll` / `hscroll` / `window` before `DisposeWindow` so anything that re-reads gw during the disposal sequence sees NULL rather than stale handles. **Does not pinpoint root cause** — see "Wheel crash diagnostic exhaustion" entry in the work queue below.
+  - Predecessors: fixes145 (probe removal), fixes144 (wne/disp probes), fixes143 (distinct-kinds probe), fixes142 (scroll-bar hardening + one-shot sbar probe), fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes147** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
 
-**fixes145 possible outcomes post-hardware-test:**
+**fixes146 possible outcomes post-hardware-test:**
 
-- **Wheel no longer crashes** — probe spam was the trigger. Ship CSS queue with confidence.
-- **Wheel still crashes** — probes weren't the cause. Need MacsBug stack capture (ADB keyboard) to make further progress. Meanwhile CSS queue proceeds.
-
-Either way, next round is **fixes146 (`gap` / `row-gap`)** — CSS momentum does not wait on a platform-bug investigation.
+- **Quit works cleanly** — Commit A confirmed, shutdown bug closed. Remove "quit crash" from blockers.
+- **Wheel stops crashing** — Commit B caught it, by direct guard or by making the bad state unreachable. Bonus win; remove wheel crash from blockers.
+- **Wheel still crashes** — Commit B's defensive hardening didn't catch it. Bug 1 root cause remains unknown from Linux-source audit. Next session: do not redo the audit — escalate to ADB-keyboard MacsBug `wh` capture. See "Wheel crash diagnostic exhaustion" below.
 
 ### Next work queue
 
-- **fixes146 — `gap` / `row-gap` parsing and layout consumption.** 76 uses in MacTrove currently silent. Fixes text-overlap complaints.
-- **fixes147 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order` / `column-gap`; layout ignores them. Follow the `lh__box_align_self` pattern.
-- **fixes148 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
-- **fixes149 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
-- **Wheel-crash proper diagnosis — deferred pending ADB keyboard OR fixes145 result.** User needs MacsBug stack capture to root-cause a `_RelString` / `DEADBEF0` crash that the fixes141 event-mask narrowing did not block. fixes144's probes confirmed the crash is inside MacSurf's updateEvt handler, but Linux-source audit cannot pinpoint the uninitialized field without the stack trace. fixes145 removes the probe pressure as a candidate fix.
+- **fixes147 — `gap` / `row-gap` parsing and layout consumption.** 76 uses in MacTrove currently silent. Fixes text-overlap complaints.
+- **fixes148 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order` / `column-gap`; layout ignores them. Follow the `lh__box_align_self` pattern.
+- **fixes149 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
+- **fixes150 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
+- **Wheel crash diagnostic exhaustion — Linux-source audit is DONE, further progress requires MacsBug access.** Evidence summary (do not redo this audit from Linux):
+  - `sbar h=<real> vh=<real> max=<real>` probe fires cleanly after MacTrove loads — extents flow through `browser_window_get_extents` correctly.
+  - `disp w=6` (updateEvt) latches on wheel spin — dispatcher is reached, crash is downstream of `macos9_dispatch_event` entry.
+  - Crash at `1A23829E` with `A67C1A23 not.w #6691` disassembly — 68k-looking data executed as code, classic "called through a function pointer that wasn't a routine descriptor."
+  - `macos9_plotters` table fully populated (9 function pointers, 3 NULL, 1 bool); core guards the NULL slots.
+  - No stray `DisposeControl` anywhere; controls disposed only implicitly via `DisposeWindow` (close box or shutdown).
+  - No UPP (ControlActionUPP / EventHandlerUPP) is live during wheel spin — scroll_action UPP is disposed immediately after `TrackControl`; wheel handler is fixes140 no-op.
+  - Every struct is `calloc`'d; every Pascal-string write is bounded; every Str255 local is written by set_pstring before Toolbox call.
+  - fixes141 narrowed `WaitNextEvent` mask + whitelist guard at dispatch; fixes142 added `SetPortWindowPort` + `Draw1Control` to scroll-bar updates; fixes145 removed probe-SetWTitle Memory Manager pressure; fixes146 adds quitting-flag and null-before-DisposeWindow hardening. **None of these hardenings conclusively fixed the crash — if it persists, the remaining hypothesis (Control Manager state corrupted somewhere we can't inspect) can only be confirmed with a MacsBug `wh` stack capture.** Next step: get ADB keyboard, reproduce, `wh`, `sc`, `ip`, `dm sp` — then we have a caller chain to fix.
+- **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
 - **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
 
 ## Docs
