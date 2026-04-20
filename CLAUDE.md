@@ -239,6 +239,12 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - `MACSURF_HOME_URL` defined in `macsurf_config.h`.
 - v0.1 fallback path (`strip_html` + direct `DrawText`) has been removed. Full NetSurf pipeline is the only rendering path.
 
+## Mouse Wheel / Input Devices
+
+- **No Carbon wheel handler.** `kEventMouseWheelMoved` is **not available in CarbonLib** on OS 9 — Apple's own `CarbonEvents.h` marks the event class as `Mac OS X: 10.0+ in Carbon.framework; CarbonLib: not available`. fixes134 attempted to install a handler and the Mac crashed with illegal-instruction at `19DBDEB8` because CarbonLib's dispatcher destabilizes when asked about events whose class was never back-ported. Root-caused and disabled in fixes140. See [browser/netsurf/frontends/macos9/macos9_wheel.c](browser/netsurf/frontends/macos9/macos9_wheel.c) — `macos9_wheel_install()` is retained as a visible no-op for ABI stability (Mac-side main.c may still reference it).
+- **USB Overdrive is the OS 9 wheel path.** Users configure USB Overdrive's Scroll Wheel action to **"Up Arrow / Down Arrow"** (or Page Up / Page Down). The synthetic keyDowns flow through `macos9_handle_key_down` and hit the existing arrow-key / page-key scroll path. No browser-side wheel code required. See [docs/usb-overdrive.md](docs/usb-overdrive.md) for the user-facing writeup.
+- **Complete scroll-input set on OS 9:** scroll-bar drag, keyboard arrows, Page Up/Down, Home/End, and USB-Overdrive arrow-key wheel mode (via the keyboard path). Carbon-native wheel events are architecturally out of reach on this platform.
+
 ## Rendering Pipeline (v0.3 — native CSS)
 
 - HTTP fetcher registered for `http:` and `https:` schemes via OT proxy at `116.202.231.103:8765`.
@@ -257,8 +263,7 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - **Flex `justify-content` / `align-content` / `order` computed by libcss but unread by `layout_flex.c`** — layout ignores them. Queued fixes142.
 - **`border-radius`, `box-shadow`, gradients, transforms not parsed** — cosmetic loss. Queued fixes143 (border-radius first via QuickDraw `PaintRoundRect`).
 - **Image content handlers not linked** — every `<img>` renders as placeholder box. Queued fixes144.
-- **Mouse wheel event handler crashes the system (fixes134 regression)** — currently under investigation for fixes140; `kEventMouseWheelMoved` handler is installed but crashes with illegal-instruction at a heap-looking address (signature: `19DBDEB8`), suggesting the `EventHandlerUPP` returned from `NewEventHandlerUPP` is garbage (CW8 Universal Interfaces likely missing the real prototype, implicit-int declaration truncates the UPP pointer). Fallback plan: `#if 0` the install if not fixable in one round.
-- **URL field input fails on the initial window, works on File → New Window** — queued with mouse wheel in fixes140. Hypothesis in 2026-04-18 survey: content redraw during `browser_window_create` overdraws the URL rect visually while TextEdit is still functional internally.
+- **URL field input fails on the initial window, works on File → New Window** — queued for a dedicated probe round. Hypothesis in 2026-04-18 survey: content redraw during `browser_window_create` overdraws the URL rect visually while TextEdit is still functional internally.
 
 ## Native CSS Custom Properties
 
@@ -295,15 +300,15 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix zip: **fixes139** (lexer-layer fix for `--foo` tokenization — the keystone that made fixes133's var() pipeline actually fire on real pages). **Next fix zip ships as fixes140** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+- Last shipped fix zip: **fixes140** (disabled the CarbonLib-unavailable `kEventMouseWheelMoved` handler from fixes134; USB Overdrive arrow-key mode is the OS 9 wheel path). **Next fix zip ships as fixes141** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
 
 ### Next work queue
 
-- **fixes140 — usability, not CSS.** Mouse wheel crash and initial-window URL bar input. Users cannot adopt a browser that crashes on scroll or refuses URL entry, no matter how well MacTrove renders. CSS feature work defers one round.
 - **fixes141 — `gap` / `row-gap` parsing and layout consumption.** 76 uses in MacTrove currently silent. Fixes text-overlap complaints.
 - **fixes142 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order` / `column-gap`; layout ignores them. Follow the `lh__box_align_self` pattern.
 - **fixes143 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
 - **fixes144 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
+- **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
 
 ## Docs
 
@@ -329,6 +334,7 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 - **libcss lexer tokenizes `--foo` as two tokens without the keystone fix.** The original CSS 2.1 grammar allowed one leading dash for vendor prefixes. Custom properties use two. libcss's `CDCOrIdentOrFunctionOrNPD` state needs a branch where `--` followed by `startNMStart(c)` appends and continues into `IdentOrFunction` rather than rewinding to emit CHAR. Without this, the 19 `:root` definitions and 219 `var()` references in a typical modern theme drop at tokenization before any parser logic runs. Fixed in fixes139 ([browser/libcss/src/lex/lex.c](browser/libcss/src/lex/lex.c)).
 - **Force-sticky title bar probes clobber each other, last writer wins.** If multiple rounds of code add `macsurf_debug_set_title_force` or `log_int_force` probes without stripping predecessors, the latest writer overwrites everything earlier in the same reformat cycle. Non-force `MS_LOG` cycling through different labels (e.g. `plot rect ↔ plot clip`) indicates no sticky is latched, which usually means the expected code path is dead. Strip upstream stickies before adding new diagnostics.
 - **Fix zips only refresh the files they ship.** If a diagnostic probe was added to file X in an earlier round and subsequent zips don't ship X, the probe persists on the Mac across rounds even after removal from the Linux tree. Phantom output with no Linux-grep hit means the Mac copy of the file is out of sync with Linux. Ship the affected file explicitly to resync (fixes137 did this for `html.c` / `layout.c` / `box_construct.c`).
+- **Carbon event classes have per-environment availability — check Apple's `CarbonEvents.h` before registering any handler.** Events added in Mac OS X 10.0+ that were never back-ported to CarbonLib (e.g. `kEventMouseWheelMoved`) will register without error but never dispatch, and CarbonLib's dispatcher destabilizes when something downstream tries to deliver an event whose class it doesn't know. The handler code will look correct in review (pascal calling convention, proper UPP, initialized EventTypeSpec, explicit return paths — all five "classic bugs" can be absent), run in hardware tests as "no crash from our code," and get blamed for illegal-instruction crashes at heap-looking addresses that are actually CarbonLib walking uninitialized dispatch state. Apple's `CarbonEvents.h` marks each event enum with either `Mac OS X: 10.x+ in Carbon.framework` AND `CarbonLib: 1.x+`, or `CarbonLib: not available` — respect the annotation. If `CarbonLib: not available`, the platform cannot deliver that event at all, and the correct fix is to not install a handler, not to debug the handler. See [browser/netsurf/frontends/macos9/macos9_wheel.c](browser/netsurf/frontends/macos9/macos9_wheel.c) and [docs/usb-overdrive.md](docs/usb-overdrive.md) for the wheel-event case study (fixes134 → fixes140).
 
 ## CLAUDE.md Maintenance
 

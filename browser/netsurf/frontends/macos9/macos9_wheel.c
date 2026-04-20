@@ -1,176 +1,64 @@
 /*
  * MacSurf - macos9_wheel.c
- * Mouse wheel event support via Carbon Events.
+ * Intentional no-op. See the long comment below before touching.
  *
- * Classic OS 9 / System 7 shipped without scroll-wheel mice, so the
- * WaitNextEvent classic event model has no dedicated wheel opcode.
- * USB wheel drivers on OS 9.2.x deliver wheel events through the
- * Carbon Event Manager as kEventMouseWheelMoved. When no application
- * handler claims these events, CarbonLib's default handler chain can
- * walk into an uninitialized slot and bus-error on dereference —
- * that is exactly what was observed on 2026-04-20 when a user with a
- * USB wheel mouse rolled the wheel over a MacSurf window.
+ * History:
+ *   fixes134 shipped a pascal OSStatus handler on
+ *   kEventClassMouse / kEventMouseWheelMoved, installed with
+ *   NewEventHandlerUPP + InstallApplicationEventHandler. The handler
+ *   code itself is correct (pascal calling convention, UPP created
+ *   properly, EventTypeSpec fully initialized, all return paths
+ *   explicit). It still caused an illegal-instruction crash at a
+ *   heap-looking PPC address (19DBDEB8) the moment a USB wheel mouse
+ *   was spun over a MacSurf window on real hardware.
  *
- * Installing the handler below both prevents that crash and routes
- * wheel deltas through the existing scroll machinery
- * (macos9_window_scroll_by), so wheel scrolling behaves the same as
- * arrow-key / Page-Up / Page-Down scrolling.
+ *   fixes140 root-caused the bug: kEventMouseWheelMoved is
+ *   **not available in CarbonLib.** Apple's own CarbonEvents.h header
+ *   marks the event class as
+ *       Mac OS X:  in version 10.0 and later in Carbon.framework
+ *       CarbonLib: not available
+ *   CarbonLib on OS 9 predates the event class, so registering a
+ *   handler for it registers against a dispatch path CarbonLib does
+ *   not know about. The registration call returns noErr, but there is
+ *   no real event plumbing behind it, and CarbonLib's dispatcher
+ *   destabilizes when asked to dispatch events whose class was never
+ *   backported — which is how fixes134's crash manifested.
+ *
+ * USB Overdrive on OS 9:
+ *   USB Overdrive (the de-facto USB HID driver on OS 9) does not
+ *   emit Carbon wheel events — that event class does not exist on the
+ *   platform. USB Overdrive's wheel modes synthesize either classic
+ *   keyDown events (Up/Down arrow, Page Up/Down) or direct scrollbar
+ *   manipulation. Users should configure USB Overdrive's Scroll Wheel
+ *   setting to "Up Arrow / Down Arrow" to get wheel scrolling in
+ *   MacSurf — that maps onto the existing WaitNextEvent keyDown
+ *   handler, which already scrolls the active window (arrow keys,
+ *   Page Up/Down, Home/End all wired in main.c / window.c). See
+ *   docs/usb-overdrive.md for the user-facing writeup.
+ *
+ * Why keep this translation unit at all:
+ *   The Mac-side CW8 project may still list macos9_wheel.c and main.c
+ *   may still call macos9_wheel_install(). Keeping the function as a
+ *   visible no-op with this comment is strictly safer than deleting
+ *   the file — the next agent that sees a wheel-related ticket will
+ *   read this and not re-attempt a Carbon wheel handler.
  */
-
-#include <string.h>
 
 #include "utils/errors.h"
 #include "macos9/macos9.h"
-#include "macsurf_debug.h"
 
 #ifdef __MACOS9__
 
-#include <Events.h>
-#include <MacWindows.h>
-#include <CarbonEvents.h>
-
-/* CW8 Universal Interfaces can miss these Carbon event codes. They
- * are documented in Apple's Carbon Event Manager Reference and are
- * stable four-character codes — define locally rather than add more
- * headers, per MacSurf's CW8-missing-constants convention. */
-#ifndef kEventClassMouse
-#define kEventClassMouse            'mous'
-#endif
-#ifndef kEventMouseWheelMoved
-#define kEventMouseWheelMoved       10
-#endif
-#ifndef kEventParamMouseWheelAxis
-#define kEventParamMouseWheelAxis   'mwax'
-#endif
-#ifndef kEventParamMouseWheelDelta
-#define kEventParamMouseWheelDelta  'mwdl'
-#endif
-#ifndef kEventParamWindowRef
-#define kEventParamWindowRef        'wind'
-#endif
-#ifndef typeMouseWheelAxis
-#define typeMouseWheelAxis          'mwax'
-#endif
-#ifndef typeSInt32
-#define typeSInt32                  'long'
-#endif
-#ifndef typeWindowRef
-#define typeWindowRef               'wind'
-#endif
-#ifndef kEventMouseWheelAxisX
-#define kEventMouseWheelAxisX       0
-#endif
-#ifndef kEventMouseWheelAxisY
-#define kEventMouseWheelAxisY       1
-#endif
-
-/* Pixels scrolled per wheel delta unit. A wheel notch typically
- * delivers delta=1 (stock Apple driver) or delta=3 (some third-party
- * drivers). 40 matches Apple's classic-era default scroll distance. */
-#define MACOS9_WHEEL_STEP_PX        40
-
-/* Typedef for the axis parameter. CW8 may or may not provide it; the
- * underlying storage is SInt16. */
-typedef short macos9_wheel_axis;
-
-
-/* One-shot: the first time the Carbon wheel handler actually gets
- * called, latch the title so the user sees it survived install. If
- * they spin the wheel and the title stays whatever layout probes set,
- * the handler is not firing — wheel events are arriving via a
- * different path (likely classic osEvt). */
-static int g_whl_fire_logged = 0;
-
-static pascal OSStatus
-macos9_wheel_handler(EventHandlerCallRef next_handler,
-                     EventRef event,
-                     void *user_data)
-{
-	macos9_wheel_axis axis;
-	SInt32 delta;
-	WindowRef window;
-	OSStatus err;
-	struct gui_window *gw;
-	int dx;
-	int dy;
-
-	(void)next_handler;
-	(void)user_data;
-
-	if (!g_whl_fire_logged) {
-		g_whl_fire_logged = 1;
-		MS_LOG_STICKY("whl fire");
-	}
-
-	axis = kEventMouseWheelAxisY;
-	delta = 0;
-	window = NULL;
-
-	err = GetEventParameter(event,
-			kEventParamMouseWheelAxis,
-			typeMouseWheelAxis,
-			NULL, sizeof(axis), NULL, &axis);
-	if (err != noErr)
-		axis = kEventMouseWheelAxisY;
-
-	err = GetEventParameter(event,
-			kEventParamMouseWheelDelta,
-			typeSInt32,
-			NULL, sizeof(delta), NULL, &delta);
-	if (err != noErr)
-		delta = 0;
-
-	err = GetEventParameter(event,
-			kEventParamWindowRef,
-			typeWindowRef,
-			NULL, sizeof(window), NULL, &window);
-	if (err != noErr || window == NULL) {
-		window = FrontWindow();
-	}
-
-	if (window == NULL || delta == 0)
-		return noErr;
-
-	gw = macos9_find_window(window);
-	if (gw == NULL)
-		return noErr;
-
-	/* Mac wheel convention: positive delta => user rolled wheel
-	 * upward => content should move down relative to the viewport
-	 * (i.e. scroll position decreases). scroll_by takes a positive
-	 * dy to mean "move viewport down into the content", so invert. */
-	dx = 0;
-	dy = 0;
-	if (axis == kEventMouseWheelAxisX) {
-		dx = -(int)delta * MACOS9_WHEEL_STEP_PX;
-	} else {
-		dy = -(int)delta * MACOS9_WHEEL_STEP_PX;
-	}
-
-	macos9_window_scroll_by(gw, dx, dy);
-	return noErr;
-}
-
+/* Deliberately no Carbon event headers. There is nothing to install. */
 
 void
 macos9_wheel_install(void)
 {
-	EventTypeSpec spec;
-	EventHandlerUPP upp;
-	OSStatus err;
-
-	spec.eventClass = kEventClassMouse;
-	spec.eventKind  = kEventMouseWheelMoved;
-
-	upp = NewEventHandlerUPP(macos9_wheel_handler);
-	if (upp == NULL)
-		return;
-
-	err = InstallApplicationEventHandler(upp, 1, &spec, NULL, NULL);
-	/* Log install result. noErr (== 0) is success. Any non-zero
-	 * means CarbonLib rejected the registration — wheel events will
-	 * still go to the default (crashing) handler chain. */
-	macsurf_debug_log_int("whl_i", (long)err);
+	/* Intentional no-op. kEventMouseWheelMoved is CarbonLib-unavailable
+	 * (Carbon.framework 10.0+ only). Wheel input on OS 9 requires
+	 * USB Overdrive configured in "Up Arrow / Down Arrow" mode; the
+	 * synthetic keyDowns flow through macos9_handle_key_down and hit
+	 * the existing arrow-key scroll path. */
 }
 
 #else /* !__MACOS9__ */
