@@ -301,15 +301,23 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix: **fixes142** (scroll-bar hardening on `window.c`: `SetPortWindowPort` at top of `macos9_window_update_scrollbars` so Control Manager internal redraws land in the right port; explicit `Draw1Control(vscroll)` / `Draw1Control(hscroll)` after value/max/hilite updates; one-shot `sbar h=N vh=M max=K` probe in `update_extents` to confirm `browser_window_get_extents` reports non-zero heights from `GW_EVENT_NEW_CONTENT`). Predecessors: fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes143** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+- Last shipped fix: **fixes143** (probe-only, no behavior change — dispatch-entry probe in `macos9_dispatch_event` logs each distinct `event->what` seen to the title bar as `disp w=A w=B w=C ...`, placed before the fixes141 whitelist guard so unknown kinds register too). Predecessors: fixes142 (scroll-bar port+Draw1Control hardening, sbar probe), fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes144** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+
+**fixes143 decision tree (post-hardware-test):**
+
+- **Title shows `disp w=<N>` during wheel spin, then crash** — crash is downstream of our dispatch in handler `N`. Next round audits that specific path.
+- **Title never shows a new `w=N` during wheel spin, crashes anyway** — crash is upstream of MacSurf in CarbonLib or USB Overdrive trap patches. MacSurf cannot fix without MacsBug access; document as platform limitation, stop chasing it.
+- **No crash, title shows `disp w=<N>` normally** — fixes142 altered timing enough to dodge the bug. Investigate cause but don't block on it.
+
+Regardless of outcome, next round is **fixes144 (`gap` / `row-gap`)** — CSS momentum does not wait on a platform-bug investigation.
 
 ### Next work queue
 
-- **fixes143 — `gap` / `row-gap` parsing and layout consumption.** 76 uses in MacTrove currently silent. Fixes text-overlap complaints. (Reordered from fixes142 — fixes142 consumed by the scroll-bar hardening work.)
-- **fixes144 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order` / `column-gap`; layout ignores them. Follow the `lh__box_align_self` pattern.
-- **fixes145 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
-- **fixes146 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
-- **Wheel-crash proper diagnosis — deferred pending ADB keyboard.** User needs the keyboard to capture a real MacsBug stack before we can root-cause the `Undefined A-Trap at 1BDC54E0` crash. fixes142 may resolve it as a side effect if the wheel path depended on scroll-bar state; otherwise fixes141's defensive disable remains the state.
+- **fixes144 — `gap` / `row-gap` parsing and layout consumption.** 76 uses in MacTrove currently silent. Fixes text-overlap complaints.
+- **fixes145 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order` / `column-gap`; layout ignores them. Follow the `lh__box_align_self` pattern.
+- **fixes146 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
+- **fixes147 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
+- **Wheel-crash proper diagnosis — deferred pending ADB keyboard OR fixes143 result.** User needs MacsBug access to capture a proper stack for a `_RelString` / DEADBEF0 crash that the fixes141 event-mask narrowing did not block. fixes143's probe answers whether our dispatcher is even reached; if not, the crash is in CarbonLib and MacSurf cannot fix it.
 - **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
 
 ## Docs
