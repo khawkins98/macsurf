@@ -242,6 +242,7 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - `no_backing_store.c` returns `NSERROR_NOT_IMPLEMENTED` from store and fetch.
 - Event-loop sleep shortens to 1 tick while any fetcher is active (`macos9_fetching || macos9_stub_fetcher_active() || macos9_http_fetcher_active()`) so NetSurf's fetcher ring progresses via `fetch_send_callback` continuations every pass. There is **no** explicit `fetch_poll()` call — an earlier CLAUDE.md draft misdescribed this.
 - Full NetSurf pipeline executes: fetch → parse → CSS cascade → layout → plot.
+- **CSS custom properties (`var()`) resolve natively as of fixes133.** `--name:` definitions are captured into each stylesheet's custom-property table at parse time; declarations whose value references `var()` are kept as raw value tokens on the rule's `css_style` and resolved inside `cascade_style` against the select_ctx-wide aggregate table (last-write-wins over sheet source order, matching author cascade). Fallback forms, nested `var()`, and cross-stylesheet references all work. Circular refs are cut at depth 10. See [browser/libcss/src/parse/custom_properties.c](browser/libcss/src/parse/custom_properties.c).
 - **First live web page rendered on G3 hardware (2026-04-19)**: `http://mac.mp.ls/` (MacTrove) loaded end-to-end — toolbar + URL bar + real HTML (headings, body text, navigation items, image placeholder boxes). Layout still rough (text overlap, odd positioning) but fetch/parse/cascade/layout/plot chain confirmed on real content.
 - CSS_NOMEM blocker resolved by raising Carbon partition (`MWProject_PPC_size` 4096 → 16384, `MWProject_PPC_minsize` 2048 → 8192). Root cause was real heap exhaustion — libcss calls `malloc`/`calloc` directly with no NetSurf wrapper, so "OOM in libcss" meant the OS heap was actually exhausted. See [docs/research/state-survey-2026-04-18.md](docs/research/state-survey-2026-04-18.md) §2 and §7.
 - v0.3 remaining: verify the seven chrome acceptance criteria against real pages (URL input on initial window, navigation, resize, scroll, Back/Forward, status bar, title bar), test apple.com as second real-page target, tune layout quality (text overlap, positioning), implement `plot_bitmap` for real images.
@@ -255,7 +256,7 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix zip: **fixes115** (strip fpmath A/D/E/p1/p2 probes from `layout.c` and `box_construct.c` now that the CW8 PPC long-long investigation is closed and the title bar needs to show real page titles). **Next fix zip ships as fixes133** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+- Last shipped fix zip: **fixes133** (Phase 1 of the native-CSS capability push — CSS custom properties and `var()` resolution inside libcss; see the "CSS custom properties (`var()`)" section below). **Next fix zip ships as fixes134** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
 
 ## Docs
 
