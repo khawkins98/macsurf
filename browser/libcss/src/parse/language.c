@@ -23,6 +23,8 @@
 #include "parse/properties/utils.h"
 
 #include "utils/parserutilserror.h"
+
+#include "macsurf_debug.h"
 #include "utils/utils.h"
 
 typedef struct context_entry {
@@ -810,37 +812,27 @@ css_error handleDeclaration(css_language *c, const parserutils_vector *vector)
 	/* Strip any leading whitespace (can happen if in nested block) */
 	consumeWhitespace(vector, &ctx);
 
-	/* CSS Custom Property definitions start with "--". libcss's
-	 * CSS 2.1-era lexer only allows a single leading dash on an
-	 * IDENT (for vendor prefixes), so "--foo" is lexed as two
-	 * separate tokens: CHAR('-') followed by IDENT('-foo'). The
-	 * normal IDENT-required check below would reject the leading
-	 * CHAR. Detect the split sequence here and route the declaration
-	 * into the custom-property capture path. Name convention: store
-	 * the IDENT's idata ("-foo") verbatim; parse_var_body on the
-	 * reference side applies the same convention and the lookup
-	 * compare strips leading dashes so the two sides always match. */
+	/* CSS Custom Property definitions start with "--". The lexer fix in
+	 * fixes139 now emits "--foo" as a single IDENT token whose idata
+	 * starts with two dashes. Detect that and route the whole
+	 * declaration into the custom-property capture path. */
 	{
-		const css_token *t1;
-		const css_token *t2;
+		const css_token *t1 = parserutils_vector_peek(vector, ctx);
 
-		t1 = parserutils_vector_peek(vector, ctx);
-		t2 = parserutils_vector_peek(vector, ctx + 1);
-
-		if (t1 != NULL && tokenIsChar(t1, '-') &&
-				t2 != NULL &&
-				t2->type == CSS_TOKEN_IDENT &&
-				t2->idata != NULL &&
-				lwc_string_length(t2->idata) >= 1 &&
-				lwc_string_data(t2->idata)[0] == '-') {
+		if (t1 != NULL && t1->type == CSS_TOKEN_IDENT &&
+				t1->idata != NULL &&
+				lwc_string_length(t1->idata) >= 3 &&
+				lwc_string_data(t1->idata)[0] == '-' &&
+				lwc_string_data(t1->idata)[1] == '-') {
 			css_cp_token *cp_tokens = NULL;
 			uint32_t cp_n = 0;
 			int32_t value_start;
 			lwc_string *name_ref;
 			const css_token *colon;
 
-			/* Skip CHAR('-') and IDENT('-foo'). */
-			(void)parserutils_vector_iterate(vector, &ctx);
+			MS_LOG_STICKY("hD -- IDENT");
+
+			/* Skip IDENT('--foo'). */
 			(void)parserutils_vector_iterate(vector, &ctx);
 
 			consumeWhitespace(vector, &ctx);
@@ -860,7 +852,7 @@ css_error handleDeclaration(css_language *c, const parserutils_vector *vector)
 			if (error != CSS_OK)
 				return error;
 
-			name_ref = lwc_string_ref(t2->idata);
+			name_ref = lwc_string_ref(t1->idata);
 			return css__sheet_add_custom_property(c->sheet,
 					name_ref, cp_tokens, cp_n);
 		}
