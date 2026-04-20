@@ -145,6 +145,11 @@ macos9_schedule_run(void)
 	void *p;
 	unsigned long now;
 
+	/* fixes146 -- during shutdown, NetSurf's teardown path frees
+	 * state that scheduled callbacks may reference. Don't drive
+	 * any more callbacks after macos9_quitting is set. */
+	if (macos9_quitting) return false;
+
 	now = macos9_get_ticks();
 
 	while (sched_queue != NULL && sched_queue->time <= now) {
