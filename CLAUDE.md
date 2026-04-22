@@ -388,6 +388,7 @@ attach MacsBug to.
 
 - [docs/macsurf-architecture.md](docs/macsurf-architecture.md) — Full platform architecture: rendering modes, proxy services, template system, milestone plan
 - [docs/research/architecture-inventory.md](docs/research/architecture-inventory.md) — Snapshot of what currently exists in the repo and on the proxy host (no decisions, just facts)
+- [docs/research/window-architecture-2026-04-22.md](docs/research/window-architecture-2026-04-22.md) — Window-framework architecture research (fixes161). Full state/event/redraw/scroll inventory of the Mac OS 9 frontend; architectural problem list; proposed unified window-state model; 6-round refactor plan (fixes162–fixes166). **fixes162+ follow this plan.**
 - [docs/status.md](docs/status.md) — Project status, milestones, test environment
 - [docs/codewarrior-setup.md](docs/codewarrior-setup.md) — How to install CodeWarrior 8 and build on a real Power Mac
 - [docs/deploying-proxy.md](docs/deploying-proxy.md) — How to deploy the Go proxy
