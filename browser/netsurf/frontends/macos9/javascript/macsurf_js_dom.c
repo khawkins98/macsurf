@@ -60,35 +60,40 @@ typedef int dom_exception;
 #define DOM_NO_ERR 0
 
 /* Local stubs — lifecycle and accessors all no-op or return null.
- * Marked static so they don't conflict with any real libdom symbols
- * if those ever land in the project. */
-static dom_exception dom_string_create(const unsigned char *ptr, size_t len,
+ * External linkage (not static): CW8 generates undefined-extern link
+ * errors for calls to statics in this TU when the static body is
+ * trivial (single `(void)x;` + return). The only other references to
+ * these bare names are via libdom's static-inline vtable dispatchers
+ * in content/handlers/html/html.c, which inline into that TU and do
+ * not produce external references — so defining them as externs here
+ * cannot collide. */
+dom_exception dom_string_create(const unsigned char *ptr, size_t len,
 		dom_string **str)
 { (void)ptr; (void)len; if (str) *str = NULL; return DOM_NO_ERR; }
-static void dom_string_unref(dom_string *str) { (void)str; }
-static const char *dom_string_data(const dom_string *str)
+void dom_string_unref(dom_string *str) { (void)str; }
+const char *dom_string_data(const dom_string *str)
 { (void)str; return ""; }
-static size_t dom_string_length(const dom_string *str)
+size_t dom_string_length(const dom_string *str)
 { (void)str; return 0; }
 
-static void dom_node_ref(dom_node *node)   { (void)node; }
-static void dom_node_unref(dom_node *node) { (void)node; }
+void dom_node_ref(dom_node *node)   { (void)node; }
+void dom_node_unref(dom_node *node) { (void)node; }
 
-static dom_exception dom_document_get_element_by_id(dom_document *doc,
+dom_exception dom_document_get_element_by_id(dom_document *doc,
 		dom_string *id, dom_element **element)
 { (void)doc; (void)id; if (element) *element = NULL; return DOM_NO_ERR; }
-static dom_exception dom_document_create_element(dom_document *doc,
+dom_exception dom_document_create_element(dom_document *doc,
 		dom_string *tag_name, dom_element **element)
 { (void)doc; (void)tag_name; if (element) *element = NULL; return DOM_NO_ERR; }
-static dom_exception dom_element_get_tag_name(dom_element *el, dom_string **name)
+dom_exception dom_element_get_tag_name(dom_element *el, dom_string **name)
 { (void)el; if (name) *name = NULL; return DOM_NO_ERR; }
-static dom_exception dom_element_get_attribute(dom_element *el,
+dom_exception dom_element_get_attribute(dom_element *el,
 		dom_string *name, dom_string **value)
 { (void)el; (void)name; if (value) *value = NULL; return DOM_NO_ERR; }
-static dom_exception dom_element_set_attribute(dom_element *el,
+dom_exception dom_element_set_attribute(dom_element *el,
 		dom_string *name, dom_string *value)
 { (void)el; (void)name; (void)value; return DOM_NO_ERR; }
-static dom_exception dom_node_append_child(dom_node *parent,
+dom_exception dom_node_append_child(dom_node *parent,
 		dom_node *new_child, dom_node **result)
 { (void)parent; (void)new_child; if (result) *result = NULL; return DOM_NO_ERR; }
 
