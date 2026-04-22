@@ -301,12 +301,15 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
 - MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix: **fixes149** — file-backed diagnostic channel (`MacSurf Debug.log` on Desktop), heavy scroll-bar-click and URL-field instrumentation, defensive `SetPortWindowPort` at scroll-handler entry. Ships the crash back-trace we could never get from hardware without ADB-keyboard MacsBug. See "File-Backed Diagnostic Channel" below.
-- Predecessor: **fixes148** — `gap` and `row-gap` native parsing + `layout_flex.c` consumption (single-value fidelity). See "Native CSS3 Strategy" above and the "`row-gap` shares storage" entry in Known Gotchas.
+- Last shipped fix: **fixes152** — hotfix to actually wire `macsurf_debug_log_init()` into `main()`. **fixes149 shipped the log infrastructure but never called the init** — three rounds (fixes149, fixes150, fixes151) of instrumentation silently discarded because `g_log_open` stayed 0 and every `macsurf_debug_log_write*` short-circuited at the first-line gate. fixes152 also adds title-bar fallback messages on each init-failure branch (FindFolder / FSpCreate / FSMakeFSSpec / FSpOpenDF) so a second missed-init regression would surface in 30 seconds rather than three rounds. See "Regression Audit Checklist" below.
+- Predecessor: **fixes151** — `SelectWindow` after `ShowWindow` in `macos9_window_create` + `Draw1Control` on all four toolbar buttons in `update_button_states` + `MACSURF_HOME_URL` switched to `http://mac.mp.ls/simple.html`. Research-run conclusion that `ShowWindow` alone doesn't generate activateEvt under Carbon OS 9. Instrumentation planned to verify — silently didn't because fixes149's log channel was dead (see fixes152).
+- Earlier: **fixes150** — `url_field_active=true` at window creation, `TEActivate` unconditional in `macos9_window_create`, `Draw1Control` in `macos9_window_scroll_to`, `macos9_handle_activate` propagates window activation to all controls via `HiliteControl`/`Draw1Control`. Targeted two real bugs (URL bar unresponsive, scroll bars grey). Verification pending because log channel was dead.
+- Earlier: **fixes149** — file-backed diagnostic channel (`MacSurf Debug.log` on Desktop), heavy scroll-bar-click and URL-field instrumentation, defensive `SetPortWindowPort` at scroll-handler entry. **Shipped broken:** `macsurf_debug_log_init()` was never called from `main()`. Fixed in fixes152.
+- Earlier: **fixes148** — `gap` and `row-gap` native parsing + `layout_flex.c` consumption (single-value fidelity). See "Native CSS3 Strategy" above and the "`row-gap` shares storage" entry in Known Gotchas.
 - Older predecessor: **fixes147** — two commits in one zip:
   - **Commit A (scroll-bar click crash — partial, hypothesis addressed, real-hardware result pending):** Clicking anywhere in a scroll bar crashed on the G3 at `PowerPC illegal instruction at 00000008, LR=00000004` with CurApName `CodeWarrio...`. Hypothesis: the UPP macro override in [window.c](browser/netsurf/frontends/macos9/window.c) — `#define NewControlActionUPP(proc) ((ControlActionUPP)(proc))` — was passing a raw PPC function pointer where CarbonLib's `TrackControl` expects a MixedMode-compatible routine descriptor. Fix: drop the action UPP entirely. `TrackControl(ctrl, pt, NULL)` — no UPP dispatch. CDEF live-tracks the thumb; `GetControlValue` on return holds the final drag position. Arrow/page clicks scroll by one step per click based on the `ControlPartCode` the caller captured from `FindControl`. Trade-off: no auto-repeat on arrow-hold (keyboard arrows still repeat). **Verified in SheepShaver** (no crash on any scroll-bar click — vertical track, up/down arrows, page regions, thumb drag). **Real-hardware result still pending** — if G3/G4 still crashes, the UPP hypothesis was wrong and this joins the wheel crash in the "hardware-specific, needs MacsBug" bucket. See the new "UPP macro override on CarbonLib" entry in Known Gotchas regardless — it was a latent bug whether or not it was the crash root cause.
   - **Commit B (docs + probe strip):** Preserves the 2026-04-19 survey and MacTrove CSS samples. Strips the stale `sbar h=... vh=... max=...` one-shot probe from `macos9_window_update_extents` (its diagnostic purpose is closed — extents confirmed flowing correctly from `browser_window_get_extents`).
-  - Predecessors: fixes146 (shutdown ordering + update-handler hardening), fixes145 (probe removal), fixes144 (wne/disp probes), fixes143 (distinct-kinds probe), fixes142 (scroll-bar hardening + one-shot sbar probe), fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes150** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+  - Older predecessors: fixes146 (shutdown ordering + update-handler hardening), fixes145 (probe removal), fixes144 (wne/disp probes), fixes143 (distinct-kinds probe), fixes142 (scroll-bar hardening + one-shot sbar probe), fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes153** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
 
 **fixes146 outcomes (hardware-tested during fixes147 prep):**
 
@@ -335,6 +338,31 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
   - Every struct is `calloc`'d; every Pascal-string write is bounded; every Str255 local is written by set_pstring before Toolbox call.
   - fixes141 narrowed `WaitNextEvent` mask + whitelist guard at dispatch; fixes142 added `SetPortWindowPort` + `Draw1Control` to scroll-bar updates; fixes145 removed probe-SetWTitle Memory Manager pressure; fixes146 adds quitting-flag and null-before-DisposeWindow hardening; fixes147 removes the scroll_action UPP entirely (which was structurally malformed but probably not the wheel-crash path since wheel spin doesn't route through TrackControl). **None of these hardenings conclusively fixed the wheel crash — if it persists, the remaining hypothesis (Control Manager state corrupted somewhere we can't inspect) can only be confirmed with a MacsBug `wh` stack capture.** Next step: get ADB keyboard, reproduce, `wh`, `sc`, `ip`, `dm sp` — then we have a caller chain to fix.
 - **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
+
+## Regression Audit Checklist
+
+**New in fixes152 after the fixes149 missed-init regression.**
+
+Any new subsystem shipped as part of a fix round MUST, before the round is closed, satisfy all three:
+
+1. **Init call wired.** Grep the entrypoint (`main.c main()` for MacSurf) for the init function name. `grep -c macsurf_foo_init main.c` must return a non-zero count. If zero, the subsystem is linked but dead.
+2. **Smoke test confirming it runs.** Either a SheepShaver smoke launch (boot, relaunch, confirm the subsystem's externally-visible artefact — file, title-bar message, menu item — is present) or a hardware cycle. "Linux syntax check passes" is NOT a smoke test; syntax passes on code that is never executed.
+3. **Dependency documented.** Add a one-line entry under this section's table for new infrastructure:
+
+| Subsystem | Init function | Init call site | Externally-visible artefact at startup |
+|---|---|---|---|
+| File-backed diagnostic log | `macsurf_debug_log_init` | `main.c main()` after `FlushEvents` | `MacSurf Debug.log` on Desktop with `=== MacSurf startup ===` entry |
+| Open Transport | `InitOpenTransportInContext` | `main.c main()` after log init | `ot_initialized = true` (internal) |
+| NetSurf core | `netsurf_init` | `main.c main()` after OT init | Window shows with content pipeline live |
+| Carbon Appearance | `RegisterAppearanceClient` | `main.c main()` after `InitCursor` | Controls render with platinum theme, not classic |
+
+**Why this checklist exists.** fixes149 through fixes151 accumulated ~20 instrumentation lines across window.c / main.c / the handle functions. None of them wrote anything to the log file because `macsurf_debug_log_init` was never called. The bug was invisible because:
+- `macsurf_debug_log_write` short-circuits silently when `g_log_open == 0` — no stderr, no toolbox call, no stdout.
+- MacSurf Debug.log on the Desktop never appeared — but its absence wasn't flagged by any build step.
+- fixes149/150/151 all "landed" per git and per user test cycles, but produced zero log output.
+- A SheepShaver smoke test ("launch, quit, ls Desktop") would have caught it in 30 seconds of the first ship.
+
+**When reviewing / shipping a fix round:** if the round adds or touches a subsystem in the table above, verify the init path still fires. If the round adds a new subsystem, add an entry. Missed-init is the exact class of regression this table catches.
 
 ## File-Backed Diagnostic Channel
 

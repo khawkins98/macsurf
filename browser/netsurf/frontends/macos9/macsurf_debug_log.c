@@ -195,12 +195,18 @@ fmt_vformat(char *dst, int dst_size, const char *fmt, va_list ap)
  * Public API
  * ------------------------------------------------------------------ */
 
+/* Forward declaration so init can post failure status to the title
+ * bar when the file channel itself cannot be opened. Avoids a
+ * circular include via macsurf_debug.h. */
+extern void macsurf_debug_set_title(const char *msg);
+
 void
 macsurf_debug_log_init(void)
 {
 #ifdef __MACOS9__
 	FSSpec spec;
 	OSErr err;
+	OSErr cerr;
 	short vRefNum;
 	long dirID;
 	unsigned char fname[32];
@@ -209,9 +215,15 @@ macsurf_debug_log_init(void)
 
 	if (g_log_open) return;
 
+	vRefNum = 0;
+	dirID = 0;
+
 	err = FindFolder(kOnSystemDisk, kDesktopFolderType,
 			kDontCreateFolder, &vRefNum, &dirID);
-	if (err != noErr) return;
+	if (err != noErr) {
+		macsurf_debug_set_title("log init: FindFolder fail");
+		return;
+	}
 
 	name = "MacSurf Debug.log";
 	nlen = strlen(name);
@@ -221,13 +233,21 @@ macsurf_debug_log_init(void)
 
 	err = FSMakeFSSpec(vRefNum, dirID, fname, &spec);
 	if (err == fnfErr) {
-		(void)FSpCreate(&spec, 'ttxt', 'TEXT', smSystemScript);
+		cerr = FSpCreate(&spec, 'ttxt', 'TEXT', smSystemScript);
+		if (cerr != noErr) {
+			macsurf_debug_set_title("log init: FSpCreate fail");
+			return;
+		}
 		err = FSMakeFSSpec(vRefNum, dirID, fname, &spec);
 	}
-	if (err != noErr) return;
+	if (err != noErr) {
+		macsurf_debug_set_title("log init: FSMakeFSSpec fail");
+		return;
+	}
 
 	if (FSpOpenDF(&spec, fsRdWrPerm, &g_log_ref) != noErr) {
 		g_log_ref = 0;
+		macsurf_debug_set_title("log init: FSpOpenDF fail");
 		return;
 	}
 
@@ -237,6 +257,9 @@ macsurf_debug_log_init(void)
 	(void)SetFPos(g_log_ref, fsFromLEOF, 0);
 
 	macsurf_debug_log_write("---- macsurf_debug_log_init ----");
+	macsurf_debug_log_writef("log init OK vref=%d dirID=%ld fsref=%d",
+		(int)vRefNum, (long)dirID, (int)g_log_ref);
+	macsurf_debug_set_title("log OK");
 #endif
 }
 
