@@ -1551,8 +1551,20 @@ bool html_redraw_box(const html_content *html, struct box *box,
 		if (r.y0 < clip->y0) r.y0 = clip->y0;
 		if (clip->x1 < r.x1) r.x1 = clip->x1;
 		if (clip->y1 < r.y1) r.y1 = clip->y1;
-		/* no point trying to draw 0-width/height boxes */
-		if (r.x0 == r.x1 || r.y0 == r.y1)
+		/* fixes158 -- no point trying to draw 0-width/height OR inverted
+		 * boxes. Previous check was r.x0 == r.x1 || r.y0 == r.y1 which
+		 * only caught zero-sized intersections. When the box sits entirely
+		 * above the clip (descendants all ABOVE clip.y0), the intersection
+		 * produces r.y0 = clip.y0 and r.y1 = box_bottom < clip.y0, i.e.
+		 * an inverted rect. The == check missed this, the walker set an
+		 * empty clipRgn via plot_clip, recursed into children with the
+		 * inverted rect as their clip, and each child's intersection
+		 * cascaded into more inverted clips. Eventually the walker's
+		 * ctx->plot->clip failed somewhere and propagated false back up,
+		 * aborting body's children loop after 3 visits. Signature in log:
+		 * visits=3 block=3 plot_text=0 at any offset below the first
+		 * viewport. The >= check catches both zero-sized and inverted. */
+		if (r.x0 >= r.x1 || r.y0 >= r.y1)
 			/* not an error */
 			return ((!ctx->plot->group_end) ||
 				(ctx->plot->group_end(ctx) == NSERROR_OK));
