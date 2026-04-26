@@ -18,7 +18,7 @@ typedef struct hubbub_entity_node {
 	uint32_t value;	/**< Data for this node */
 } hubbub_entity_node;
 
-#include "entities.inc"
+#include <entities.inc>
 
 /**
  * Step-wise search for a key in our entity tree
