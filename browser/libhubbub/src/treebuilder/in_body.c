@@ -265,7 +265,7 @@ hubbub_error process_start_tag(hubbub_treebuilder *treebuilder,
 	} else if (type == ADDRESS || type == ARTICLE || type == ASIDE ||
 			type == BLOCKQUOTE || type == CENTER ||
 			type == DATAGRID || type == DETAILS ||
-			type == DIALOG || type == DIR ||
+			type == DIALOG || type == HUBBUB_DIR ||
 			type == DIV || type == DL || type == FIELDSET ||
 			type == FIGCAPTION || type == FIGURE ||
 			type == FOOTER || type == HEADER || type == MAIN ||
@@ -432,7 +432,7 @@ hubbub_error process_end_tag(hubbub_treebuilder *treebuilder,
 		err = process_0body_in_body(treebuilder);
 	} else if (type == ADDRESS || type == ARTICLE || type == ASIDE ||
 			type == BLOCKQUOTE || type == CENTER ||
-			type == DETAILS || type == DIALOG || type == DIR ||
+			type == DETAILS || type == DIALOG || type == HUBBUB_DIR ||
 			type == DATAGRID || type == DIV || type == DL ||
 			type == FIELDSET || type == FIGCAPTION ||
 			type == FIGURE || type == FOOTER || type == HEADER ||

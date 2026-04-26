@@ -192,7 +192,7 @@ static const struct element_type_map wordlist[] =
 #line 74 "browser/libhubbub/src/treebuilder/element-type.gperf"
     {"hr",                  HR},
 #line 52 "browser/libhubbub/src/treebuilder/element-type.gperf"
-    {"dir",                 DIR},
+    {"dir",                 HUBBUB_DIR},
 #line 123 "browser/libhubbub/src/treebuilder/element-type.gperf"
     {"tfoot",               TFOOT},
 #line 97 "browser/libhubbub/src/treebuilder/element-type.gperf"
