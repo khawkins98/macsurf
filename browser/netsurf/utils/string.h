@@ -49,6 +49,9 @@ void *memset(void *s, int c, unsigned long n);
 void *memcpy(void *dst, const void *src, unsigned long n);
 void *memmove(void *dst, const void *src, unsigned long n);
 int   memcmp(const void *s1, const void *s2, unsigned long n);
+char *strtok(char *str, const char *delim);
+char *strpbrk(const char *s, const char *accept);
+char *strsep(char **stringp, const char *delim);
 #endif
 #endif
 

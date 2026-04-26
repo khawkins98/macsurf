@@ -60,6 +60,11 @@
 #endif
 
 #define NETSURF_LOG_H
+
+/* NSLOG stub — blocks log.h above but files still call NSLOG().
+ * GCC-style named variadic macro: accepted by CW8 as an extension. */
+#define NSLOG(cat, level, logmsg, args...) do {} while(0)
+
 #ifdef __MWERKS__
 #include <stat.h>
 #include <fcntl.h>
