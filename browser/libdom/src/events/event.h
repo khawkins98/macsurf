@@ -14,8 +14,6 @@
 #include <dom/events/event_target.h>
 #include <dom/events/event.h>
 
-#include "utils/list.h"
-
 /* The private virtual table */
 struct dom_event_private_vtable {
 	void (*destroy)(dom_event *evt);
