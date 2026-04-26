@@ -61,9 +61,10 @@
 
 #define NETSURF_LOG_H
 
-/* NSLOG stub — blocks log.h above but files still call NSLOG().
- * GCC-style named variadic macro: accepted by CW8 as an extension. */
-#define NSLOG(cat, level, logmsg, args...) do {} while(0)
+/* NSLOG stub for CW8 C89: no variadic macros. Fixed 3-param macro;
+ * CW8 discards extra args silently. cat/level tokens are never
+ * substituted into the body so they need not be declared. */
+#define NSLOG(cat, level, fmt) do {} while(0)
 
 #ifdef __MWERKS__
 #include <stat.h>
