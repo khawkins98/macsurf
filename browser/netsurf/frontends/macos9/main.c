@@ -210,25 +210,16 @@ int main(void) {
 		macos9_table.fetch = &macos9_fetch_table;
 	}
 	MS_LOG("table set");
-	{
-		nserror nrr = netsurf_register(&macos9_table);
-		if (nrr != NSERROR_OK) {
-			MS_LOG("netsurf_register FAILED");
-			return 1;
-		}
-	}
-	MS_LOG("register ok");
+	netsurf_register(&macos9_table);
+	MS_LOG("register done");
 	nsoption_init(NULL, NULL, NULL);
-	MS_LOG("nsoption_init ok");
-	{
-		nserror nri = netsurf_init(NULL);
-		if (nri != NSERROR_OK) { MS_LOG("netsurf_init FAILED"); return 1; }
-	}
-	MS_LOG("netsurf_init ok");
+	MS_LOG("nsoption done");
+	netsurf_init(NULL);
+	MS_LOG("netsurf_init done");
 	{ extern nserror macos9_http_fetcher_register(void); macos9_http_fetcher_register(); }
-	MS_LOG("http_fetcher_register ok");
+	MS_LOG("fetcher_register done");
 	macos9_create_initial_window();
-	MS_LOG("initial_window ok");
+	MS_LOG("initial_window done");
 	while (!macos9_done) macos9_poll();
 	macos9_quitting = (bool)1; netsurf_exit();
 	if (macos9_ot_context) CloseOpenTransportInContext(macos9_ot_context);
