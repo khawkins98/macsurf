@@ -69,6 +69,14 @@
  * GCC-varargs NSLOG).  Provide the typedef log.c needs so it can compile. */
 typedef bool(nslog_ensure_t)(FILE *fptr);
 
+/* nsoption.c / options.h expect these to be defined. */
+#ifndef NETSURF_BUILTIN_LOG_FILTER
+#define NETSURF_BUILTIN_LOG_FILTER NULL
+#endif
+#ifndef NETSURF_BUILTIN_VERBOSE_FILTER
+#define NETSURF_BUILTIN_VERBOSE_FILTER NULL
+#endif
+
 #ifdef __MWERKS__
 #include <stat.h>
 #include <fcntl.h>

@@ -45,92 +45,48 @@
  * Plot style for heading font.
  */
 static plot_font_style_t pi__heading[PAGE_STATE__COUNT] = {
-	[PAGE_STATE_UNKNOWN] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_INTERNAL] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_LOCAL] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_INSECURE] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_SECURE_OVERRIDE] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_SECURE_ISSUES] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
-	[PAGE_STATE_SECURE] = {
-		.family = PLOT_FONT_FAMILY_SANS_SERIF,
-		.size = 14 * PLOT_STYLE_SCALE,
-		.flags = FONTF_NONE,
-		.weight = 400,
-	},
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 },
+	{ NULL, PLOT_FONT_FAMILY_SANS_SERIF, 14 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0 }
 };
 
 /**
  * Plot style for domain font.
  */
 static plot_font_style_t pi__domain = {
-	.family = PLOT_FONT_FAMILY_SANS_SERIF,
-	.size = 8 * PLOT_STYLE_SCALE,
-	.flags = FONTF_NONE,
-	.weight = 700,
+	NULL, PLOT_FONT_FAMILY_SANS_SERIF, 8 * PLOT_STYLE_SCALE, 700, FONTF_NONE, 0, 0
 };
 
 /**
  * Plot style for item font.
  */
 static plot_font_style_t pi__item = {
-	.family = PLOT_FONT_FAMILY_SANS_SERIF,
-	.size = 11 * PLOT_STYLE_SCALE,
-	.flags = FONTF_NONE,
-	.weight = 400,
+	NULL, PLOT_FONT_FAMILY_SANS_SERIF, 11 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0
 };
 
 /**
  * Plot style for item detail font.
  */
 static plot_font_style_t pi__item_detail = {
-	.family = PLOT_FONT_FAMILY_SANS_SERIF,
-	.size = 11 * PLOT_STYLE_SCALE,
-	.flags = FONTF_NONE,
-	.weight = 400,
+	NULL, PLOT_FONT_FAMILY_SANS_SERIF, 11 * PLOT_STYLE_SCALE, 400, FONTF_NONE, 0, 0
 };
 
 /**
  * Plot style for window background.
  */
 static plot_style_t pi__bg = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0, 0, 0
 };
 
 /**
  * Plot style for hover background.
  */
 static plot_style_t pi__hover = {
-	.fill_type = PLOT_OP_TYPE_SOLID,
+	PLOT_OP_TYPE_NONE, 0, 0, PLOT_OP_TYPE_SOLID, 0, 0, 0
 };
 
 /**
@@ -168,19 +124,18 @@ enum pi_entry {
 };
 
 /**
+ * List of page info entry types.
+ */
+enum page_info_entry_type {
+	PAGE_INFO_ENTRY_TYPE_TEXT,
+	PAGE_INFO_ENTRY_TYPE_ITEM,
+};
+
+/**
  * An entry on a page info window.
  */
 struct page_info_entry {
-	/**
-	 * List of page info entry types.
-	 */
-	enum page_info_entry_type {
-		PAGE_INFO_ENTRY_TYPE_TEXT,
-		PAGE_INFO_ENTRY_TYPE_ITEM,
-	} type;
-	/**
-	 * Type-specific page info entry data.
-	 */
+	enum page_info_entry_type type;
 	union {
 		struct page_info_text text;
 		struct page_info_item item;
@@ -189,48 +144,9 @@ struct page_info_entry {
 
 /**
  * The default page info window data.
+ * Non-zero fields and pointer fields are set at runtime in page_info_init().
  */
-struct page_info_entry pi__entries[PI_ENTRY__COUNT] = {
-	[PI_ENTRY_HEADER] = {
-		.type = PAGE_INFO_ENTRY_TYPE_TEXT,
-	},
-	[PI_ENTRY_DOMAIN] = {
-		.type = PAGE_INFO_ENTRY_TYPE_TEXT,
-		.u = {
-			.text = {
-				.style = &pi__domain,
-			},
-		},
-	},
-	[PI_ENTRY_CERT] = {
-		.type = PAGE_INFO_ENTRY_TYPE_ITEM,
-		.u = {
-			.item = {
-				.item = {
-					.style = &pi__item,
-				},
-				.detail = {
-					.style = &pi__item_detail,
-				},
-				.hover_bg = &pi__hover,
-			},
-		},
-	},
-	[PI_ENTRY_COOKIES] = {
-		.type = PAGE_INFO_ENTRY_TYPE_ITEM,
-		.u = {
-			.item = {
-				.item = {
-					.style = &pi__item,
-				},
-				.detail = {
-					.style = &pi__item_detail,
-				},
-				.hover_bg = &pi__hover,
-			},
-		},
-	},
-};
+struct page_info_entry pi__entries[PI_ENTRY__COUNT];
 
 /**
  * The page info window structure.
@@ -257,6 +173,18 @@ struct page_info {
 /* Exported interface documented in desktop/page_info.h */
 nserror page_info_init(void)
 {
+	pi__entries[PI_ENTRY_HEADER].type = PAGE_INFO_ENTRY_TYPE_TEXT;
+	pi__entries[PI_ENTRY_DOMAIN].type = PAGE_INFO_ENTRY_TYPE_TEXT;
+	pi__entries[PI_ENTRY_DOMAIN].u.text.style = &pi__domain;
+	pi__entries[PI_ENTRY_CERT].type = PAGE_INFO_ENTRY_TYPE_ITEM;
+	pi__entries[PI_ENTRY_CERT].u.item.item.style = &pi__item;
+	pi__entries[PI_ENTRY_CERT].u.item.detail.style = &pi__item_detail;
+	pi__entries[PI_ENTRY_CERT].u.item.hover_bg = &pi__hover;
+	pi__entries[PI_ENTRY_COOKIES].type = PAGE_INFO_ENTRY_TYPE_ITEM;
+	pi__entries[PI_ENTRY_COOKIES].u.item.item.style = &pi__item;
+	pi__entries[PI_ENTRY_COOKIES].u.item.detail.style = &pi__item_detail;
+	pi__entries[PI_ENTRY_COOKIES].u.item.hover_bg = &pi__hover;
+
 	pi__bg.fill_colour = nscolours[NSCOLOUR_WIN_EVEN_BG];
 	pi__hover.fill_colour = nscolours[NSCOLOUR_WIN_EVEN_BG_HOVER];
 
@@ -388,22 +316,22 @@ static nserror page_info__set_text(
 {
 	int printed;
 	static const char *header[PAGE_STATE__COUNT] = {
-		[PAGE_STATE_UNKNOWN]         = "Provenance unknown",
-		[PAGE_STATE_INTERNAL]        = "NetSurf data",
-		[PAGE_STATE_LOCAL]           = "Local data",
-		[PAGE_STATE_INSECURE]        = "Connection not secure",
-		[PAGE_STATE_SECURE_OVERRIDE] = "Connection not secure",
-		[PAGE_STATE_SECURE_ISSUES]   = "Connection not secure",
-		[PAGE_STATE_SECURE]          = "Connection is secure",
+		"Provenance unknown",
+		"NetSurf data",
+		"Local data",
+		"Connection not secure",
+		"Connection not secure",
+		"Connection not secure",
+		"Connection is secure"
 	};
 	static const char *certificate[PAGE_STATE__COUNT] = {
-		[PAGE_STATE_UNKNOWN]         = "Missing",
-		[PAGE_STATE_INTERNAL]        = "None",
-		[PAGE_STATE_LOCAL]           = "None",
-		[PAGE_STATE_INSECURE]        = "Not valid",
-		[PAGE_STATE_SECURE_OVERRIDE] = "Not valid",
-		[PAGE_STATE_SECURE_ISSUES]   = "Not valid",
-		[PAGE_STATE_SECURE]          = "Valid",
+		"Missing",
+		"None",
+		"None",
+		"Not valid",
+		"Not valid",
+		"Not valid",
+		"Valid"
 	};
 
 	assert(pi != NULL);
@@ -789,12 +717,11 @@ nserror page_info_mouse_action(
 				}
 			}
 			if (entry->u.item.hover != hovering) {
+				struct rect r;
 				int w, h;
-				struct rect r = {
-					.x0 = 0,
-					.y0 = cur_y,
-					.y1 = cur_y + height,
-				};
+				r.x0 = 0;
+				r.y0 = cur_y;
+				r.y1 = cur_y + height;
 				guit->corewindow->get_dimensions(pi->cw_h, &w, &h);
 				r.x1 = (pi->width > w) ? pi->width : w;
 
