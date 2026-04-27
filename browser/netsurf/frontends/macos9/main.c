@@ -191,9 +191,24 @@ int main(void) {
 	macsurf_debug_log_init();
 	MS_LOG("MacSurf Start");
 #ifdef __MACOS__
+	FlushEvents(everyEvent, 0);
 	InitCursor();
-	if (InitOpenTransportInContext(kInitOTForApplicationMask, &macos9_ot_context) != noErr) macos9_ot_context = NULL;
-	RegisterAppearanceClient();
+	MS_LOG("InitCursor done");
+	{
+		long appearResp;
+		if (Gestalt(gestaltAppearanceAttr, &appearResp) == noErr) {
+			RegisterAppearanceClient();
+			MS_LOG("Appearance registered");
+		} else {
+			MS_LOG("Appearance NOT present");
+		}
+	}
+	if (InitOpenTransport() != noErr) {
+		MS_LOG("InitOpenTransport FAIL");
+	} else {
+		MS_LOG("InitOpenTransport OK");
+	}
+	macos9_ot_context = NULL; /* plain OT path — no context */
 #endif
 	memset(&macos9_table, 0, sizeof(macos9_table));
 	macos9_table.window = macos9_window_table;
@@ -222,6 +237,8 @@ int main(void) {
 	MS_LOG("initial_window done");
 	while (!macos9_done) macos9_poll();
 	macos9_quitting = (bool)1; netsurf_exit();
-	if (macos9_ot_context) CloseOpenTransportInContext(macos9_ot_context);
+#ifdef __MACOS__
+	CloseOpenTransport();
+#endif
 	return 0;
 }
