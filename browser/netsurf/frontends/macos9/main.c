@@ -203,12 +203,15 @@ int main(void) {
 			MS_LOG("Appearance NOT present");
 		}
 	}
-	if (InitOpenTransport() != noErr) {
-		MS_LOG("InitOpenTransport FAIL");
+#ifndef kInitOTForApplicationMask
+#define kInitOTForApplicationMask 0x00000002
+#endif
+	if (InitOpenTransportInContext(kInitOTForApplicationMask, &macos9_ot_context) != noErr) {
+		MS_LOG("InitOT FAIL");
+		macos9_ot_context = NULL;
 	} else {
-		MS_LOG("InitOpenTransport OK");
+		MS_LOG("InitOT OK");
 	}
-	macos9_ot_context = NULL; /* plain OT path — no context */
 #endif
 	memset(&macos9_table, 0, sizeof(macos9_table));
 	macos9_table.window = macos9_window_table;
@@ -238,7 +241,7 @@ int main(void) {
 	while (!macos9_done) macos9_poll();
 	macos9_quitting = (bool)1; netsurf_exit();
 #ifdef __MACOS__
-	CloseOpenTransport();
+	if (macos9_ot_context) CloseOpenTransportInContext(macos9_ot_context);
 #endif
 	return 0;
 }
