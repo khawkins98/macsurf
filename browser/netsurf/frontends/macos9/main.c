@@ -206,9 +206,17 @@ int main(void) {
 	macos9_table.clipboard = macos9_clipboard_table;
 	{
 		extern struct gui_llcache_table *null_llcache_table;
+		extern struct gui_fetch_table macos9_fetch_table;
 		macos9_table.llcache = null_llcache_table;
+		macos9_table.fetch = &macos9_fetch_table;
 	}
-	netsurf_register(&macos9_table);
+	{
+		nserror nrr = netsurf_register(&macos9_table);
+		if (nrr != NSERROR_OK) {
+			MS_LOG("netsurf_register FAILED");
+			return 1;
+		}
+	}
 	nsoption_init(NULL, NULL, NULL);
 	netsurf_init(NULL);
 	{ extern nserror macos9_http_fetcher_register(void); macos9_http_fetcher_register(); }
