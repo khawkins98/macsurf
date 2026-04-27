@@ -158,7 +158,8 @@ int mkdir(const char *path, unsigned long mode) {
 	(void)path; (void)mode;
 	return -1;
 }
-int stat(const char *path, void *buf) {
+struct stat;
+int stat(const char *path, struct stat *buf) {
 	(void)path; (void)buf;
 	return -1; /* always "doesn't exist" */
 }
