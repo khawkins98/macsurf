@@ -42,6 +42,25 @@ struct rect;
 	#define __INTERNETCONFIG__
 	#endif
 
+	/* MacWindows.h (via LowMem.h→Carbon.h) uses AliasHandle before Aliases.h
+	 * has been processed. Pre-declare the minimal types and suppress the full
+	 * Aliases.h inclusion — MacSurf does not use the Alias Manager. */
+	#ifndef __ALIASES__
+	#define __ALIASES__
+	struct AliasRecord;
+	typedef struct AliasRecord *AliasPtr;
+	typedef AliasPtr *AliasHandle;
+	#endif
+	/* MacSurf does not use the Keychain — suppress to avoid its C++ headers. */
+	#ifndef __KEYCHAINCORE__
+	#define __KEYCHAINCORE__
+	#endif
+	/* ATSLayoutTypes.h uses C11 anonymous struct/union members which CW8 rejects.
+	 * MacSurf uses QuickDraw, not ATS text layout. */
+	#ifndef __ATSLayoutTypes__
+	#define __ATSLayoutTypes__
+	#endif
+
 	#include <Carbon.h>
 	#include <Quickdraw.h>
 	#include <TextEdit.h>
