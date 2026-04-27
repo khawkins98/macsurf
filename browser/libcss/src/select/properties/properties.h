@@ -8,6 +8,12 @@
 #ifndef css_select_properties_h_
 #define css_select_properties_h_
 
+/* Defensive: empty out _ALIGNED so CW8 doesn't emit a duplicate symbol
+ * per TU if any header still has `} _ALIGNED;` at a struct close. */
+#ifndef _ALIGNED
+#define _ALIGNED
+#endif
+
 #include <libcss/errors.h>
 #include <libcss/computed.h>
 

@@ -8,6 +8,13 @@
 #ifndef css_css__parse_properties_utils_h_
 #define css_css__parse_properties_utils_h_
 
+/* Defensive: if any header still tags a struct close with `} _ALIGNED;`,
+ * make the token harmless so CW8 doesn't read it as a global variable
+ * and emit a duplicate _ALIGNED symbol per TU. */
+#ifndef _ALIGNED
+#define _ALIGNED
+#endif
+
 #include "parse/language.h"
 
 static inline bool is_css_inherit(css_language *c, const css_token *token)
