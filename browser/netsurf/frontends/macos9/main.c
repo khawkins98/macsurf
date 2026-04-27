@@ -188,9 +188,8 @@ void macos9_poll(void) {
 }
 
 int main(void) {
-#ifdef MACSURF_DEBUG
-	macsurf_debug_log_init(); MS_LOG("MacSurf Start");
-#endif
+	macsurf_debug_log_init();
+	MS_LOG("MacSurf Start");
 #ifdef __MACOS__
 	InitCursor();
 	if (InitOpenTransportInContext(kInitOTForApplicationMask, &macos9_ot_context) != noErr) macos9_ot_context = NULL;
@@ -210,6 +209,7 @@ int main(void) {
 		macos9_table.llcache = null_llcache_table;
 		macos9_table.fetch = &macos9_fetch_table;
 	}
+	MS_LOG("table set");
 	{
 		nserror nrr = netsurf_register(&macos9_table);
 		if (nrr != NSERROR_OK) {
@@ -217,10 +217,18 @@ int main(void) {
 			return 1;
 		}
 	}
+	MS_LOG("register ok");
 	nsoption_init(NULL, NULL, NULL);
-	netsurf_init(NULL);
+	MS_LOG("nsoption_init ok");
+	{
+		nserror nri = netsurf_init(NULL);
+		if (nri != NSERROR_OK) { MS_LOG("netsurf_init FAILED"); return 1; }
+	}
+	MS_LOG("netsurf_init ok");
 	{ extern nserror macos9_http_fetcher_register(void); macos9_http_fetcher_register(); }
+	MS_LOG("http_fetcher_register ok");
 	macos9_create_initial_window();
+	MS_LOG("initial_window ok");
 	while (!macos9_done) macos9_poll();
 	macos9_quitting = (bool)1; netsurf_exit();
 	if (macos9_ot_context) CloseOpenTransportInContext(macos9_ot_context);
