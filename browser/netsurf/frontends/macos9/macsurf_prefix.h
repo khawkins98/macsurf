@@ -98,4 +98,13 @@ typedef bool(nslog_ensure_t)(FILE *fptr);
 #define NO_IPV6 1
 #define PATH_MAX 256
 
+/* libcss stylesheet.h once tagged a struct close with `} _ALIGNED;`.
+ * If any header is still found with that token undefined, CW8 reads
+ * it as a global variable declaration and every TU emits a duplicate
+ * symbol at link time. Define _ALIGNED as empty so the token is
+ * harmless wherever it appears. */
+#ifndef _ALIGNED
+#define _ALIGNED
+#endif
+
 #endif /* MACSURF_PREFIX_H */
