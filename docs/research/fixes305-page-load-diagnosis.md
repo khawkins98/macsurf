@@ -1,268 +1,212 @@
-# fixes305 — page-load diagnosis (no code changes)
+# fixes305 — page-load diagnosis (markdown only)
 
-Round purpose: diagnostic only. Reconcile documentation gap, verify the
-file-backed log channel is wired, then have the user run a test cycle
-on hardware and read the log. Code changes are deferred to fixes306.
+Round purpose: diagnostic. Reconcile docs gap between CLAUDE.md and the
+fixes260–304 sprint handoff, verify the file-backed log channel is
+wired, inventory the MS_LOG checkpoints actually present in source,
+and lock a decision tree that maps the last log line in
+`MacSurf Debug.log` to a fixes306 scope.
 
-Last shipped (per handoff): **fixes304** — wired `macos9_schedule_run()`
-into `macos9_poll`. Untested by user.
+No code shipped this round.
+
+Last shipped (per git): **fixes304** — wires `macos9_schedule_run()`
+into `macos9_poll()`. Untested by the user. fixes305 explicitly does
+**not** assume fixes304 was the right fix.
 
 ---
 
-## 1. CLAUDE.md vs. fixes260–304 handoff — reconciliation
+## 1. CLAUDE.md vs. handoff — reconciliation
 
-CLAUDE.md "Last shipped fix" line still says **fixes266**.
-Actual last shipped fix is **fixes304** (45-fix gap: fixes267–304 are
-not represented in the project doc).
+CLAUDE.md "Last shipped fix" line says **fixes266**. Git says **fixes304**.
+Documentation gap is 38 fixes wide. Edits queued for fixes306+ (after
+the page-load loop is closed); fixes305 does not touch CLAUDE.md so
+that, if the load failure exposes a regression, we don't have to
+revert documentation.
 
-The CLAUDE.md "Build State" section still describes the v0.3 native CSS
-custom-property milestone with MacTrove rendering — that history is
-correct as a v0.3 description, but does not capture that the project
-has since gone through:
+Concrete deltas the handoff records that CLAUDE.md does not yet reflect:
 
-- A massive Carbon.h `#include` chain pruning campaign (fixes260–269).
-- The libcss `_ALIGNED` keyword cascade and 20+ headers gaining
-  defensive `#define _ALIGNED` (fixes271–277).
-- Wholesale replacement of `*_stub.c` files with real ports
-  (fixes278–286). MacSurf.mcp's project file list changed materially
-  in this phase — see handoff §"Project file list changes during the
-  sprint."
-- Discovery and fix of the **MSL Console shadow bug** (fixes298) which
-  was the actual "main never enters" root cause across the run-to-Play
-  sessions in fixes294–296.
-- `'carb'` resource regression: `MacSurf.rsrc` (binary) silently fails
-  through CW8's File Mappings (which routes `.rsrc` extension to the
-  Rez compiler). Real fix is `MacSurf.r` + `Types.r` Rez sources
-  (fixes297). CLAUDE.md's "Carbon App Requirements" still describes
-  the binary-`.rsrc` path as canonical.
-- Discovery that `InitOpenTransport()` is **not exported** by this
-  CarbonLib build, contradicting CLAUDE.md "Open Transport Rules" which
-  recommend the plain (non-`InContext`) variants. Current code uses
-  `InitOpenTransportInContext` with manual `#define
-  kInitOTForApplicationMask 0x00000002` (fixes289–291).
-- `macos9_schedule_run()` wiring into the event-loop poll (fixes304),
-  which CLAUDE.md does not mention as a hard requirement for fetcher
-  callbacks to drain.
+| Topic | CLAUDE.md state | Actual state |
+|---|---|---|
+| Last shipped fix | fixes266 | fixes304 |
+| `'carb'` resource source | "binary `MacSurf.rsrc`" | Rez sources `MacSurf.r` + `Types.r`. Binary `.rsrc` silently fails through CW8 File Mappings (extension routes to Rez compiler). Fixed fixes297. |
+| Open Transport entry point | "plain `InitOpenTransport()`" | `InitOpenTransportInContext` with manual `#define kInitOTForApplicationMask 0x00000002`. Plain variant is **not exported** by this CarbonLib build. Fixed fixes289–291. |
+| MSL Carbon stdio | (not documented) | `MSL_All_Carbon.Lib` provides `InstallConsole` / `RemoveConsole` / `Read/WriteCharsToConsole` / `strdup` / `strcasecmp` / `strncasecmp` / `mkdir` / `stat`. Stubbing them silently corrupts FILE* table init and crashes before `main()`. Discovered fixes298 — root cause of the "main never runs" mystery in fixes294–296. |
+| Schedule runner | (not documented as mandatory) | `macos9_schedule_run()` MUST be called every event-loop tick or fetcher_poll self-schedules but never drains. Wired in fixes304. |
+| libcss `_ALIGNED` cascade | (not documented) | `_ALIGNED` was used as a struct-close tag in `stylesheet.h` but never defined as a macro; CW8 read it as a global → multi-link conflict. Defensive `#define _ALIGNED` empty in 20+ headers. Fixed fixes271–277. |
+| Project file list | "470 .c files / 443 in MacSurf.mcp" | Materially churned in fixes278–286 — most `*_stub.c` and `dt_*.c` removed, real ports added. Authoritative list lives in `MacSurf.mcp` on the Mac side, not in CLAUDE.md. |
 
-Documentation update is queued for fixes306+ once page-load behavior
-is confirmed. **Do not update CLAUDE.md inside fixes305**; the round is
-diagnostic and shouldn't ship a new doc state we then have to revert
-if the load failure exposes a regression.
-
-Concrete CLAUDE.md edits queued for after fixes306 closes:
-
-1. "Last shipped fix" → fixes306 (or whatever closes the loop).
-2. "Carbon App Requirements" — replace "compile binary `.rsrc`" with
-   "ship `MacSurf.r` + `Types.r` Rez sources, do not add binary
-   `.rsrc` files because CW8 File Mappings routes `.rsrc` to Rez."
-3. "Open Transport Rules" — annotate "plain OT calls" as the
-   architectural intent, but document that this CarbonLib only exports
-   `*InContext` variants, so current code uses InContext + the
-   `kInitOTForApplicationMask 0x00000002` manual define.
-4. New "Don't shadow MSL" gotcha — `InstallConsole`, `RemoveConsole`,
-   `Read/WriteCharsToConsole`, `strdup`, `strcasecmp`, `strncasecmp`,
-   `mkdir`, `stat` are provided by `MSL_All_Carbon.Lib`. Stubbing them
-   silently corrupts `FILE*` table init and crashes before `main()`.
-5. New "Schedule runner is mandatory" gotcha — `macos9_schedule_run()`
-   must be called every event-loop tick. Without it, fetcher_poll
-   self-schedules but never drains.
-6. Build state section — bump v0.3 description to note the post-sprint
-   state (libcss/libdom/libhubbub/libparserutils real ports in
-   MacSurf.mcp; many `*_stub.c` removed; MSL_All_Carbon shadowing rule
-   in effect).
+These are the edits that fixes306+ should apply once the page-load
+loop is closed. **Not applied this round.**
 
 ## 2. File-backed log channel — verification
 
-Per the Regression Audit Checklist in CLAUDE.md, every shipped
-subsystem must satisfy three things: init wired, smoke confirmed,
-documented dependency. Verifying the log channel against this rule:
+CLAUDE.md's Regression Audit Checklist requires three things for any
+shipped subsystem: init wired, smoke confirmed, dependency documented.
+Verifying the log channel:
 
 | Requirement | Status |
 |---|---|
-| `macsurf_debug_log_init()` symbol exists | ✓ [macsurf_debug_log.c:206](../../browser/netsurf/frontends/macos9/macsurf_debug_log.c#L206) |
-| Init call wired into `main()` | ✓ [main.c:191](../../browser/netsurf/frontends/macos9/main.c#L191) — first executable line in `main()`, before any other init |
-| `MS_LOG` macro wired through to log file | ✓ macsurf_debug.h forwards to `macsurf_debug_log_write*` |
-| Init dependencies documented in CLAUDE.md | ✓ "Regression Audit Checklist" table includes the entry for "File-backed diagnostic log" |
+| `macsurf_debug_log_init` symbol exists | ✓ `macsurf_debug_log.c` |
+| Init call wired into `main()` | ✓ [main.c:191](../../browser/netsurf/frontends/macos9/main.c#L191) — first executable line of `main()` |
+| `MS_LOG` macro routes to log file | ✓ [macsurf_debug.c:190](../../browser/netsurf/frontends/macos9/macsurf_debug.c#L190) calls `macsurf_debug_log_write` |
+| Documented in CLAUDE.md | ✓ "Regression Audit Checklist" + "File-Backed Diagnostic Channel" sections |
 
-Conclusion: the channel **is** wired and should populate
-`MacSurf Debug.log` on the Desktop on every launch. No fixes305a hotfix
-needed.
+**Conclusion: log channel is wired. No fixes305a hotfix needed.** If
+the user launches the build and `MacSurf Debug.log` does **not**
+appear on the Desktop, three failure modes (in order):
 
-If the user runs a launch and the log file does **not** appear on the
-Desktop, the failure mode is one of:
+1. Crash before [main.c:191](../../browser/netsurf/frontends/macos9/main.c#L191) — i.e. CFM startup or MSL init aborts. This was the shape of the fixes294–298 "main never runs" mystery (MSL Console shadow). If it returns, suspect newly added stubs that shadow MSL.
+2. `FindFolder(kOnSystemDisk, kDesktopFolderType, ...)` failing — log init goes silently inert per the channel's design.
+3. `FSpCreate` failing — full / locked / read-only volume.
 
-- `FindFolder(kOnSystemDisk, kDesktopFolderType, ...)` returning an
-  error — log init silently inert (per CLAUDE.md's "File-Backed
-  Diagnostic Channel" section).
-- `FSpCreate` failing because the volume is full / locked / read-only.
-- Crash before `main.c:191` runs at all — i.e. CFM startup or MSL init
-  blowing up. This was the failure shape in fixes294–298 (the
-  MSL-Console shadow bug). If it returns, suspect newly added
-  stubs or new Console-touching code.
+## 3. MS_LOG checkpoint inventory (verified by `git grep`)
 
-## 3. Pipeline trace — what each MS_LOG entry means
+This is what currently writes to `MacSurf Debug.log`. Anything not
+listed here cannot appear in the log. Use this as the dictionary when
+reading the log file in §5.
 
-Current MS_LOG checkpoints in code (from `git grep MS_LOG`):
+### Startup (main.c)
 
-```
-main.c:192   "== MacSurf start =="            entry into main
-main.c:199   "InitOT FAIL"                    Open Transport init failure
-main.c:202   "InitOT OK"                      Open Transport ready
-main.c:205   "Appearance OK"                  RegisterAppearanceClient returned
-main.c:222   "netsurf_register done"          gui table registered
-main.c:224   "nsoption_init done"             options system live
-main.c:226   "netsurf_init done"              core init complete
-main.c:230   "http_fetcher registered"        http: scheme handler installed
-main.c:233   "initial window created"         first window up
-main.c:235   "event loop exited"              main loop returned
+| Line | Message | Meaning |
+|---|---|---|
+| [main.c:192](../../browser/netsurf/frontends/macos9/main.c#L192) | `== MacSurf start ==` | First line in `main()`, after log init |
+| [main.c:199](../../browser/netsurf/frontends/macos9/main.c#L199) | `InitOT FAIL` | `InitOpenTransportInContext` non-zero return |
+| [main.c:202](../../browser/netsurf/frontends/macos9/main.c#L202) | `InitOT OK` | OT ready |
+| [main.c:205](../../browser/netsurf/frontends/macos9/main.c#L205) | `Appearance OK` | `RegisterAppearanceClient` returned |
+| [main.c:222](../../browser/netsurf/frontends/macos9/main.c#L222) | `netsurf_register done` | gui table registered |
+| [main.c:224](../../browser/netsurf/frontends/macos9/main.c#L224) | `nsoption_init done` | options system live |
+| [main.c:226](../../browser/netsurf/frontends/macos9/main.c#L226) | `netsurf_init done` | core init complete |
+| [main.c:230](../../browser/netsurf/frontends/macos9/main.c#L230) | `http_fetcher registered` | http/https scheme handler installed |
+| [main.c:233](../../browser/netsurf/frontends/macos9/main.c#L233) | `initial window created` | first window up |
+| [main.c:235](../../browser/netsurf/frontends/macos9/main.c#L235) | `event loop exited` | main loop returned (clean Quit) |
 
-window.c:72  "navigate:"                      browser_window_navigate path entered
-window.c:73  <url string>                     URL being navigated to
-window.c:74  "nav: no g or empty u"           bailout: missing window or URL
-window.c:75  "nav: no bw"                     bailout: window has no browser_window yet
-window.c:79  "nav: nsurl_create FAIL"         URL parsing failed
-window.c:80  "nav: calling browser_window_navigate"  about to enter NetSurf
-window.c:83  "nav: done"                      browser_window_navigate returned
+### URL submit + navigate (window.c)
 
-window.c:88  "URL submit fired"               Return key in URL field captured
-window.c:89  "submit: no g or url_te"         bailout: missing TextEdit handle
-window.c:90  "submit: TEGetText null"         TextEdit returned no buffer
-window.c:91  "submit: empty"                  TextEdit buffer was zero-length
+| Line | Message | Meaning |
+|---|---|---|
+| [window.c:88](../../browser/netsurf/frontends/macos9/window.c#L88) | `URL submit fired` | Return key in URL field captured |
+| [window.c:89](../../browser/netsurf/frontends/macos9/window.c#L89) | `submit: no g or url_te` | TextEdit handle missing |
+| [window.c:90](../../browser/netsurf/frontends/macos9/window.c#L90) | `submit: TEGetText null` | TextEdit returned no buffer |
+| [window.c:91](../../browser/netsurf/frontends/macos9/window.c#L91) | `submit: empty` | TextEdit buffer was empty |
+| [window.c:72](../../browser/netsurf/frontends/macos9/window.c#L72) | `navigate:` | navigate path entered |
+| [window.c:73](../../browser/netsurf/frontends/macos9/window.c#L73) | `<url string>` | URL being navigated |
+| [window.c:74](../../browser/netsurf/frontends/macos9/window.c#L74) | `nav: no g or empty u` | bailout: missing window or URL |
+| [window.c:75](../../browser/netsurf/frontends/macos9/window.c#L75) | `nav: no bw` | bailout: window has no browser_window |
+| [window.c:79](../../browser/netsurf/frontends/macos9/window.c#L79) | `nav: nsurl_create FAIL` | URL parsing failed |
+| [window.c:80](../../browser/netsurf/frontends/macos9/window.c#L80) | `nav: calling browser_window_navigate` | about to enter NetSurf |
+| [window.c:83](../../browser/netsurf/frontends/macos9/window.c#L83) | `nav: done` | `browser_window_navigate` returned |
 
-macos9_http_fetcher.c:55  "mfs_open called"   http_setup → mfs_open transition
-macos9_http_fetcher.c:141 "http_setup called" fetcher_operation_table::setup invoked
-```
+### Fetcher (macos9_http_fetcher.c)
 
-## 4. What the user should do
+| Line | Message | Meaning |
+|---|---|---|
+| [macos9_http_fetcher.c:141](../../browser/netsurf/frontends/macos9/macos9_http_fetcher.c#L141) | `http_setup called` | `fetcher_operation_table::setup` invoked |
+| [macos9_http_fetcher.c:55](../../browser/netsurf/frontends/macos9/macos9_http_fetcher.c#L55) | `mfs_open called` | `mfs_open` (post-setup transition) |
 
-Single test cycle on hardware, exactly:
+### Plotter (plotters.c)
 
-1. Empty Desktop of any prior `MacSurf Debug.log` (so we can be sure the
-   log we read is from this run).
+| Line | Message | Meaning |
+|---|---|---|
+| [plotters.c:200](../../browser/netsurf/frontends/macos9/plotters.c#L200) | `plot_clip in=... content=... effective=...` | clip rect at draw time. Useful for the URL-field-overdraw hypothesis but noisy on real renders. |
+
+### Dead-code MS_LOGs (will not appear)
+
+These exist but are not on the live path:
+
+- `macos9_ns_fetcher.c` (`http start`, `http finished`) — file is partially dead. Its `macos9_http_fetcher_register` is never called from main.c (main.c calls `macos9_http_fetcher.c::macos9_http_fetcher_register` instead). `macos9_http_fetcher_active()` is the only function from `macos9_ns_fetcher.c` that's externally used.
+- `macos9_fetcher_stubs.c` (`stub setup`, `stub start`) — stub fetcher. If you see these, something is registering the stub for http/https or the user is fetching a non-http scheme.
+- `macos9_fetcher_stubs_crlf.c` and `macos9_http_fetcher_crlf.c` — `_crlf` duplicates. Per the handoff these were removed from `MacSurf.mcp`; the files remain on disk but the project does not link them. If their MS_LOGs ever appear, MacSurf.mcp has a regression.
+
+**fixes306 housekeeping:** the two `_crlf.c` files and the dead-register code in `macos9_ns_fetcher.c` are confusing on inspection. Worth a cleanup pass once page-load is unblocked.
+
+## 4. Test cycle the user runs
+
+Single, exact sequence:
+
+1. **Empty Desktop of any prior `MacSurf Debug.log`.** We need to be sure the log we read is from this run.
 2. Launch MacSurf.
 3. Wait for the window to appear.
-4. Click in the URL field, type `http://mac.mp.ls/simple.html`.
+4. Click in the URL field and type `http://mac.mp.ls/simple.html`.
 5. Press Return.
-6. Wait 30 seconds (let any OT timeout fire).
+6. Wait 30 seconds (let any OT timeout fire, give scheduled callbacks time to drain).
 7. Quit cleanly via File → Quit (or Cmd-Q if it works).
-8. Open `MacSurf Debug.log` in SimpleText. Send the entire contents back.
+8. Open `MacSurf Debug.log` in SimpleText. Send the entire contents.
 
-## 5. How to read the log (decision tree)
+If quit is not clean, send the log anyway — `event loop exited` will be missing but everything before it is durable (per fixes149's flush-after-write design).
 
-Find the **last MS_LOG line before the file ends**. That entry
-identifies the subsystem that owns the page-load break.
+## 5. Decision tree — last log line → fixes306 scope
 
-### Case A — log ends at startup (no `initial window created`)
+The diagnostic principle: **find the last MS_LOG line before the file ends.** That entry identifies the subsystem that broke. The case the log lands in locks the fixes306 scope.
 
-Init failure, not a page-load failure. Not the bug we're chasing —
-report and stop. Likely culprits if this happens:
+### Case A — log ends before `initial window created`
 
-- "InitOT FAIL" — `kInitOTForApplicationMask` mismatch or OT
-  not loadable at all under this CarbonLib version.
-- Missing entry between `netsurf_register done` and `nsoption_init done`
-  → nsoption init crashes, possibly because options.h vars aren't
-  initialized.
-- Missing entry between `netsurf_init done` and `http_fetcher
-  registered` → fetcher register crash.
+Init regression. Not the page-load bug. Possible breakpoints:
 
-### Case B — log ends at `initial window created` and never gains anything when user types
+- After `== MacSurf start ==`, before `InitOT OK` → OT init failure or crash. Suspect `kInitOTForApplicationMask` value.
+- After `Appearance OK`, before `netsurf_register done` → `netsurf_register(&macos9_table)` crash. Suspect a NULL slot in the table (fixes287/288 fixed two; could be a third).
+- After `netsurf_register done`, before `nsoption_init done` → `nsoption_init` crash. Default options init.
+- After `nsoption_init done`, before `netsurf_init done` → `netsurf_init` crash. Fetcher factory or content factory init.
+- After `netsurf_init done`, before `http_fetcher registered` → `macos9_http_fetcher_register` crash. lwc_intern or fetcher_add.
+- After `http_fetcher registered`, before `initial window created` → `macos9_window_create` crash. TextEdit handle / control creation.
 
-The keyboard input path doesn't reach the URL field. The user is typing
-but `URL submit fired` is never logged on Return.
+**fixes306 scope if Case A:** instrument the gap, then fix the broken init step. This is unrelated to fixes304 — schedule_run never runs because we never reach the loop.
 
-Suspects (in order of likelihood):
-- TextEdit field never activated for the initial window. CLAUDE.md
-  already documents this exact bug in "Current blockers — feature
-  gaps" as "URL field input fails on the initial window, works on
-  File → New Window." Hypothesis from 2026-04-18 survey: content
-  redraw during `browser_window_create` overdraws the URL rect while
-  TE is functional internally.
-- Workaround for the user's test cycle: try `File → New Window`, then
-  type URL there. If submit fires from the new window but not the
-  initial one, this is the same bug, not a regression.
+### Case B — `initial window created` is the last line, no `URL submit fired` after Return
 
-If the user's test bypasses this by using `File → New Window` and
-**still** sees no progress past `URL submit fired`, see Case C.
+Keyboard input doesn't reach the URL field. This is the **already-documented "URL field on initial window" bug** (CLAUDE.md "Current blockers"). 2026-04-18 survey hypothesis: content redraw during `browser_window_create` overdraws the URL rect while TE is functional internally.
 
-### Case C — `URL submit fired` logged, no `navigate:` follows
+**Workaround during the test cycle:** try `File → New Window`, click in that window's URL field, type, hit Return. If submit fires there but not on the initial window, this is the same bug, not a regression — Case B is confirmed and unrelated to fixes304.
 
-The submit handler bails before calling `macos9_window_navigate`.
-Probable cause: `submit: TEGetText null` or `submit: empty`. Both will
-appear in the log. The address bar is reading nothing — TextEdit handle
-state is bad. Different bug from "fetcher inert."
+**fixes306 scope if Case B:** dedicated probe round on the URL-rect overdraw. Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the hypothesis. Plotters.c already has the `plot_clip` MS_LOG infrastructure to extend.
 
-### Case D — `nav: calling browser_window_navigate` logged, no `nav: done`
+### Case C — `URL submit fired`, then `submit: TEGetText null` or `submit: empty`
 
-NetSurf entered `browser_window_navigate` and did not return. This
-means a synchronous crash or an infinite loop inside core. Compare
-against pre-sprint MacTrove behaviour: a fresh-window navigate should
-return promptly (the actual fetch is async via the scheduler).
+Address bar is reading nothing. TextEdit handle state is bad. Different bug from "fetcher inert."
 
-### Case E — `nav: done` logged, but **no** `http_setup called` ever appears
+**fixes306 scope if Case C:** TE handle lifecycle in `window.c` URL field setup. Check `g->url_te` is being initialized before the first submit.
 
-This is the fetcher-inert case fixes304 was supposed to fix.
+### Case D — `nav: calling browser_window_navigate`, no `nav: done`
 
-If fixes304 is in the build (line 185 of `main.c` reads
-`{ extern bool macos9_schedule_run(void); macos9_schedule_run(); }`)
-and the log still shows `nav: done` with no subsequent `http_setup
-called`, fixes304 did **not** fix the issue. Next steps in fixes306:
+NetSurf core entered `browser_window_navigate` and didn't return. Synchronous crash or infinite loop inside core.
 
-- Verify `macos9_misc_table.schedule == macos9_schedule` is taking
-  effect — log inside `macos9_schedule()` to confirm fetcher_poll is
-  being inserted. (Currently no instrumentation there.)
-- Verify the queue head's `time` isn't in the past relative to
-  `TickCount()` due to a sign / wraparound bug.
-- Verify `macos9_quitting` isn't getting set early — line 151 of
-  `schedule.c` short-circuits the runner if so.
+**fixes306 scope if Case D:** bisect inside `browser_window_navigate` with more MS_LOG. Hot suspects on this codebase: nsurl normalization, hlcache_handle_retrieve content-type lookup.
 
-### Case F — `http_setup called` and `mfs_open called` appear, but page never visibly renders
+### Case E — `nav: done`, no `http_setup called`
 
-The fetcher ran. The OT request was set up. We're past the bug fixes304
-addressed. Next instrumentation belongs inside `macos9_http_fetcher.c`
-at the OT result-handling path (`OTSnd` / `OTRcv` returns,
-`fetch_send_callback(FETCH_HEADER|FETCH_DATA|FETCH_FINISHED)` calls).
+This is the case fixes304 was supposed to fix. fetcher_poll wasn't running because `macos9_schedule_run()` wasn't being called from the event loop. fixes304 wires it at [main.c:185](../../browser/netsurf/frontends/macos9/main.c#L185).
 
-### Case G — fetcher pipeline completes, but render is wrong
+**If Case E persists, fixes304 was wrong or insufficient.** Investigation queue for fixes306:
 
-Out of scope for fixes305. Compare against
-`screenshots/v0.3-mactrove-fixes139.png` to confirm whether layout has
-regressed or whether something specific to `simple.html` is wrong.
+1. Confirm the binary actually has the fixes304 line. Grep the shipped main.c source on the Mac for `macos9_schedule_run`. If absent, the build didn't pick up the change.
+2. Add MS_LOG inside [schedule.c:96 `macos9_schedule()`](../../browser/netsurf/frontends/macos9/schedule.c#L96) to confirm fetcher_poll is being inserted into the queue at all.
+3. Add MS_LOG at the top of [schedule.c:141 `macos9_schedule_run()`](../../browser/netsurf/frontends/macos9/schedule.c#L141) to confirm the runner is firing every tick. Drop it before shipping — it'll be very noisy.
+4. Verify [misc.c:62](../../browser/netsurf/frontends/macos9/misc.c#L62) — `macos9_schedule` is in the right slot of `macos9_misc_table`. The handoff notes the cast on `macos9_gw_get_scroll` was masking a return-type mismatch (fixes296); same class of bug could apply here.
+5. Check `macos9_quitting` — [schedule.c:151](../../browser/netsurf/frontends/macos9/schedule.c#L151) short-circuits the runner if it's set. If something sets it during init, the runner is permanently inert.
 
-## 6. Files implicated by current evidence (pre-test)
+### Case F — `http_setup called` and `mfs_open called`, no visible page
 
-These are the files that own the most likely failure points. Listed so
-fixes306 can target them directly without re-discovering during the
-next round:
+Fetcher ran. OT request set up. Past the bug fixes304 addressed.
 
-- [main.c:175-188](../../browser/netsurf/frontends/macos9/main.c#L175-L188) — `macos9_poll`,
-  the schedule_run dispatch site.
-- [schedule.c:140-173](../../browser/netsurf/frontends/macos9/schedule.c#L140-L173) — `macos9_schedule_run` itself.
-- [misc.c:61-68](../../browser/netsurf/frontends/macos9/misc.c#L61-L68) — `macos9_misc_table` field order; if `schedule` is at the wrong slot, NetSurf calls the wrong function pointer.
-- [window.c:72-83](../../browser/netsurf/frontends/macos9/window.c#L72-L83) — navigate path.
-- [macos9_http_fetcher.c:55,141](../../browser/netsurf/frontends/macos9/macos9_http_fetcher.c) — fetcher entry points.
-- [macsurf_debug_log.c:206-275](../../browser/netsurf/frontends/macos9/macsurf_debug_log.c#L206) — log init (verified wired).
+**fixes306 scope if Case F:** new instrumentation in [macos9_http_fetcher.c](../../browser/netsurf/frontends/macos9/macos9_http_fetcher.c) at the OT result-handling path — `OTSnd` / `OTRcv` returns and `fetch_send_callback(FETCH_HEADER | FETCH_DATA | FETCH_FINISHED)` calls. Goal: confirm bytes leave the box, response arrives, callback fires.
 
-## 7. Recommended fixes306 scope (contingent on log)
+### Case G — pipeline completes, page renders but wrong
 
-Cannot be locked in until we read the log. The candidates by case:
+Out of scope for fixes305. Compare against `screenshots/v0.3-mactrove-fixes139.png`. Different bug class — layout / plotter regression rather than fetch inert.
 
-| Log stops at | fixes306 owner |
-|---|---|
-| Pre-`initial window created` | Init regression — fix where the chain breaks. |
-| `initial window created`, no submit fires | URL-field-on-initial-window bug (already documented). Probe `plot_clip`/`plot_rectangle` for URL-rect overdraws. |
-| `URL submit fired`, no `navigate:` | TextEdit handle / submit guard in `window.c`. |
-| `nav: calling browser_window_navigate`, no `nav: done` | NetSurf core hang or crash on nsurl. Bisect via more MS_LOG inside `browser_window_navigate`. |
-| `nav: done`, no `http_setup called` | fixes304 didn't fix; instrument `macos9_schedule` insertion path and verify queue draining. |
-| `http_setup called`, no `mfs_open called` | OT setup error — check `macos9_http_setup` return path. |
-| `mfs_open called`, blank page | OT recv path or fetch_send_callback wiring; new instrumentation in fetcher result path. |
+## 6. Files most likely implicated (pre-test)
 
-## 8. Hard rules respected this round
+For fixes306 to target without re-discovery:
 
-- No code shipped (markdown only).
-- No staleness theories. The user's build is what they say it is.
-- Init wiring verified before recommending instrumentation. Per the
-  Regression Audit Checklist, the file-backed log was confirmed wired
-  by `grep -c macsurf_debug_log_init main.c` returning ≥1 (it returns
-  1, at line 191).
-- The diagnosis explicitly does not assume fixes304 was correct.
-  Cases E and F above are written to confirm or refute it.
+- [main.c:175-187](../../browser/netsurf/frontends/macos9/main.c#L175-L187) — `macos9_poll` event-loop body. Schedule_run dispatch site.
+- [schedule.c:96, 141, 151](../../browser/netsurf/frontends/macos9/schedule.c#L96) — schedule insert, run, quitting-flag short-circuit.
+- [misc.c:62](../../browser/netsurf/frontends/macos9/misc.c#L62) — `macos9_misc_table.schedule` field assignment.
+- [window.c:72-91](../../browser/netsurf/frontends/macos9/window.c#L72-L91) — navigate + URL submit path.
+- [macos9_http_fetcher.c:55, 141, 152, 158](../../browser/netsurf/frontends/macos9/macos9_http_fetcher.c) — fetcher ops, register, `fetcher_add` for http/https.
+- [plotters.c:200](../../browser/netsurf/frontends/macos9/plotters.c#L200) — `plot_clip` instrumentation point for Case B URL-overdraw probe.
+
+## 7. Hard rules respected this round
+
+- **Markdown only.** No code shipped.
+- **No staleness theories.** The user's build is what they say it is. Per CLAUDE.md Directive #1, every diagnosis path leads to a code-side root cause, not a transfer / cache narrative.
+- **Init verified before instrumentation.** Per the Regression Audit Checklist, `grep -c macsurf_debug_log_init main.c` returns 1 at line 191. Channel is live, no fixes305a needed.
+- **fixes304 is on probation, not assumed correct.** Cases E and F are written to confirm or refute it from the log evidence.
+- **Documentation drift acknowledged but not patched mid-diagnosis.** CLAUDE.md edits are queued for fixes306+, not fixes305 — so a regression discovered by the test cycle doesn't force a doc revert.
