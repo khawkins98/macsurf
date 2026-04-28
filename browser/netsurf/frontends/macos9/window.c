@@ -131,7 +131,15 @@ void macos9_windows_process_deferred(void) {
 	}
 }
 
-struct gui_window *macos9_create_initial_window(void) { return macos9_window_create(NULL, NULL, 0); }
+struct gui_window *macos9_create_initial_window(void) {
+	struct browser_window *bw = NULL;
+	nserror e;
+	MS_LOG("create_initial: calling browser_window_create");
+	e = browser_window_create(BW_CREATE_HISTORY, NULL, NULL, NULL, &bw);
+	if (e != NSERROR_OK) { MS_LOG("create_initial: browser_window_create FAIL"); return NULL; }
+	MS_LOG("create_initial: bw attached");
+	return window_list;
+}
 
 static struct gui_window *macos9_window_create(struct browser_window *bw, struct gui_window *ex, gui_window_create_flags f) {
 	struct gui_window *g=(struct gui_window *)calloc(1,sizeof(*g)); Rect b; short x; if(!g) return NULL;
