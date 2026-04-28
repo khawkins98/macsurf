@@ -109,6 +109,18 @@ typedef bool(nslog_ensure_t)(FILE *fptr);
 #define UNUSED(x) ((void)(x))
 #endif
 
+/* fixes305a: enable the file-backed diagnostic log channel by default.
+ * macsurf_debug_log.c and macsurf_debug.c gate their real bodies on
+ * MACSURF_DEBUG; without this define, macsurf_debug_log_init() is the
+ * empty release stub at macsurf_debug_log.c:352 and every MS_LOG() call
+ * compiles out, so MacSurf Debug.log never appears on the Desktop.
+ * Define for everything except an explicit MACSURF_RELEASE build. */
+#ifndef MACSURF_RELEASE
+#ifndef MACSURF_DEBUG
+#define MACSURF_DEBUG 1
+#endif
+#endif
+
 /* libcss stylesheet.h once tagged a struct close with `} _ALIGNED;`.
  * If any header is still found with that token undefined, CW8 reads
  * it as a global variable declaration and every TU emits a duplicate
