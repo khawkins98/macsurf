@@ -22,7 +22,8 @@ extern "C"
 /* type for fixed point numbers */
 typedef int32_t css_fixed;
 
-static inline css_fixed css_add_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed
+css_add_fixed(const css_fixed x, const css_fixed y) {
 	int32_t ux = x;
 	int32_t uy = y;
 	int32_t res = ux + uy;
@@ -30,30 +31,86 @@ static inline css_fixed css_add_fixed(const css_fixed x, const css_fixed y) {
 	/* Calculate overflowed result. (Don't change the sign bit of ux) */
 	ux = (ux >> 31) + INT_MAX;
 
-	/* Force compiler to use cmovns instruction */
-	if ((int32_t) ((ux ^ uy) | ~(uy ^ res)) >= 0) {
-		res = ux;
+	/* Force compiler to use cmovns instruction.
+	 * Split to avoid CW8 internal compiler error on complex expression. */
+	{
+		int32_t temp_ice = (ux ^ uy) | ~(uy ^ res);
+		if (temp_ice >= 0) {
+			res = ux;
+		}
 	}
 
 	return res;
 }
 
-static inline css_fixed css_subtract_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed
+css_subtract_fixed(const css_fixed x, const css_fixed y) {
 	int32_t ux = x;
 	int32_t uy = y;
 	int32_t res = ux - uy;
 
 	ux = (ux >> 31) + INT_MAX;
 
-	/* Force compiler to use cmovns instruction */
-	if ((int32_t)((ux ^ uy) & (ux ^ res)) < 0) {
-		res = ux;
+	/* Split to avoid CW8 internal compiler error. */
+	{
+		int32_t temp_ice = (ux ^ uy) & (ux ^ res);
+		if (temp_ice < 0) {
+			res = ux;
+		}
 	}
 
 	return res;
 }
 
-static inline css_fixed css_divide_fixed(const css_fixed x, const css_fixed y) {
+#ifdef __MWERKS__
+/* CW8 PPC miscompiles `(int64_t)a * small_const`: the 64-bit
+ * multiply-by-constant codegen writes `a >> log2(const)` into
+ * the high word instead of the correct `(a*const) >> 32`.
+ * Confirmed via probe G (fixes113) showing `(long long)131072
+ * * 1024LL` produces hi=128, lo=134217728 — full product
+ * 549,890,031,616 instead of 134,217,728. Route the three
+ * fpmath operations that rely on int64 intermediates through
+ * `double` instead — PPC's FPU handles this natively, and 52
+ * bits of mantissa comfortably covers every int32 product we
+ * need. */
+static inline css_fixed
+css_divide_fixed(const css_fixed x, const css_fixed y) {
+	double dd = ((double)x * 1024.0) / (double)y;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+
+static inline css_fixed
+css_multiply_fixed(const css_fixed x, const css_fixed y) {
+	double dd = ((double)x * (double)y) / 1024.0;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+
+static inline css_fixed
+css_int_to_fixed(const int a) {
+	double dd = (double)a * 1024.0;
+
+	if (dd < (double)INT_MIN)
+		return INT_MIN;
+	if (dd > (double)INT_MAX)
+		return INT_MAX;
+
+	return (css_fixed)dd;
+}
+#else
+static inline css_fixed
+css_divide_fixed(const css_fixed x, const css_fixed y) {
 	int64_t xx = ((int64_t)x * (1 << CSS_RADIX_POINT)) / y;
 
 	if (xx < INT_MIN)
@@ -65,7 +122,8 @@ static inline css_fixed css_divide_fixed(const css_fixed x, const css_fixed y) {
 	return xx;
 }
 
-static inline css_fixed css_multiply_fixed(const css_fixed x, const css_fixed y) {
+static inline css_fixed
+css_multiply_fixed(const css_fixed x, const css_fixed y) {
 	int64_t xx = ((int64_t)x * (int64_t)y) >> CSS_RADIX_POINT;
 
 	if (xx < INT_MIN)
@@ -77,7 +135,8 @@ static inline css_fixed css_multiply_fixed(const css_fixed x, const css_fixed y)
 	return xx;
 }
 
-static inline css_fixed css_int_to_fixed(const int a) {
+static inline css_fixed
+css_int_to_fixed(const int a) {
 	int64_t xx = ((int64_t) a) * (1 << CSS_RADIX_POINT);
 
 	if (xx < INT_MIN)
@@ -88,8 +147,10 @@ static inline css_fixed css_int_to_fixed(const int a) {
 
 	return xx;
 }
+#endif
 
-static inline css_fixed css_float_to_fixed(const float a) {
+static inline css_fixed
+css_float_to_fixed(const float a) {
 	float xx = a * (float) (1 << CSS_RADIX_POINT);
 
 	if (xx < INT_MIN)
