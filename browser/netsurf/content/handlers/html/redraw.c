@@ -1341,59 +1341,6 @@ bool html_redraw_box(const html_content *html, struct box *box,
 		overflow_y = css_computed_overflow_y(box->style);
 	}
 
-	/* Defensive sanity clamp: sanitise any box field before feeding it
-	 * into the clip computation. Upstream layout / CSS engine has been
-	 * observed to leave box->x, box->y, box->margin/padding/border with
-	 * huge garbage values when the computed style or unit_len_ctx is
-	 * incompletely initialised. Those garbage values then trick this
-	 * function's clip test and cause the walker to skip real content.
-	 * See box->x = 30728, box->descendant_y0 = -39845888 on macos9. */
-	{
-		if (box->x < -10000 || box->x > 10000) box->x = 0;
-		if (box->y < -10000 || box->y > 10000) box->y = 0;
-		if (box->width < 0 || box->width > 10000) box->width = 0;
-		if (box->height < 0 || box->height > 10000) box->height = 0;
-		if (box->padding[LEFT] < 0 || box->padding[LEFT] > 10000) box->padding[LEFT] = 0;
-		if (box->padding[TOP] < 0 || box->padding[TOP] > 10000) box->padding[TOP] = 0;
-		if (box->padding[RIGHT] < 0 || box->padding[RIGHT] > 10000) box->padding[RIGHT] = 0;
-		if (box->padding[BOTTOM] < 0 || box->padding[BOTTOM] > 10000) box->padding[BOTTOM] = 0;
-		if (box->border[LEFT].width < 0 || box->border[LEFT].width > 1000) box->border[LEFT].width = 0;
-		if (box->border[TOP].width < 0 || box->border[TOP].width > 1000) box->border[TOP].width = 0;
-		if (box->border[RIGHT].width < 0 || box->border[RIGHT].width > 1000) box->border[RIGHT].width = 0;
-		if (box->border[BOTTOM].width < 0 || box->border[BOTTOM].width > 1000) box->border[BOTTOM].width = 0;
-		if (box->descendant_x0 < -10000 || box->descendant_x0 > 10000) box->descendant_x0 = 0;
-		if (box->descendant_y0 < -10000 || box->descendant_y0 > 10000) box->descendant_y0 = 0;
-		if (box->descendant_x1 < -10000 || box->descendant_x1 > 10000) box->descendant_x1 = box->width;
-		if (box->descendant_y1 < -10000 || box->descendant_y1 > 10000) box->descendant_y1 = box->height;
-		/* If descendants are tiny relative to box content, expand so
-		 * the clip intersection doesn't collapse to zero pixels.
-		 * This happens when layout doesn't run fully (body->height=0,
-		 * descendant_y1=0) but the box still has real text children. */
-		if (box->descendant_x1 <= box->descendant_x0)
-			box->descendant_x1 = box->descendant_x0 + 10000;
-		if (box->descendant_y1 <= box->descendant_y0)
-			box->descendant_y1 = box->descendant_y0 + 10000;
-
-		/* DIAGNOSTIC: when layout hasn't produced per-line y offsets
-		 * for text boxes (every text box in an inline container
-		 * stacks at y=0), synthesise a y based on sibling index so
-		 * content is legible. This is a stop-gap until the CSS
-		 * cascade -> layout pipeline is producing real coordinates;
-		 * remove once layout_inline_container works end-to-end. */
-		if (box->type == BOX_TEXT && box->y == 0 &&
-				box->parent != NULL) {
-			int sib_idx = 0;
-			struct box *s;
-			for (s = box->parent->children; s != NULL && s != box;
-					s = s->next) {
-				if (s->type == BOX_TEXT)
-					sib_idx++;
-			}
-			if (sib_idx > 0)
-				box->y = sib_idx * 18;
-		}
-	}
-
 	/* avoid trivial FP maths */
 	if (scale == 1.0) {
 		x = x_parent + box->x;
@@ -1502,16 +1449,7 @@ bool html_redraw_box(const html_content *html, struct box *box,
 	if (clip->y1 < r.y0 || r.y1 < clip->y0 ||
 			clip->x1 < r.x0 || r.x1 < clip->x0) {
 		macos9_hrb_clip_skips++;
-		sprintf(macos9_skipbox_info,
-			"T=%d V=%ld xy=%d,%d WH=%d,%d dx=%d,%d dy=%d,%d clip=%d,%d,%d,%d",
-			(int)box->type, macos9_hrb_visits,
-			x, y, width, height,
-			(int)box->descendant_x0, (int)box->descendant_x1,
-			(int)box->descendant_y0, (int)box->descendant_y1,
-			clip->x0, clip->y0, clip->x1, clip->y1);
-		/* DIAG: do NOT return - force walker to recurse so we can
-		 * see if text renders when clip-skip is bypassed. */
-		/* return true; */
+		return true;
 	}
 
 	/*if the rectangle is under the page bottom but it can fit in a page,
