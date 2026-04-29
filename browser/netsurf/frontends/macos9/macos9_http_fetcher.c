@@ -30,7 +30,7 @@ struct macos9_fetch_ctx {
 #endif
 	char *h_buf; long h_len; long h_cap;
 	int status; char mime[128]; const char *err;
-	long body_bytes; /* fixes310a: total bytes delivered as FETCH_DATA after headers */
+	long body_bytes; /* fixes311: total bytes delivered as FETCH_DATA after headers */
 };
 static struct macos9_fetch_ctx f_slots[MAX_F];
 
@@ -95,7 +95,7 @@ static void mfs_parse_headers(struct macos9_fetch_ctx *c) {
 		msg.type=FETCH_DATA; msg.data.header_or_data.buf=(const uint8_t*)(sep+4);
 		msg.data.header_or_data.len=(size_t)initial_body;
 		fetch_send_callback(&msg,c->parent);
-		c->body_bytes += initial_body; /* fixes310a */
+		c->body_bytes += initial_body; /* fixes311 */
 	}
 	free(c->h_buf); c->h_buf=NULL;
 }
@@ -122,7 +122,7 @@ static void mfs_poll_one(struct macos9_fetch_ctx *c) {
 	} else {
 		m.type=FETCH_DATA; m.data.header_or_data.buf=(const uint8_t*)b;
 		m.data.header_or_data.len=(size_t)n; fetch_send_callback(&m,c->parent);
-		c->body_bytes += (long)n; /* fixes310a */
+		c->body_bytes += (long)n; /* fixes311 */
 	}
 #endif
 }

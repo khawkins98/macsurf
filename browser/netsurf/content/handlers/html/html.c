@@ -252,7 +252,7 @@ static void html_box_convert_done(html_content *c, bool success)
 		html_dump_frameset(c->frameset, 0);
 #endif
 
-	/* fixes310a -- box tree counters at convert-success boundary.
+	/* fixes311 -- box tree counters at convert-success boundary.
 	 * Walks the layout via children/next/parent without recursion so
 	 * arbitrarily deep trees do not blow the stack on real hardware. */
 	{
@@ -381,7 +381,7 @@ void html_finish_conversion(html_content *htmlc)
 	dom_node *html;
 	nserror error;
 
-	/* fixes310a -- byte-in count crosses parser-boundary here. Lets us
+	/* fixes311 -- byte-in count crosses parser-boundary here. Lets us
 	 * cross-check the http fetcher's body_bytes summary. */
 	macsurf_debug_log_writef(
 		"finish_conversion: parser_bytes=%ld head=%s",
@@ -1146,7 +1146,7 @@ static void html_reformat(struct content *c, int width, int height)
 	if (c->height < layout->y + layout->descendant_y1)
 		c->height = layout->y + layout->descendant_y1;
 
-	/* fixes310a -- post-layout dimensions probe. */
+	/* fixes311 -- post-layout dimensions probe. */
 	macsurf_debug_log_writef(
 		"reformat: in_w=%d in_h=%d c_w=%d c_h=%d desc_x1=%d desc_y1=%d lyt_xy=%d,%d lyt_wh=%d,%d",
 		width, height, (int)c->width, (int)c->height,
