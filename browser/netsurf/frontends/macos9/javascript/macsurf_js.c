@@ -7,6 +7,16 @@
 #include "macsurf_js.h"
 
 #ifdef WITH_DUKTAPE
+
+struct jsheap {
+	duk_context *ctx;
+};
+
+struct jsthread {
+	struct jsheap *heap;
+	duk_context *ctx;
+};
+
 static struct jsheap *global_heap = NULL;
 static duk_ret_t native_console_log(duk_context *ctx) {
 	int n = duk_get_top(ctx), i; char log_buf[512]; size_t pos = 0; log_buf[0] = '\0';
