@@ -59,32 +59,28 @@ typedef struct dom_string   dom_string;
 typedef int dom_exception;
 #define DOM_NO_ERR 0
 
-/* Forward decls — real bodies live in macsurf_js_dom_stubs.c (fixes164).
- * Both prior attempts to put the definitions in THIS TU (fixes162 as
- * static, fixes163 as non-static external) still left the Mac build
- * with undefined-symbol link errors. Splitting into a separate .c
- * file forces cross-.o resolution, which is the path CW8 handles
- * reliably. */
+/* Real out-of-line functions from libdom src/core/string.c */
 extern dom_exception dom_string_create(const unsigned char *ptr, size_t len,
 		dom_string **str);
-extern void          dom_string_unref(dom_string *str);
 extern const char   *dom_string_data(const dom_string *str);
 extern size_t        dom_string_length(const dom_string *str);
 
-extern void          dom_node_ref(dom_node *node);
-extern void          dom_node_unref(dom_node *node);
-
-extern dom_exception dom_document_get_element_by_id(dom_document *doc,
+/* macsurf_dom_dispatch.c — wrappers for libdom static-inline functions.
+ * Static inlines have no out-of-line symbol; the dispatch .c creates one. */
+extern void          macsurf_dom_node_ref(dom_node *node);
+extern void          macsurf_dom_node_unref(dom_node *node);
+extern void          macsurf_dom_string_unref(dom_string *str);
+extern dom_exception macsurf_dom_document_get_element_by_id(dom_document *doc,
 		dom_string *id, dom_element **element);
-extern dom_exception dom_document_create_element(dom_document *doc,
+extern dom_exception macsurf_dom_document_create_element(dom_document *doc,
 		dom_string *tag_name, dom_element **element);
-extern dom_exception dom_element_get_tag_name(dom_element *el,
+extern dom_exception macsurf_dom_element_get_tag_name(dom_element *el,
 		dom_string **name);
-extern dom_exception dom_element_get_attribute(dom_element *el,
+extern dom_exception macsurf_dom_element_get_attribute(dom_element *el,
 		dom_string *name, dom_string **value);
-extern dom_exception dom_element_set_attribute(dom_element *el,
+extern dom_exception macsurf_dom_element_set_attribute(dom_element *el,
 		dom_string *name, dom_string *value);
-extern dom_exception dom_node_append_child(dom_node *parent,
+extern dom_exception macsurf_dom_node_append_child(dom_node *parent,
 		dom_node *new_child, dom_node **result);
 
 /* ----------------------------------------------------------------- */
@@ -113,7 +109,7 @@ element_finalizer(duk_context *duk)
 	duk_pop(duk);
 
 	if (el != NULL) {
-		dom_node_unref((dom_node *)el);
+		macsurf_dom_node_unref((dom_node *)el);
 	}
 	return 0;
 }
@@ -138,7 +134,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	}
 
 	/* Take an extra ref — the finalizer will drop it. */
-	dom_node_ref((dom_node *)el);
+	macsurf_dom_node_ref((dom_node *)el);
 
 	duk_push_object(duk);
 	duk_push_pointer(duk, el);
@@ -215,11 +211,11 @@ macsurf_getElementById(duk_context *duk)
 		return 1;
 	}
 
-	if (dom_document_get_element_by_id(macsurf_js_current_document,
+	if (macsurf_dom_document_get_element_by_id(macsurf_js_current_document,
 			id_str, &el) != DOM_NO_ERR) {
 		el = NULL;
 	}
-	dom_string_unref(id_str);
+	macsurf_dom_string_unref(id_str);
 
 	macsurf_push_element(duk, el);
 	return 1;
@@ -241,13 +237,13 @@ macsurf_getTagName(duk_context *duk)
 		return 1;
 	}
 
-	if (dom_element_get_tag_name(el, &tag) != DOM_NO_ERR || tag == NULL) {
+	if (macsurf_dom_element_get_tag_name(el, &tag) != DOM_NO_ERR || tag == NULL) {
 		duk_push_string(duk, "");
 		return 1;
 	}
 
 	duk_push_lstring(duk, dom_string_data(tag), dom_string_length(tag));
-	dom_string_unref(tag);
+	macsurf_dom_string_unref(tag);
 	return 1;
 }
 
@@ -309,17 +305,17 @@ macsurf_getAttribute(duk_context *duk)
 		return 1;
 	}
 
-	if (dom_element_get_attribute(el, name_str, &val_str) != DOM_NO_ERR
+	if (macsurf_dom_element_get_attribute(el, name_str, &val_str) != DOM_NO_ERR
 			|| val_str == NULL) {
-		dom_string_unref(name_str);
+		macsurf_dom_string_unref(name_str);
 		duk_push_null(duk);
 		return 1;
 	}
 
 	duk_push_lstring(duk, dom_string_data(val_str),
 			dom_string_length(val_str));
-	dom_string_unref(val_str);
-	dom_string_unref(name_str);
+	macsurf_dom_string_unref(val_str);
+	macsurf_dom_string_unref(name_str);
 	return 1;
 }
 
@@ -346,13 +342,13 @@ macsurf_setAttribute(duk_context *duk)
 	}
 	if (dom_string_create((const unsigned char *)val, strlen(val),
 			&val_str) != DOM_NO_ERR || val_str == NULL) {
-		dom_string_unref(name_str);
+		macsurf_dom_string_unref(name_str);
 		return 0;
 	}
 
-	dom_element_set_attribute(el, name_str, val_str);
-	dom_string_unref(val_str);
-	dom_string_unref(name_str);
+	macsurf_dom_element_set_attribute(el, name_str, val_str);
+	macsurf_dom_string_unref(val_str);
+	macsurf_dom_string_unref(name_str);
 	return 0;
 }
 
@@ -382,7 +378,7 @@ macsurf_appendChild(duk_context *duk)
 		return 1;
 	}
 
-	if (dom_node_append_child((dom_node *)parent, (dom_node *)child,
+	if (macsurf_dom_node_append_child((dom_node *)parent, (dom_node *)child,
 			&result) != DOM_NO_ERR) {
 		duk_push_null(duk);
 		return 1;
@@ -416,11 +412,11 @@ macsurf_createElement(duk_context *duk)
 		return 1;
 	}
 
-	if (dom_document_create_element(macsurf_js_current_document,
+	if (macsurf_dom_document_create_element(macsurf_js_current_document,
 			tag_str, &el) != DOM_NO_ERR) {
 		el = NULL;
 	}
-	dom_string_unref(tag_str);
+	macsurf_dom_string_unref(tag_str);
 
 	macsurf_push_element(duk, el);
 	return 1;
@@ -501,8 +497,6 @@ macsurf_console_log(duk_context *duk)
 	duk_join(duk, n);
 	{
 		const char *line = duk_safe_to_string(duk, -1);
-		nslog_log(__FILE__, "", __LINE__,
-				"console.log: %s", line != NULL ? line : "(null)");
 		macsurf_js_console_append(line);
 	}
 	duk_pop(duk);
@@ -514,7 +508,7 @@ macsurf_console_log(duk_context *duk)
 /* ----------------------------------------------------------------- */
 
 /*
- * alert(msg) — logs to NSLOG only.  We avoid pulling Dialogs.h into
+ * alert(msg) — logs to debug channel only.  We avoid pulling Dialogs.h into
  * this TU (it cascades into MacWindows.h and AliasHandle compile
  * errors on CW8's Universal Interfaces; the Files.h + Aliases.h
  * workaround used in macos9.h is fragile here).  A real Carbon
@@ -525,8 +519,7 @@ static duk_ret_t
 macsurf_alert(duk_context *duk)
 {
 	const char *msg = duk_safe_to_string(duk, 0);
-	nslog_log(__FILE__, "", __LINE__,
-			"alert: %s", msg != NULL ? msg : "(null)");
+	(void)msg;
 	return 0;
 }
 
@@ -719,7 +712,7 @@ macsurf_js_dispatch_event(struct jscontext *ctx,
 		if (dom_string_create((const unsigned char *)attr_buf,
 				et_len + 2, &attr_name) == DOM_NO_ERR &&
 		    attr_name != NULL) {
-			if (dom_element_get_attribute(el, attr_name,
+			if (macsurf_dom_element_get_attribute(el, attr_name,
 					&attr_val) == DOM_NO_ERR &&
 			    attr_val != NULL) {
 				if (duk_peval_lstring(ctx->duk,
@@ -727,16 +720,11 @@ macsurf_js_dispatch_event(struct jscontext *ctx,
 						dom_string_length(attr_val))
 						== 0) {
 					fired = true;
-				} else {
-					nslog_log(__FILE__, "", __LINE__,
-						"inline %s handler error: %s",
-						event_type,
-						duk_safe_to_string(ctx->duk, -1));
 				}
 				duk_pop(ctx->duk);
-				dom_string_unref(attr_val);
+				macsurf_dom_string_unref(attr_val);
 			}
-			dom_string_unref(attr_name);
+			macsurf_dom_string_unref(attr_name);
 		}
 	}
 
