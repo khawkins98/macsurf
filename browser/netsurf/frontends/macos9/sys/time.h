@@ -11,6 +11,8 @@
 #ifndef MACOS9_SYS_TIME_H
 #define MACOS9_SYS_TIME_H
 
+#include <stddef.h>
+
 /* CW8's access path includes macos9:sys: so <time.h> finds THIS file
  * before MSL's time.h — the previous #include <time.h> was circular
  * (guarded out), so struct tm and localtime were never declared.
