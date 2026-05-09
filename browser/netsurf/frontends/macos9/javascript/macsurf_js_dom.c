@@ -38,54 +38,14 @@
 #include "macsurf_js.h"
 
 /*
- * libdom is in the source tree but not all the implementation .c files
- * are in the CW8 project file list, and the public header relies on
- * static-inline helpers that CW8 doesn't always emit out-of-line bodies
- * for.  Until the full libdom binding lands (deferred — see
- * dom_parser.c port note in the moonshot plan), we provide local
- * forward decls + no-op stubs in this TU so the JS DOM bindings
- * compile, link, and gracefully return null when no document is set.
+ * Real libdom headers — the full binding is now linked into the build,
+ * so use the upstream types and prototypes directly. The earlier round
+ * of local typedefs (typedef int dom_exception, size_t dom_string_length,
+ * etc.) collided with libdom's enum dom_exception and uint32_t
+ * dom_string_length signatures and triggered redeclaration errors.
  */
-
-struct dom_document;
-struct dom_element;
-struct dom_node;
-struct dom_string;
-typedef struct dom_element  dom_element;
-typedef struct dom_document dom_document;
-typedef struct dom_node     dom_node;
-typedef struct dom_string   dom_string;
-
-typedef int dom_exception;
-#define DOM_NO_ERR 0
-
-/* Forward decls — real bodies live in macsurf_js_dom_stubs.c (fixes164).
- * Both prior attempts to put the definitions in THIS TU (fixes162 as
- * static, fixes163 as non-static external) still left the Mac build
- * with undefined-symbol link errors. Splitting into a separate .c
- * file forces cross-.o resolution, which is the path CW8 handles
- * reliably. */
-extern dom_exception dom_string_create(const unsigned char *ptr, size_t len,
-		dom_string **str);
-extern void          dom_string_unref(dom_string *str);
-extern const char   *dom_string_data(const dom_string *str);
-extern size_t        dom_string_length(const dom_string *str);
-
-extern void          dom_node_ref(dom_node *node);
-extern void          dom_node_unref(dom_node *node);
-
-extern dom_exception dom_document_get_element_by_id(dom_document *doc,
-		dom_string *id, dom_element **element);
-extern dom_exception dom_document_create_element(dom_document *doc,
-		dom_string *tag_name, dom_element **element);
-extern dom_exception dom_element_get_tag_name(dom_element *el,
-		dom_string **name);
-extern dom_exception dom_element_get_attribute(dom_element *el,
-		dom_string *name, dom_string **value);
-extern dom_exception dom_element_set_attribute(dom_element *el,
-		dom_string *name, dom_string *value);
-extern dom_exception dom_node_append_child(dom_node *parent,
-		dom_node *new_child, dom_node **result);
+#include <dom/dom.h>
+#include <dom/core/string.h>
 
 /* ----------------------------------------------------------------- */
 /* Current document — set by the html handler on page load.          */
