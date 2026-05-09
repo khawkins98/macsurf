@@ -56,7 +56,7 @@ typedef enum css_node_flags {
 			 CSS_NODE_FLAGS_PSEUDO_CLASS_FOCUS  |
 			 CSS_NODE_FLAGS_PSEUDO_CLASS_HOVER  |
 			 CSS_NODE_FLAGS_PSEUDO_CLASS_LINK   |
-			 CSS_NODE_FLAGS_PSEUDO_CLASS_VISITED),
+			 CSS_NODE_FLAGS_PSEUDO_CLASS_VISITED)
 } css_node_flags;
 
 struct css_node_data {
