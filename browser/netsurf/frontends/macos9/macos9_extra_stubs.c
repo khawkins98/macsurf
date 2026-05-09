@@ -92,49 +92,38 @@ nserror image_cache_init(const struct image_cache_parameters *p)
 /* dom_hubbub_parser_* stubs removed — v0.3 adds the real
  * dom_parser.c now that internal headers are C89-clean. */
 
-/* --- orphan symbols formerly in misc_stub.c, browser_history_stub.c,
- * http_stub.c. The other symbols those files used to provide are now
- * supplied by real upstream sources (desktop/*, utils/http/*, etc.).
- * Move only the orphans here and drop the three stub files from the
- * project list to avoid multiply-defined link errors. */
+/* --- former orphan stubs from misc_stub / browser_history_stub /
+ * http_stub. All of those now have real upstream implementations in
+ * the project (libwapcaplet.c, desktop/browser_history.c, scrollbar.c,
+ * utils/http/content-disposition.c, utils/http/www-authenticate.c),
+ * so the stubs that used to live here have been removed. Anything
+ * still referenced as undefined after this round is a project-list
+ * gap (file on disk but not added to MacSurf.mcp), not a missing
+ * stub. */
 
-/* libwapcaplet shim — no per-string iteration on this platform */
-struct lwc_string_s;
-void lwc_iterate_strings(void (*cb)(struct lwc_string_s *str, void *pw),
-		void *pw) { (void)cb; (void)pw; }
+/* hubbub_error_from_parserutils_error is `static inline` in
+ * libhubbub/src/utils/parserutilserror.h. Under our prefix `inline`
+ * is defined-empty, so CW8 sees `static` -- which means the body is
+ * file-scope only inside whichever TU includes the header. Some TUs
+ * (e.g. tokeniser.c) reference it but the static body never produces
+ * an external symbol. Provide an out-of-line non-static copy here so
+ * it is visible to every caller via the linker. The signature is
+ * stable upstream and we copy the implementation 1:1. */
+#include <hubbub/errors.h>
+#include <parserutils/errors.h>
 
-/* browser_window_history_add / browser_window_history_get_scroll and
- * the scrollbar_* family are now provided by the real desktop/
- * browser_history.c and desktop/scrollbar.c that are in the project. */
-
-/* HTTP Content-Disposition / WWW-Authenticate parsing — real impls
- * exist at utils/http/content-disposition.c and www-authenticate.c
- * but those aren't in the project list yet. Stub returns NOT_FOUND
- * which is harmless for the only caller (dt_download.c). */
-struct http_content_disposition;
-struct http_www_authenticate;
-
-nserror http_parse_content_disposition(const char *header,
-		struct http_content_disposition **result)
+hubbub_error hubbub_error_from_parserutils_error(parserutils_error error)
 {
-	(void)header;
-	if (result) *result = NULL;
-	return NSERROR_NOT_FOUND;
+	if (error == PARSERUTILS_OK)            return HUBBUB_OK;
+	if (error == PARSERUTILS_NOMEM)         return HUBBUB_NOMEM;
+	if (error == PARSERUTILS_BADPARM)       return HUBBUB_BADPARM;
+	if (error == PARSERUTILS_INVALID)       return HUBBUB_INVALID;
+	if (error == PARSERUTILS_FILENOTFOUND)  return HUBBUB_FILENOTFOUND;
+	if (error == PARSERUTILS_NEEDDATA)      return HUBBUB_NEEDDATA;
+	if (error == PARSERUTILS_BADENCODING)   return HUBBUB_BADENCODING;
+	if (error == PARSERUTILS_EOF)           return HUBBUB_OK;
+	return HUBBUB_UNKNOWN;
 }
-
-void http_content_disposition_destroy(
-		struct http_content_disposition *cd) { (void)cd; }
-
-nserror http_parse_www_authenticate(const char *header,
-		struct http_www_authenticate **result)
-{
-	(void)header;
-	if (result) *result = NULL;
-	return NSERROR_NOT_FOUND;
-}
-
-void http_www_authenticate_destroy(
-		struct http_www_authenticate *wa) { (void)wa; }
 
 /* Fetcher registration stubs moved to macos9_fetcher_stubs.c which
  * provides real (minimal) fetcher implementations that register with
