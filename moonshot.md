@@ -1,6 +1,8 @@
 # MacSurf JavaScript Implementation Plan
 # Duktape on Mac OS 9 PowerPC — Full Implementation Guide
 
+> **STATUS: COMPLETED.** This plan describes work that has shipped. Duktape 2.7.0 is linked into the base build, ES5 evaluator confirmed working on real Mac OS 9 G3 hardware (closures, prototypes, regex, JSON, recursion, matrix multiply, Mandelbrot). `js_newheap` / `js_destroyheap` / `js_exec` lifecycle live; JS glue files at `browser/netsurf/frontends/macos9/javascript/`; `duk_config.h` hand-crafted for PPC big-endian under CW8. Kept here as the historical implementation record. See [CLAUDE.md](CLAUDE.md) "JavaScript Engine" for current state.
+
 ---
 
 ## Why This Is Historically Significant

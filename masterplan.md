@@ -1,6 +1,17 @@
 # MacSurf: NetSurf for Classic Mac OS 9
 ### Master Plan & Roadmap
 
+> **Phase status (2026-05-09).**
+> - Phase 1 (Build Environment): **DONE** — CW8 cross-compile + access paths + flat-folder build live.
+> - Phase 2 (Platform Abstraction Layer): **DONE** — frontend in `browser/netsurf/frontends/macos9/`.
+> - Phase 3 (Cooperative Multitasking): **DONE** — WaitNextEvent loop + OT sync-idle yield path verified on hardware.
+> - Phase 4 (Networking): **DONE** — direct OT calls, proxy fetcher registered for `http:` and `https:`.
+> - Phase 5 (Rendering): **DONE for v0.3** — full NetSurf pipeline with native CSS custom properties; MacTrove confirmed on real G3.
+> - Phase 6 (UI & UX): **PARTIAL** — chrome wired, scroll-bar crash fixed (fixes159), wheel still crashes pending MacsBug capture.
+> - Phase 7 (Proxy Integration): **DONE for plain HTTP proxy.** Render-and-flatten service for JS-heavy sites is deferred.
+>
+> See [CLAUDE.md](CLAUDE.md) for current state and known feature gaps. This document is preserved as the original roadmap; phase bodies below are the architectural sketch, not current truth.
+
 ---
 
 ## Vision
