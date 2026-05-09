@@ -92,6 +92,93 @@ nserror image_cache_init(const struct image_cache_parameters *p)
 /* dom_hubbub_parser_* stubs removed — v0.3 adds the real
  * dom_parser.c now that internal headers are C89-clean. */
 
+/* --- orphan symbols formerly in misc_stub.c, browser_history_stub.c,
+ * http_stub.c. The other symbols those files used to provide are now
+ * supplied by real upstream sources (desktop/*, utils/http/*, etc.).
+ * Move only the orphans here and drop the three stub files from the
+ * project list to avoid multiply-defined link errors. */
+
+/* libwapcaplet shim — no per-string iteration on this platform */
+struct lwc_string_s;
+void lwc_iterate_strings(void (*cb)(struct lwc_string_s *str, void *pw),
+		void *pw) { (void)cb; (void)pw; }
+
+/* History helpers declared in desktop/browser_private.h with no
+ * upstream definition. */
+struct browser_window;
+struct hlcache_handle;
+struct nsurl;
+
+nserror browser_window_history_add(struct browser_window *bw,
+		struct hlcache_handle *content, struct nsurl *frag_id)
+{
+	(void)bw; (void)content; (void)frag_id;
+	return NSERROR_OK;
+}
+
+nserror browser_window_history_get_scroll(struct browser_window *bw,
+		float *sx, float *sy)
+{
+	(void)bw;
+	if (sx) *sx = 0;
+	if (sy) *sy = 0;
+	return NSERROR_OK;
+}
+
+/* Mac OS 9 uses Toolbox scroll-bar controls directly; desktop/scrollbar.c
+ * is not in the project. Provide harmless no-ops for the API. */
+struct scrollbar;
+
+nserror scrollbar_create(int horizontal, int length, int full_size,
+		int visible_size, void *pw,
+		void (*cb)(void *pw, int msg, void *data),
+		struct scrollbar **bar)
+{
+	(void)horizontal; (void)length; (void)full_size; (void)visible_size;
+	(void)pw; (void)cb;
+	if (bar) *bar = NULL;
+	return NSERROR_OK;
+}
+
+void scrollbar_destroy(struct scrollbar *s) { (void)s; }
+
+nserror scrollbar_set(struct scrollbar *s, int value, int bar_full)
+{
+	(void)s; (void)value; (void)bar_full;
+	return NSERROR_OK;
+}
+
+int scrollbar_get_offset(struct scrollbar *s) { (void)s; return 0; }
+
+/* HTTP Content-Disposition / WWW-Authenticate parsing — real impls
+ * exist at utils/http/content-disposition.c and www-authenticate.c
+ * but those aren't in the project list yet. Stub returns NOT_FOUND
+ * which is harmless for the only caller (dt_download.c). */
+struct http_content_disposition;
+struct http_www_authenticate;
+
+nserror http_parse_content_disposition(const char *header,
+		struct http_content_disposition **result)
+{
+	(void)header;
+	if (result) *result = NULL;
+	return NSERROR_NOT_FOUND;
+}
+
+void http_content_disposition_destroy(
+		struct http_content_disposition *cd) { (void)cd; }
+
+nserror http_parse_www_authenticate(const char *header,
+		struct http_www_authenticate **result)
+{
+	(void)header;
+	if (result) *result = NULL;
+	return NSERROR_NOT_FOUND;
+}
+
+void http_www_authenticate_destroy(
+		struct http_www_authenticate *wa) { (void)wa; }
+
 /* Fetcher registration stubs moved to macos9_fetcher_stubs.c which
  * provides real (minimal) fetcher implementations that register with
  * the fetcher system and fire completion callbacks. */
