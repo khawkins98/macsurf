@@ -20,6 +20,24 @@
 #include "../events/mutation_event.h"
 #include "../events/dispatch.h"
 
+/* Belt-and-braces: redefine the dispatch macros locally so this TU
+ * never depends on the dispatch.h chain reaching it cleanly. The
+ * forward decls match the prototypes in dispatch.h. */
+extern dom_exception __dom_dispatch_characterdata_modified_event(
+		dom_document *doc, dom_event_target *et,
+		dom_string *prev, dom_string *new, bool *success);
+extern dom_exception __dom_dispatch_subtree_modified_event(
+		dom_document *doc, dom_event_target *et, bool *success);
+#undef _dom_dispatch_characterdata_modified_event
+#define _dom_dispatch_characterdata_modified_event(doc, et, prev, new, success) \
+	__dom_dispatch_characterdata_modified_event((dom_document *) (doc), \
+			(dom_event_target *) (et), (dom_string *) (prev), \
+			(dom_string *) (new), (bool *) (success))
+#undef _dom_dispatch_subtree_modified_event
+#define _dom_dispatch_subtree_modified_event(doc, et, success) \
+	__dom_dispatch_subtree_modified_event((dom_document *) (doc), \
+			(dom_event_target *) (et), (bool *) (success))
+
 /* The virtual functions for dom_characterdata, we make this vtable
  * public to each child class */
 const struct dom_characterdata_vtable characterdata_vtable = {
