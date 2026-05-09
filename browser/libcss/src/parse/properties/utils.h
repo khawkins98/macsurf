@@ -69,7 +69,7 @@ enum border_side_e { BORDER_SIDE_TOP = 0, BORDER_SIDE_RIGHT = 1, BORDER_SIDE_BOT
  */
 css_error css__parse_border_side(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum border_side_e side);
+		struct css_style *result, enum border_side_e side);
 
 /**
  * Parse border-{top,right,bottom,left}-color
@@ -88,7 +88,7 @@ css_error css__parse_border_side(css_language *c,
  */
 css_error css__parse_border_side_color(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 /**
  * Parse border-{top,right,bottom,left}-style
@@ -107,7 +107,7 @@ css_error css__parse_border_side_color(css_language *c,
  */
 css_error css__parse_border_side_style(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 
 /**
@@ -127,7 +127,7 @@ css_error css__parse_border_side_style(css_language *c,
  */
 css_error css__parse_border_side_width(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 
 /**
@@ -147,7 +147,7 @@ css_error css__parse_border_side_width(css_language *c,
  */
 css_error css__parse_side(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 
 /**
@@ -166,7 +166,7 @@ css_error css__parse_side(css_language *c,
  */
 css_error css__parse_margin_side(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 /**
  * Parse padding-{top,right,bottom,left}
@@ -184,7 +184,7 @@ css_error css__parse_margin_side(css_language *c,
  */
 css_error css__parse_padding_side(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result, enum css_properties_e op);
+		struct css_style *result, enum css_properties_e op);
 
 
 
@@ -228,7 +228,7 @@ css_error css__comma_list_to_style(css_language *c,
 		css_code_t (*get_value)(css_language *c,
 				const css_token *token,
 				bool first),
-		css_style *result);
+		struct css_style *result);
 
 /**
  * Parse a CSS calc() invocation
@@ -251,7 +251,7 @@ css_error css__comma_list_to_style(css_language *c,
  */
 css_error css__parse_calc(css_language *c,
 		const parserutils_vector *vector, int *ctx,
-		css_style *result,
+		struct css_style *result,
 		css_code_t OPV,
 		uint32_t unit);
 #endif
