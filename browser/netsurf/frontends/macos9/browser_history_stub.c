@@ -1,6 +1,12 @@
 /*
  * MacSurf — browser_history_stub.c
- * Stub implementations for browser history, scrollbars, frames, carets.
+ *
+ * desktop/browser_history.c and desktop/textinput.c and desktop/frames.c
+ * provide the real implementations of most history / caret / iframe
+ * functions. The only history entrypoints with no upstream impl are
+ * browser_window_history_add and browser_window_history_get_scroll
+ * (only declared in browser_private.h).
+ *
  * Licensed under GPL v2.
  */
 
@@ -9,87 +15,45 @@
 
 struct browser_window;
 struct hlcache_handle;
-struct scrollbar;
-struct rect;
 struct nsurl;
-struct content;
-
-/* Browser history */
-nserror browser_window_history_create(struct browser_window *bw)
-{
-	return NSERROR_OK;
-}
-
-void browser_window_history_destroy(struct browser_window *bw) {}
+struct scrollbar;
 
 nserror browser_window_history_add(struct browser_window *bw,
 		struct hlcache_handle *content, struct nsurl *frag_id)
 {
-	return NSERROR_OK;
-}
-
-nserror browser_window_history_update(struct browser_window *bw,
-		struct hlcache_handle *content)
-{
+	(void)bw; (void)content; (void)frag_id;
 	return NSERROR_OK;
 }
 
 nserror browser_window_history_get_scroll(struct browser_window *bw,
 		float *sx, float *sy)
 {
+	(void)bw;
 	if (sx) *sx = 0;
 	if (sy) *sy = 0;
 	return NSERROR_OK;
 }
 
-/* Scrollbars */
+/* scrollbar_* — Mac OS 9 frontend uses Toolbox scroll-bar controls
+ * directly, not desktop/scrollbar.c. Provide no-op stubs so any core
+ * code that links against the API at all gets harmless behaviour. */
 nserror scrollbar_create(int horizontal, int length, int full_size,
 		int visible_size, void *pw,
 		void (*cb)(void *pw, int msg, void *data),
 		struct scrollbar **bar)
 {
-	*bar = NULL;
+	(void)horizontal; (void)length; (void)full_size; (void)visible_size;
+	(void)pw; (void)cb;
+	if (bar) *bar = NULL;
 	return NSERROR_OK;
 }
 
-void scrollbar_destroy(struct scrollbar *s) {}
+void scrollbar_destroy(struct scrollbar *s) { (void)s; }
 
 nserror scrollbar_set(struct scrollbar *s, int value, int bar_full)
 {
+	(void)s; (void)value; (void)bar_full;
 	return NSERROR_OK;
 }
 
-int scrollbar_get_offset(struct scrollbar *s)
-{
-	return 0;
-}
-
-/* Caret */
-void browser_window_place_caret(struct browser_window *bw,
-		int x, int y, int height,
-		void (*remove_fn)(struct browser_window *bw))
-{
-}
-
-void browser_window_remove_caret(struct browser_window *bw, int only_check) {}
-
-/* Frames / Iframes */
-nserror browser_window_create_iframes(struct browser_window *bw)
-{
-	return NSERROR_OK;
-}
-
-void browser_window_recalculate_iframes(struct browser_window *bw) {}
-
-void browser_window_invalidate_iframe(struct browser_window *bw) {}
-
-nserror browser_window_create_frameset(struct browser_window *bw)
-{
-	return NSERROR_OK;
-}
-
-void browser_window_recalculate_frameset(struct browser_window *bw) {}
-
-void browser_window_destroy_iframes(struct browser_window *bw) {}
-
-void browser_window_handle_scrollbars(struct browser_window *bw) {}
+int scrollbar_get_offset(struct scrollbar *s) { (void)s; return 0; }
