@@ -149,6 +149,23 @@ System paths:
 ### Linux Cross-Check
 Use `gcc -fsyntax-only -std=c89 -pedantic -Dinline= -Ibrowser/netsurf/frontends/macos9/shims -Ibrowser/netsurf/frontends -Ibrowser/netsurf/include -Ibrowser/netsurf -include stdbool.h` to syntax-check frontend files on Linux before copying to Mac.
 
+### Retro68 PPC Cross-Check
+Stricter pre-flight that catches CW8-likely errors GCC's regular C89 mode misses (trailing commas in enums, comma-end of init list, K&R prototypes, etc.). Toolchain at `/home/patrick/Retro68/toolchain/bin/powerpc-apple-macos-gcc` (GCC 12.2.0).
+
+```
+$CC -fsyntax-only -std=c89 -pedantic-errors -Wall \
+  -Wno-unused-parameter -Wno-unused-variable -Wno-long-long \
+  -Dinline= -D__MACOS9__=1 -DTARGET_API_MAC_CARBON=1 -DWITH_DUKTAPE -DNO_IPV6 \
+  -I browser/libwapcaplet/include \
+  -I browser/libdom/include -I browser/libdom/include/dom -I browser/libdom/src \
+  -I browser/libcss/include -I browser/libhubbub/include -I browser/libparserutils/include \
+  -I browser/netsurf -I browser/netsurf/include \
+  -I browser/netsurf/frontends/macos9 -I browser/netsurf/frontends/macos9/shims \
+  -include stdbool.h <file.c>
+```
+
+`-Wno-long-long` is required because `frontends/macos9/shims/stdint.h` uses `long long` for `int64_t` (CW8 accepts as extension). **Do not** `-include macsurf_prefix.h` — its CW8-specific `time_t` / `struct tm` typedefs collide with Retro68's libc `time.h`. Filter results with `grep -E "browser/.*error:"` to ignore Retro68 sysroot noise (e.g. `sys/stat.h` `mode_t` undefined, unrelated to MacSurf code). Green Retro68 ≠ green CW8 — CW8 is the source of truth — but red Retro68 is always real.
+
 ### Project File List (470 .c files)
 Added to MacSurf.mcp:
 - 12 frontend `.c` files
@@ -183,17 +200,7 @@ Combined LOC: ~125K. Stub footprint replaced: 3,688 lines (parserutils utf8.h + 
 - [libdom-port.md](docs/research/libdom-port.md)
 - [libcss-port.md](docs/research/libcss-port.md)
 
-**Next milestone — NetSurf core wiring (5 phases).** All five libraries are now ported and C89-clean (443 .c files in MacSurf.mcp), so the remaining work is glue between NetSurf core and the libraries. Full audit and sequencing in [docs/research/netsurf-core-wiring.md](docs/research/netsurf-core-wiring.md). Phases:
-
-1. **HTTP fetcher rewrite** — `macos9_http_fetcher.c` implementing the real `fetcher_operation_table`, replacing the v0.1 standalone OT fetch path. Reuses the OT primitives from `macos9_fetch.c`. Delete `fetch_stub.c`.
-2. **Content handler infrastructure** — add `content/content_factory.c` + ~9 utils/ helpers (corestrings, libdom, talloc, hashtable, idna, etc.) + ~4 desktop/ helpers (selection, scrollbar, textarea, system_colour). Cascading compile errors expected.
-3. **CSS handler** — add 5 files from `content/handlers/css/`, convert designated initializers, delete `frontends/macos9/css/` stubs.
-4. **HTML handler** — add 23 files from `content/handlers/html/`, convert ~9 designated initializers (including the `html_content_handler` vtable with 16+ function pointer fields), 1 for-scope decl in `layout_flex.c`, delete `frontends/macos9/html/` stubs, create `dom/bindings/hubbub/parser.h` wrapper header.
-5. **End-to-end render** — implement `plot_text` / `plot_clip` / `plot_rectangle` in QuickDraw in `plotters.c`, wire `browser_window_create` to drive a real fetch through `hlcache_handle_retrieve`.
-
-**Total scope:** ~44 new .c files in MacSurf.mcp (taking the project to ~487 files), ~800 lines of new frontend code, ~25 designated init conversions, 226 lines of stub deletion. **Image rendering deferred to v0.3** — `image_init()` is fully `#ifdef WITH_*` gated, so without `WITH_BMP`/`WITH_GIF`/etc. it's a no-op and saves 28 files / 5.4K LOC of work this milestone.
-
-**Most likely bottleneck:** the talloc question. NetSurf's `utils/talloc.c` is a Samba-derived hierarchical allocator with POSIX-y patterns; if it doesn't compile under CW8 it needs its own port pass before HTML can land. Documented in §13 open question 3 of the wiring audit.
+All five libraries are linked and the NetSurf core wiring (HTTP fetcher, content factory, CSS/HTML handlers, end-to-end render) landed across the v0.2 → v0.3 transition. The wiring audit is preserved at [docs/research/netsurf-core-wiring.md](docs/research/netsurf-core-wiring.md) for historical reference.
 
 ### Library port audit checklist
 
@@ -258,13 +265,14 @@ When auditing a new C99 library for CW8 / strict C89, grep for:
 - Screenshot canonical location: `screenshots/v0.3-mactrove-fixes139.png` (user-saved from the 2026-04-20 session).
 - Carbon partition bumped to 16 MB preferred / 8 MB minimum to accommodate libcss allocation footprint on real pages (CSS_NOMEM blocker long resolved; see Gotchas).
 
-### Current blockers — feature gaps, not pipeline bugs
+### Known feature gaps (not pipeline bugs)
 
-- **`gap` / `row-gap` — parsed, single-value fidelity only (fixes148).** `gap: N` and `row-gap: N` both emit column-gap bytecode; `layout_flex.c` reads `css_computed_column_gap` and applies it as main-axis gap between items and cross-axis gap between wrapped lines. Two-value `gap: A B` loses one value (column-gap = B wins). Full-fidelity row-gap (independent storage, bit-packing extension) deferred. MacTrove usage audit: 74 single-value + 2 two-value, so the 97% case is covered.
-- **Flex `justify-content` / `align-content` / `order` computed by libcss but unread by `layout_flex.c`** — layout ignores them. Queued fixes149.
-- **`border-radius`, `box-shadow`, gradients, transforms not parsed** — cosmetic loss. Queued fixes150 (border-radius first via QuickDraw `PaintRoundRect`).
-- **Image content handlers not linked** — every `<img>` renders as placeholder box. Queued fixes151.
-- **URL field input fails on the initial window, works on File → New Window** — queued for a dedicated probe round. Hypothesis in 2026-04-18 survey: content redraw during `browser_window_create` overdraws the URL rect visually while TextEdit is still functional internally.
+- **`gap` / `row-gap`** — parsed at single-value fidelity only; `row-gap` shares storage with `column-gap`, so two-value `gap: A B` loses the first value. See the row-gap entry in Known Gotchas for the bit-packing path required for full-fidelity split.
+- **Flex `justify-content` / `align-content` / `order`** computed by libcss but unread by `layout_flex.c`.
+- **`border-radius`, `box-shadow`, gradients, transforms** — not parsed; cosmetic loss only.
+- **Image content handlers** not linked — `<img>` renders as a placeholder box.
+- **URL field input fails on the initial window, works on File → New Window** — content redraw during `browser_window_create` overdraws the URL rect visually while TextEdit is still functional internally (per 2026-04-18 survey §1).
+- **Mouse wheel still crashes** on real G3/G4 hardware after `kEventMouseWheelMoved` was disabled in fixes140 and `WaitNextEvent` mask + dispatch whitelist hardened in fixes141. Linux-source hypothesis space exhausted; further progress requires direct MacsBug `wh`/`sc`/`ip`/`dm sp` capture, which needs an ADB keyboard the user does not currently have. **Do not redo the Linux-side audit** — it's documented at length in the git history (fixes140-147 commit messages).
 
 ## Native CSS Custom Properties
 
@@ -281,71 +289,29 @@ Shipped incrementally across fixes133-139. Native libcss implementation, not a p
 
 MacSurf handles modern CSS natively in libcss and the layout engine rather than preprocessing via the proxy. This preserves the "real web browser running natively on Mac OS 9" value proposition. The proxy strips TLS and optionally renders-and-flattens JavaScript-heavy sites; it does **not** preprocess CSS for browser limitations.
 
-Native support landed or in progress:
+Native support landed:
 
-- CSS custom properties (`var()`) — **fixes133-139, shipped.**
-- `gap` / `row-gap` — **fixes148, shipped with single-value fidelity (97% of MacTrove uses); two-value `gap: A B` degrades to column-gap=B.** Full-fidelity row-gap requires the bit-packing round deferred earlier.
-- Flex alignment (`justify-content`, `align-content`, `order`) reads — queued fixes149.
-- `border-radius` via QuickDraw `PaintRoundRect` / `FrameRoundRect` — queued fixes143.
-- Image content handlers (GIF/PNG/JPEG) — queued fixes144.
+- CSS custom properties (`var()`) — full pipeline including the lexer keystone fix (see Known Gotchas).
+- `gap` / `row-gap` — single-value fidelity (column-gap storage shared); see "Known feature gaps" for the deferred two-value split.
 
 Features that remain unsupported and degrade gracefully to block layout or flat rendering: CSS Grid (collapses to block), `box-shadow`, `transform`, `transition`, `animation`, gradients, `clip-path`, `mask`. These are cosmetic in most cases and their absence does not prevent page comprehension.
 
 ## Build State
 
-- MacSurf v0.3 renders real live web pages on G3 hardware with native CSS custom property support.
-- First confirmed page: MacTrove (`http://mac.mp.ls/`), 2026-04-19, via the full NetSurf pipeline.
-- v0.2 baseline (plain text, JS, OT networking) remains stable.
-- CW8 project file is [browser/netsurf/frontends/macos9/MacSurf.mcp](browser/netsurf/frontends/macos9/MacSurf.mcp).
+- **Branch state (2026-05-09).** Active branch is `recovery`. `master` and `moonshot` lag behind v0.3 work; `revive-fixes-no-regression` carries fixes through 328; `v0.3-rendering` carries fixes through 318. The recovery branch is where post-regression rebuilding happens — last shipped zip is **fixes333** (libdom internal-include path fix + `fallthrough`/`FLEX_ARRAY_LEN_DECL` macros + trailing-comma in `html_script_element.h`). Hardware verification of the post-fixes169 history is incomplete; check the git log on each branch before quoting state.
+- **Fix-zip numbering is monotonic** per user convention — the next round after the last shipped zip on disk under `Old Zips/`. **First ship of a session: ASK** before committing to a number; memory has been wrong about this in past sessions.
+- MacSurf v0.3 has rendered real live web pages on G3 hardware with native CSS custom property support. First confirmed page was MacTrove (`http://mac.mp.ls/`), 2026-04-19, via the full NetSurf pipeline. v0.2 baseline (plain text, JS, OT networking) remains stable. Whether the current `recovery` HEAD reproduces v0.3 rendering on hardware is **unverified** — every fix round lists Retro68 syntax-clean as the strongest Linux signal; CW8 build outcome is the user's authoritative call.
+- CW8 project file is [browser/netsurf/frontends/macos9/MacSurf.mcp](browser/netsurf/frontends/macos9/MacSurf.mcp). The agent does NOT edit it; new `.c` files are mentioned plainly in handoff so the user adds them on the Mac.
 - Carbon partition: **16 MB preferred / 8 MB minimum** (`MWProject_PPC_size` / `MWProject_PPC_minsize`). Anything smaller starves libcss and triggers CSS_NOMEM mid-cascade on real pages.
 - Flat-folder build approach — all `.c` files in one folder, one search path.
 - Remove Object Code is required before every rebuild after file changes.
-- MacsBug is installed on the G4 for pipeline debugging — `MS_LOG` checkpoints are active throughout the pipeline.
-- Last shipped fix: **fixes160** — two post-fixes159 scroll polish items on hardware-confirmed report: (1) call `macos9_window_update_extents` from the `GW_EVENT_STOP_THROBBER` handler so scroll bars pick up the final rendered height after load completion (initial `UPDATE_EXTENT` event fires before late CSS-resolve / font / flex reflow passes finish, leaving `content_height` stale and scroll bars disabled until a manual window resize forces `update_scrollbars` via the resize path); (2) bump `MACOS9_KEY_SCROLL_STEP` from 16 to 48 so an arrow click or keyboard arrow moves a more useful distance on real pages — 16px was matching Mac classic line-height but feels "one line at a time" on web content.
-- Predecessor: **fixes159** — drop the Appearance live-tracking scroll bar CDEF (`kControlScrollBarLiveProc = 386`) for the non-live variant (`kControlScrollBarProc = 384`). On G3/G4 hardware, clicking a scroll bar crashed into MacsBug with IDENT pointing at an Appearance Manager internal (symbol prefix `hD`); SheepShaver never reproduced it. fixes147 had already removed the UPP macro override and switched `TrackControl` to `NULL` action, but the crash persisted, leaving proc 386's live-track CDEF itself as the remaining suspect on the drop path from `TrackControl`. Proc 384 is the non-live Appearance scroll bar: the CDEF handles thumb visual feedback on its own without the per-frame app-callback cadence that live-tracking uses, so whatever in the live path corrupts or races on real hardware never runs. Trade-off: during drag, content does NOT scroll live — thumb moves visually, then content snaps to the final position on mouseup. This is still the existing `GetControlValue`-on-return path from fixes147, so only the CDEF procID changed. Arrow / page clicks scroll by one step per click exactly as before. **Hardware-confirmed:** scroll bar click no longer crashes.
-- Predecessor: **fixes152** — hotfix to actually wire `macsurf_debug_log_init()` into `main()`. **fixes149 shipped the log infrastructure but never called the init** — three rounds (fixes149, fixes150, fixes151) of instrumentation silently discarded because `g_log_open` stayed 0 and every `macsurf_debug_log_write*` short-circuited at the first-line gate. fixes152 also adds title-bar fallback messages on each init-failure branch (FindFolder / FSpCreate / FSMakeFSSpec / FSpOpenDF) so a second missed-init regression would surface in 30 seconds rather than three rounds. See "Regression Audit Checklist" below.
-- Predecessor: **fixes151** — `SelectWindow` after `ShowWindow` in `macos9_window_create` + `Draw1Control` on all four toolbar buttons in `update_button_states` + `MACSURF_HOME_URL` switched to `http://mac.mp.ls/simple.html`. Research-run conclusion that `ShowWindow` alone doesn't generate activateEvt under Carbon OS 9. Instrumentation planned to verify — silently didn't because fixes149's log channel was dead (see fixes152).
-- Earlier: **fixes150** — `url_field_active=true` at window creation, `TEActivate` unconditional in `macos9_window_create`, `Draw1Control` in `macos9_window_scroll_to`, `macos9_handle_activate` propagates window activation to all controls via `HiliteControl`/`Draw1Control`. Targeted two real bugs (URL bar unresponsive, scroll bars grey). Verification pending because log channel was dead.
-- Earlier: **fixes149** — file-backed diagnostic channel (`MacSurf Debug.log` on Desktop), heavy scroll-bar-click and URL-field instrumentation, defensive `SetPortWindowPort` at scroll-handler entry. **Shipped broken:** `macsurf_debug_log_init()` was never called from `main()`. Fixed in fixes152.
-- Earlier: **fixes148** — `gap` and `row-gap` native parsing + `layout_flex.c` consumption (single-value fidelity). See "Native CSS3 Strategy" above and the "`row-gap` shares storage" entry in Known Gotchas.
-- Older predecessor: **fixes147** — two commits in one zip:
-  - **Commit A (scroll-bar click crash — partial, hypothesis addressed, real-hardware result pending):** Clicking anywhere in a scroll bar crashed on the G3 at `PowerPC illegal instruction at 00000008, LR=00000004` with CurApName `CodeWarrio...`. Hypothesis: the UPP macro override in [window.c](browser/netsurf/frontends/macos9/window.c) — `#define NewControlActionUPP(proc) ((ControlActionUPP)(proc))` — was passing a raw PPC function pointer where CarbonLib's `TrackControl` expects a MixedMode-compatible routine descriptor. Fix: drop the action UPP entirely. `TrackControl(ctrl, pt, NULL)` — no UPP dispatch. CDEF live-tracks the thumb; `GetControlValue` on return holds the final drag position. Arrow/page clicks scroll by one step per click based on the `ControlPartCode` the caller captured from `FindControl`. Trade-off: no auto-repeat on arrow-hold (keyboard arrows still repeat). **Verified in SheepShaver** (no crash on any scroll-bar click — vertical track, up/down arrows, page regions, thumb drag). **Real-hardware result still pending** — if G3/G4 still crashes, the UPP hypothesis was wrong and this joins the wheel crash in the "hardware-specific, needs MacsBug" bucket. See the new "UPP macro override on CarbonLib" entry in Known Gotchas regardless — it was a latent bug whether or not it was the crash root cause.
-  - **Commit B (docs + probe strip):** Preserves the 2026-04-19 survey and MacTrove CSS samples. Strips the stale `sbar h=... vh=... max=...` one-shot probe from `macos9_window_update_extents` (its diagnostic purpose is closed — extents confirmed flowing correctly from `browser_window_get_extents`).
-  - Older predecessors: fixes146 (shutdown ordering + update-handler hardening), fixes145 (probe removal), fixes144 (wne/disp probes), fixes143 (distinct-kinds probe), fixes142 (scroll-bar hardening + one-shot sbar probe), fixes141 (event-class whitelist), fixes140 (wheel handler disable). **Next fix ships as fixes153** — numbering is monotonic per user convention; always confirm the number with the user before shipping.
+- MacsBug is installed on the G4 for pipeline debugging; `MS_LOG` checkpoints + the file-backed diagnostic log on Desktop (`MacSurf Debug.log`) are the post-crash forensics channels.
 
-**fixes146 outcomes (hardware-tested during fixes147 prep):**
-
-- **Quit works cleanly** — Commit A **confirmed on hardware**, shutdown bug closed.
-- **MacTrove render stable through fixes146** — var() resolution intact, Platinum theme rendering correctly, window resize works on real content.
-- **Wheel still crashes (separate from scroll bar).** Different signature from fixes147's crash. Remaining Linux-source hypothesis space exhausted; progress gated on ADB-keyboard MacsBug `wh` capture. See "Wheel crash diagnostic exhaustion" below.
-
-### Next work queue
-
-- **Read the fixes149 log file first.** Tester runs the seven-criterion chrome gauntlet from the fixes149 brief; `MacSurf Debug.log` on Desktop is the deliverable. Scroll-bar crash hypothesis tree narrows as follows from log output:
-  - `sb_handler` logged but `sb_ctrl_state` missing → ControlRef is stale (dangling handle); fix is lifetime-tracking the control pointers (fixes146 already nulls them on destroy; possible next step is version-token validation).
-  - `sb_call_track` logged but `sb_post_track` missing → `TrackControl` itself crashes on the live-tracking CDEF. Likely Appearance Manager state corruption; next step is disabling the live CDEF (drop procID 386 → 16 classic scroll bar) as a workaround.
-  - All pre-TrackControl logs AND `sb_post_track` present but no `sb_dispatch` → post-TrackControl branch dispatch crashes (unlikely given the code is pure int math, but possible if GetControlValue returns garbage).
-  - Clean run with no crash on real hardware → fixes147's drop-the-UPP fix was correct all along, just needed the defensive SetPortWindowPort in fixes149 to close it fully.
-- **fixes150 — flex alignment reads in `layout_flex.c`.** libcss computes `justify-content` / `align-content` / `order`; layout ignores them. Follow the `lh__box_align_self` pattern. (column-gap is now consumed as of fixes148.) Ship after fixes149 closes the chrome verification loop.
-- **fixes151 — `border-radius` via `PaintRoundRect` / `FrameRoundRect`.** 30 uses in MacTrove. Plumb `corner_radius` through `plot_style_t`.
-- **fixes152 — image content handlers (GIF/PNG/JPEG).** Every `<img>` becomes a real image. Bottleneck: talloc on CW8.
-- **Full-fidelity `row-gap` (deferred).** Split row-gap from column-gap storage — new `CSS_PROP_ROW_GAP` enum entry, new field in `css_computed_style_i`, new bit slot in `autogenerated_computed.h` (word 14 has free bits), new propset/propget macros, new parse + select files, `css_computed_row_gap` accessor, wire `layout_flex.c` to read both independently. Currently fixes148 parses both properties into `column-gap` storage; two-value `gap: A B` loses the first value. Only worth doing if real-world pages exercise the two-value form enough to notice.
-- **Wheel crash diagnostic exhaustion — Linux-source audit is DONE, further progress requires MacsBug access.** Evidence summary (do not redo this audit from Linux):
-  - `sbar h=<real> vh=<real> max=<real>` probe fires cleanly after MacTrove loads — extents flow through `browser_window_get_extents` correctly.
-  - `disp w=6` (updateEvt) latches on wheel spin — dispatcher is reached, crash is downstream of `macos9_dispatch_event` entry.
-  - Crash at `1A23829E` with `A67C1A23 not.w #6691` disassembly — 68k-looking data executed as code, classic "called through a function pointer that wasn't a routine descriptor."
-  - `macos9_plotters` table fully populated (9 function pointers, 3 NULL, 1 bool); core guards the NULL slots.
-  - No stray `DisposeControl` anywhere; controls disposed only implicitly via `DisposeWindow` (close box or shutdown).
-  - **Updated by fixes147:** the claim that "no UPP is live during wheel spin" was true but the scroll_action UPP itself was structurally malformed (raw function pointer instead of RoutineDescriptor). That bug was real and caused the separate scroll-bar click crash, not the wheel crash. Wheel crash remains unexplained.
-  - Every struct is `calloc`'d; every Pascal-string write is bounded; every Str255 local is written by set_pstring before Toolbox call.
-  - fixes141 narrowed `WaitNextEvent` mask + whitelist guard at dispatch; fixes142 added `SetPortWindowPort` + `Draw1Control` to scroll-bar updates; fixes145 removed probe-SetWTitle Memory Manager pressure; fixes146 adds quitting-flag and null-before-DisposeWindow hardening; fixes147 removes the scroll_action UPP entirely (which was structurally malformed but probably not the wheel-crash path since wheel spin doesn't route through TrackControl). **None of these hardenings conclusively fixed the wheel crash — if it persists, the remaining hypothesis (Control Manager state corrupted somewhere we can't inspect) can only be confirmed with a MacsBug `wh` stack capture.** Next step: get ADB keyboard, reproduce, `wh`, `sc`, `ip`, `dm sp` — then we have a caller chain to fix.
-- **URL field on initial window — dedicated probe round.** Add a one-shot probe in `plot_clip` / `plot_rectangle` logging coordinates that intersect `gw->url_rect` to confirm the content-redraw-overdraws-URL hypothesis from the 2026-04-18 survey §1.
+For the per-fix history (what each round did, which crashes are still open, which features are pending), read `git log --oneline` on the relevant branch — the durable architectural facts live in this file's other sections, not in a fix-by-fix narrative here.
 
 ## Regression Audit Checklist
 
-**New in fixes152 after the fixes149 missed-init regression.**
-
-Any new subsystem shipped as part of a fix round MUST, before the round is closed, satisfy all three:
+A single fix round (fixes149-152) shipped log infrastructure with the init never wired into `main()`, silently discarding three rounds of instrumentation. This checklist is the durable response — any new subsystem shipped as part of a fix round MUST, before the round is closed, satisfy all three:
 
 1. **Init call wired.** Grep the entrypoint (`main.c main()` for MacSurf) for the init function name. `grep -c macsurf_foo_init main.c` must return a non-zero count. If zero, the subsystem is linked but dead.
 2. **Smoke test confirming it runs.** Either a SheepShaver smoke launch (boot, relaunch, confirm the subsystem's externally-visible artefact — file, title-bar message, menu item — is present) or a hardware cycle. "Linux syntax check passes" is NOT a smoke test; syntax passes on code that is never executed.
@@ -358,13 +324,7 @@ Any new subsystem shipped as part of a fix round MUST, before the round is close
 | NetSurf core | `netsurf_init` | `main.c main()` after OT init | Window shows with content pipeline live |
 | Carbon Appearance | `RegisterAppearanceClient` | `main.c main()` after `InitCursor` | Controls render with platinum theme, not classic |
 
-**Why this checklist exists.** fixes149 through fixes151 accumulated ~20 instrumentation lines across window.c / main.c / the handle functions. None of them wrote anything to the log file because `macsurf_debug_log_init` was never called. The bug was invisible because:
-- `macsurf_debug_log_write` short-circuits silently when `g_log_open == 0` — no stderr, no toolbox call, no stdout.
-- MacSurf Debug.log on the Desktop never appeared — but its absence wasn't flagged by any build step.
-- fixes149/150/151 all "landed" per git and per user test cycles, but produced zero log output.
-- A SheepShaver smoke test ("launch, quit, ls Desktop") would have caught it in 30 seconds of the first ship.
-
-**When reviewing / shipping a fix round:** if the round adds or touches a subsystem in the table above, verify the init path still fires. If the round adds a new subsystem, add an entry. Missed-init is the exact class of regression this table catches.
+**When reviewing / shipping a fix round:** if the round adds or touches a subsystem in the table above, verify the init path still fires. If the round adds a new subsystem, add an entry. Missed-init is the exact class of regression this table catches — `macsurf_debug_log_write` short-circuits silently when `g_log_open == 0`, so a missed init produces zero stderr, zero toolbox output, and a "successful" run that wrote nothing to disk.
 
 ## File-Backed Diagnostic Channel
 
@@ -388,7 +348,7 @@ attach MacsBug to.
 
 - [docs/macsurf-architecture.md](docs/macsurf-architecture.md) — Full platform architecture: rendering modes, proxy services, template system, milestone plan
 - [docs/research/architecture-inventory.md](docs/research/architecture-inventory.md) — Snapshot of what currently exists in the repo and on the proxy host (no decisions, just facts)
-- [docs/research/window-architecture-2026-04-22.md](docs/research/window-architecture-2026-04-22.md) — Window-framework architecture research (fixes161). Full state/event/redraw/scroll inventory of the Mac OS 9 frontend; architectural problem list; proposed unified window-state model; 6-round refactor plan (fixes162–fixes166). **fixes162+ follow this plan.**
+- [docs/research/window-architecture-2026-04-22.md](docs/research/window-architecture-2026-04-22.md) — Window-framework architecture research (originally fixes161). State/event/redraw/scroll inventory of the Mac OS 9 frontend, architectural problem list, proposed unified window-state model, and a 6-round refactor plan. The refactor partially landed (fixes162–166) but the branch then went through a regression cycle — verify against current code before quoting the plan as still in force.
 - [docs/status.md](docs/status.md) — Project status, milestones, test environment
 - [docs/codewarrior-setup.md](docs/codewarrior-setup.md) — How to install CodeWarrior 8 and build on a real Power Mac
 - [docs/deploying-proxy.md](docs/deploying-proxy.md) — How to deploy the Go proxy
