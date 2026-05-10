@@ -10,12 +10,12 @@
 #include <string.h>
 #include <time.h>
 
-#include "events/event.h"
+#include "event.h"
 
-#include "core/string.h"
-#include "core/node.h"
-#include "core/document.h"
-#include "utils/utils.h"
+#include "dom_internal_string.h"
+#include "node.h"
+#include "document.h"
+#include "utils.h"
 
 static void _virtual_dom_event_destroy(dom_event *evt);
 

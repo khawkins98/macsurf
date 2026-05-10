@@ -10,7 +10,7 @@
 
 #include <dom/events/mouse_multi_wheel_event.h>
 
-#include "events/mouse_event.h"
+#include "mouse_event.h"
 
 /**
  * The MouseMultiWheelEvent

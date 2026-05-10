@@ -5,7 +5,7 @@
  * Copyright 2009 Bo Yang <struggleyb.nku@gmail.com>
  */
 
-#include "utils/character_valid.h"
+#include "character_valid.h"
 
 #include <assert.h>
 

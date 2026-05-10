@@ -10,7 +10,7 @@
 
 #include <dom/events/mutation_event.h>
 
-#include "events/event.h"
+#include "event.h"
 
 /**
  * The MutationEvent

@@ -14,9 +14,9 @@
 
 #include <parserutils/charset/utf8.h>
 
-#include "core/string.h"
-#include "core/document.h"
-#include "utils/utils.h"
+#include "dom_internal_string.h"
+#include "document.h"
+#include "utils.h"
 
 /**
  * Type of a DOM string

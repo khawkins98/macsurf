@@ -7,11 +7,11 @@
 
 #include <stdlib.h>
 
-#include "events/mouse_multi_wheel_event.h"
-#include "events/keyboard_event.h"
-#include "core/document.h"
+#include "mouse_multi_wheel_event.h"
+#include "keyboard_event.h"
+#include "document.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 static void _virtual_dom_mouse_multi_wheel_event_destroy(
 		struct dom_event *evt);

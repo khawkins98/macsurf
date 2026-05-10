@@ -11,7 +11,7 @@
 #include <dom/html/html_document.h>
 #include <dom/html/html_element.h>
 
-#include "core/document.h"
+#include "document.h"
 
 /**
  * The dom_html_document class

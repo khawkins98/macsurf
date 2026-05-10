@@ -10,7 +10,7 @@
 
 #include <dom/events/event_listener.h>
 
-#include "utils/list.h"
+#include "list.h"
 
 /**
  * The EventListener class

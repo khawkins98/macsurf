@@ -8,7 +8,7 @@
 #include <dom/core/typeinfo.h>
 #include <dom/core/string.h>
 
-#include "utils/utils.h"
+#include "utils.h"
 
 /* TypeInfo object */
 struct dom_type_info {

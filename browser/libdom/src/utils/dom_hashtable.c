@@ -14,7 +14,7 @@
 #ifdef TEST_RIG
 #include <stdio.h>
 #endif
-#include "utils/dom_hashtable.h"
+#include "dom_hashtable.h"
 
 #include <libwapcaplet/libwapcaplet.h>
 

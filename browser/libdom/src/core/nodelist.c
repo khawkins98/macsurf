@@ -14,11 +14,11 @@
 #include <dom/core/nodelist.h>
 #include <dom/core/string.h>
 
-#include "core/document.h"
-#include "core/node.h"
-#include "core/nodelist.h"
+#include "document.h"
+#include "node.h"
+#include "nodelist.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 /**
  * DOM node list

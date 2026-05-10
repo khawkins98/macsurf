@@ -10,22 +10,22 @@
 
 #include <libwapcaplet/libwapcaplet.h>
 
-#include "core/string.h"
-#include "core/node.h"
-#include "core/document.h"
-#include "events/document_event.h"
-#include "events/event.h"
-#include "events/ui_event.h"
-#include "events/custom_event.h"
-#include "events/text_event.h"
-#include "events/keyboard_event.h"
-#include "events/mouse_event.h"
-#include "events/mouse_multi_wheel_event.h"
-#include "events/mouse_wheel_event.h"
-#include "events/mutation_event.h"
-#include "events/mutation_name_event.h"
+#include "dom_internal_string.h"
+#include "node.h"
+#include "document.h"
+#include "document_event.h"
+#include "event.h"
+#include "ui_event.h"
+#include "custom_event.h"
+#include "text_event.h"
+#include "keyboard_event.h"
+#include "mouse_event.h"
+#include "mouse_multi_wheel_event.h"
+#include "mouse_wheel_event.h"
+#include "mutation_event.h"
+#include "mutation_name_event.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 static const char *__event_types[] = {
 	"Event",

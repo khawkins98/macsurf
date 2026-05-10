@@ -13,10 +13,10 @@
 #include <dom/core/node.h>
 #include <dom/functypes.h>
 
-#include "events/event_target.h"
-#include "events/mutation_event.h"
+#include "event_target.h"
+#include "mutation_event.h"
 
-#include "utils/list.h"
+#include "list.h"
 
 /**
  * User data context attached to a DOM node

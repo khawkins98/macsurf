@@ -8,16 +8,16 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "events/event.h"
-#include "events/event_listener.h"
-#include "events/event_target.h"
+#include "event.h"
+#include "event_listener.h"
+#include "event_target.h"
 
-#include "core/document.h"
-#include "core/node.h"
-#include "core/string.h"
+#include "document.h"
+#include "node.h"
+#include "dom_internal_string.h"
 
-#include "utils/utils.h"
-#include "utils/validate.h"
+#include "utils.h"
+#include "validate.h"
 
 static void event_target_destroy_listener(struct listener_entry *e)
 {
