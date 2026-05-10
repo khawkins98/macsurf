@@ -14,7 +14,7 @@
 #ifdef TEST_RIG
 #include <stdio.h>
 #endif
-#include "utils/hashtable.h"
+#include "hashtable.h"
 
 #include <libwapcaplet/libwapcaplet.h>
 

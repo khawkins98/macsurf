@@ -11,12 +11,12 @@
 
 #include <dom/html/html_anchor_element.h>
 
-#include "html/html_document.h"
-#include "html/html_anchor_element.h"
+#include "html_document.h"
+#include "html_anchor_element.h"
 
-#include "core/node.h"
-#include "core/attr.h"
-#include "utils/utils.h"
+#include "node.h"
+#include "attr.h"
+#include "utils.h"
 
 static const struct dom_element_protected_vtable _protect_vtable = {
 	{

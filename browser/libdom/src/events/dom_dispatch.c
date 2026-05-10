@@ -7,11 +7,11 @@
 
 #include <assert.h>
 
-#include "core/document.h"
-#include "events/dispatch.h"
-#include "events/mutation_event.h"
+#include "document.h"
+#include "dispatch.h"
+#include "mutation_event.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 /**
  * Dispatch a DOMNodeInserted/DOMNodeRemoved event

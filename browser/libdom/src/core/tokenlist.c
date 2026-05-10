@@ -18,10 +18,10 @@
 #include <dom/events/event_listener.h>
 #include <dom/events/mutation_event.h>
 
-#include "core/element.h"
-#include "core/document.h"
+#include "element.h"
+#include "document.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 #define DOM_TOKENLIST_GROW_INCREMENT 4
 

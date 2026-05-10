@@ -8,10 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "events/mouse_event.h"
-#include "core/document.h"
+#include "mouse_event.h"
+#include "document.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 static void _virtual_dom_mouse_event_destroy(struct dom_event *evt);
 

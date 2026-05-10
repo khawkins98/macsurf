@@ -7,11 +7,11 @@
 
 #include <stdlib.h>
 
-#include "core/document.h"
-#include "core/node.h"
-#include "core/pi.h"
+#include "document.h"
+#include "node.h"
+#include "pi.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 /**
  * A DOM processing instruction

@@ -10,12 +10,12 @@
 
 #include <libwapcaplet/libwapcaplet.h>
 
-#include "html/html_options_collection.h"
+#include "html_options_collection.h"
 
-#include "core/node.h"
-#include "core/element.h"
-#include "core/string.h"
-#include "utils/utils.h"
+#include "node.h"
+#include "element.h"
+#include "dom_internal_string.h"
+#include "utils.h"
 
 /*-----------------------------------------------------------------------*/
 /* Constructor and destructor */

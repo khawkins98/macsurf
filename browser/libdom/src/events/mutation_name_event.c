@@ -7,10 +7,10 @@
 
 #include <stdlib.h>
 
-#include "events/mutation_name_event.h"
-#include "core/document.h"
+#include "mutation_name_event.h"
+#include "document.h"
 
-#include "utils/utils.h"
+#include "utils.h"
 
 static void _virtual_dom_mutation_name_event_destroy(struct dom_event *evt);
 

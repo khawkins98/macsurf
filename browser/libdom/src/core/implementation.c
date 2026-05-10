@@ -9,14 +9,14 @@
 
 #include <dom/core/implementation.h>
 
-#include "core/document.h"
-#include "core/document_type.h"
+#include "document.h"
+#include "document_type.h"
 
-#include "html/html_document.h"
+#include "html_document.h"
 
-#include "utils/namespace.h"
-#include "utils/utils.h"
-#include "utils/validate.h"
+#include "namespace.h"
+#include "utils.h"
+#include "validate.h"
 
 /**
  * Test whether a DOM implementation implements a specific feature

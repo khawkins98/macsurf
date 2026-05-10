@@ -10,7 +10,7 @@
 
 #include <dom/events/mutation_name_event.h>
 
-#include "events/mutation_event.h"
+#include "mutation_event.h"
 
 /**
  * The MutationName event 

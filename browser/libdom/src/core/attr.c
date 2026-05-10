@@ -16,12 +16,12 @@
 #include <dom/core/node.h>
 #include <dom/core/string.h>
 
-#include "core/attr.h"
-#include "core/document.h"
-#include "core/entity_ref.h"
-#include "core/node.h"
-#include "core/element.h"
-#include "utils/utils.h"
+#include "attr.h"
+#include "document.h"
+#include "entity_ref.h"
+#include "node.h"
+#include "element.h"
+#include "utils.h"
 
 struct dom_element;
 

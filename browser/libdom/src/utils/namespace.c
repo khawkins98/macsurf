@@ -10,9 +10,9 @@
 
 #include <dom/dom.h>
 
-#include "utils/namespace.h"
-#include "utils/validate.h"
-#include "utils/utils.h"
+#include "namespace.h"
+#include "validate.h"
+#include "utils.h"
 
 
 /** XML prefix */

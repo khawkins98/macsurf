@@ -8,10 +8,10 @@
 
 #include <stdlib.h>
 
-#include "core/cdatasection.h"
-#include "core/document.h"
-#include "core/text.h"
-#include "utils/utils.h"
+#include "cdatasection.h"
+#include "document.h"
+#include "text.h"
+#include "utils.h"
 
 /**
  * A DOM CDATA section

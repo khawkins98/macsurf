@@ -8,13 +8,13 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-#include "utils/validate.h"
+#include "validate.h"
 
 #include <dom/core/string.h>
 
-#include "utils/character_valid.h"
-#include "utils/namespace.h"
-#include "utils/utils.h"
+#include "character_valid.h"
+#include "namespace.h"
+#include "utils.h"
 
 #include <parserutils/charset/utf8.h>
 

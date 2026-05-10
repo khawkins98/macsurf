@@ -24,14 +24,14 @@
 #include <dom/core/text.h>
 #include <dom/core/implementation.h>
 
-#include "core/string.h"
-#include "core/node.h"
-#include "core/nodelist.h"
+#include "dom_internal_string.h"
+#include "node.h"
+#include "nodelist.h"
 
-#include "utils/dom_hashtable.h"
-#include "utils/list.h"
+#include "dom_hashtable.h"
+#include "list.h"
 
-#include "events/document_event.h"
+#include "document_event.h"
 
 struct dom_doc_nl;
 

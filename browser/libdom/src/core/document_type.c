@@ -10,12 +10,12 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "core/string.h"
-#include "core/document_type.h"
-#include "core/namednodemap.h"
-#include "core/node.h"
-#include "utils/utils.h"
-#include "utils/namespace.h"
+#include "dom_internal_string.h"
+#include "document_type.h"
+#include "namednodemap.h"
+#include "node.h"
+#include "utils.h"
+#include "namespace.h"
 
 /**
  * DOM DocumentType node
