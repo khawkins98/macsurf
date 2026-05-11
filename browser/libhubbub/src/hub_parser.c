@@ -13,10 +13,10 @@
 
 #include <hubbub/parser.h>
 
-#include "charset/detect.h"
+#include "hub_charset_detect.h"
 #include "tokeniser/tokeniser.h"
 #include "treebuilder/treebuilder.h"
-#include "utils/parserutilserror.h"
+#include "hub_parserutilserror.h"
 
 /**
  * Hubbub parser object

@@ -13,7 +13,7 @@
 
 #include <parserutils/charset/utf8.h>
 
-#include "utils/parserutilserror.h"
+#include "hub_parserutilserror.h"
 #include "utils/utils.h"
 
 #include "hubbub/errors.h"

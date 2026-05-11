@@ -31,6 +31,7 @@
 #include "utils.h"
 #include "list.h"
 #include "mutation_event.h"
+#include "dom_internal_dispatch.h"
 
 const struct dom_element_vtable _dom_element_vtable = {
 	{
