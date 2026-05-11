@@ -816,6 +816,9 @@ static nserror treeview__search_walk_cb(
 		bool *end)
 {
 	struct treeview_search_walk_data *sw = ctx;
+	struct treeview_node_entry *entry;
+	bool matched = false;
+	int i;
 
 	/* only entry nodes can be searched */
 	if (n->type != TREE_NODE_ENTRY) {
@@ -828,9 +831,7 @@ static nserror treeview__search_walk_cb(
 		return NSERROR_OK;
 	}
 
-	struct treeview_node_entry *entry = (struct treeview_node_entry *)n;
-	bool matched = false;
-	int i;
+	entry = (struct treeview_node_entry *)n;
 
 	for (i = 0; i < sw->tree->n_fields; i++) {
 		struct treeview_field *ef = &(sw->tree->fields[i + 1]);
@@ -1998,20 +1999,18 @@ static struct textarea *treeview__create_textarea(
 {
 	/* Configure the textarea */
 	textarea_flags ta_flags = TEXTAREA_INTERNAL_CARET;
-	textarea_setup ta_setup = {
-		.text = text,
-		.width = width,
-		.height = height,
-		.pad_top = 0,
-		.pad_left = 2,
-		.pad_right = 2,
-		.pad_bottom = 0,
-		.border_width = 1,
-		.border_col = border,
-		.selected_bg = foreground,
-		.selected_text = background,
-	};
-
+	textarea_setup ta_setup;
+	ta_setup.width = width;
+	ta_setup.height = height;
+	ta_setup.pad_top = 0;
+	ta_setup.pad_right = 2;
+	ta_setup.pad_bottom = 0;
+	ta_setup.pad_left = 2;
+	ta_setup.border_width = 1;
+	ta_setup.border_col = border;
+	ta_setup.selected_text = background;
+	ta_setup.selected_bg = foreground;
+	ta_setup.text = text;
 	ta_setup.text.foreground = foreground;
 	ta_setup.text.background = background;
 
