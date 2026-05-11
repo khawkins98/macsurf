@@ -16,7 +16,7 @@
 
 #include "utils/utils.h"
 
-#include "detect.h"
+#include "hub_charset_detect.h"
 
 static uint16_t hubbub_charset_read_bom(const uint8_t *data, size_t len);
 static uint16_t hubbub_charset_scan_meta(const uint8_t *data, size_t len);

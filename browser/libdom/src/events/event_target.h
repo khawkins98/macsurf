@@ -14,7 +14,7 @@
 #include <dom/events/event_target.h>
 #include <dom/events/event_listener.h>
 
-#include "dispatch.h"
+#include "dom_internal_dispatch.h"
 
 #include "list.h"
 

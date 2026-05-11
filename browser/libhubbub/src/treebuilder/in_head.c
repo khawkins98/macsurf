@@ -14,7 +14,7 @@
 #include "treebuilder/internal.h"
 #include "treebuilder/treebuilder.h"
 
-#include "charset/detect.h"
+#include "hub_charset_detect.h"
 
 #include "utils/utils.h"
 #include "utils/hub_string.h"

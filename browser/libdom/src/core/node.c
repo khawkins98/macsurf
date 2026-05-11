@@ -37,6 +37,7 @@
 #include "utils.h"
 #include "validate.h"
 #include "mutation_event.h"
+#include "dom_internal_dispatch.h"
 
 static bool _dom_node_permitted_child(const dom_node_internal *parent, 
 		const dom_node_internal *child);
@@ -996,7 +997,8 @@ dom_exception _dom_node_remove_child(dom_node_internal *node,
 	*result = (dom_node_internal *) dom_node_ref(old_child);
 
 	success = true;
-	err = _dom_dispatch_subtree_modified_event(node->owner, node,
+	err = __dom_dispatch_subtree_modified_event(node->owner,
+			(dom_event_target *)node,
 			&success);
 	if (err != DOM_NO_ERR)
 		return err;
@@ -2155,7 +2157,8 @@ dom_exception _dom_node_attach_range(dom_node_internal *first,
 	}
 
 	success = true;
-	err = _dom_dispatch_subtree_modified_event(parent->owner, parent,
+	err = __dom_dispatch_subtree_modified_event(parent->owner,
+			(dom_event_target *)parent,
 			&success);
 	if (err != DOM_NO_ERR)
 		return err;
@@ -2199,7 +2202,8 @@ dom_exception _dom_node_detach_range(dom_node_internal *first,
 	}
 
 	success = true;
-	_dom_dispatch_subtree_modified_event(parent->owner, parent,
+	__dom_dispatch_subtree_modified_event(parent->owner,
+			(dom_event_target *)parent,
 			&success);
 
 	first->previous = NULL;
@@ -2669,7 +2673,9 @@ dom_exception _dom_node_dispatch_node_change_event(dom_document *doc,
 	dom_exception err;
 
 	/* Fire change event at immediate target */
-	err = _dom_dispatch_node_change_event(doc, node, related, 
+	err = __dom_dispatch_node_change_event(doc,
+			(dom_event_target *)node,
+			(dom_event_target *)related,
 			change, success);
 	if (err != DOM_NO_ERR)
 		return err;
@@ -2677,7 +2683,8 @@ dom_exception _dom_node_dispatch_node_change_event(dom_document *doc,
 	/* Fire document change event at subtree */
 	target = node->first_child;
 	while (target != NULL) {
-		err = _dom_dispatch_node_change_document_event(doc, target, 
+		err = __dom_dispatch_node_change_document_event(doc,
+				(dom_event_target *)target,
 				change, success);
 		if (err != DOM_NO_ERR)
 			return err;

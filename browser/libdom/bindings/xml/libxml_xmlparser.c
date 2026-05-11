@@ -22,7 +22,7 @@
 #include "xmlparser.h"
 #include "utils.h"
 
-#include "core/document.h"
+#include "document.h"
 
 #undef DEBUG_XML_PARSER
 

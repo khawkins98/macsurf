@@ -18,6 +18,7 @@
 #include "node.h"
 #include "utils.h"
 #include "mutation_event.h"
+#include "dom_internal_dispatch.h"
 
 /* The virtual functions for dom_characterdata, we make this vtable
  * public to each child class */

@@ -22,6 +22,7 @@
 #include "node.h"
 #include "element.h"
 #include "utils.h"
+#include "dom_internal_dispatch.h"
 
 struct dom_element;
 
