@@ -52,7 +52,7 @@ static bool isWhitespace(char c)
  * \param c  Character to consider
  * \return true if character is a valid hex digit, false otherwise
  */
-static bool isHex(char c)
+static bool hints_isHex(int c)
 {
 	return ('0' <= c && c <= '9') ||
 			('A' <= (c & ~0x20) && (c & ~0x20) <= 'F');
@@ -66,7 +66,7 @@ static bool isHex(char c)
  *
  * \note This function assumes an ASCII-compatible character set
  */
-static uint8_t charToHex(char c)
+static uint8_t hints_charToHex(int c)
 {
 	/* 0-9 */
 	c -= '0';
@@ -79,7 +79,7 @@ static uint8_t charToHex(char c)
 	if (c > 15)
 		c -= 'a' - 'A';
 
-	return c;
+	return (uint8_t)c;
 }
 
 
@@ -470,10 +470,10 @@ bool nscss_parse_colour(const char *data, css_color *result)
 		len--;
 	}
 
-	if (len == 3 && isHex(data[0]) && isHex(data[1]) && isHex(data[2])) {
-		r = charToHex(data[0]);
-		g = charToHex(data[1]);
-		b = charToHex(data[2]);
+	if (len == 3 && hints_isHex(data[0]) && hints_isHex(data[1]) && hints_isHex(data[2])) {
+		r = hints_charToHex(data[0]);
+		g = hints_charToHex(data[1]);
+		b = hints_charToHex(data[2]);
 
 		r |= (r << 4);
 		g |= (g << 4);
@@ -482,12 +482,12 @@ bool nscss_parse_colour(const char *data, css_color *result)
 		*result = (0xff << 24) | (r << 16) | (g << 8) | b;
 
 		return true;
-	} else if (len == 6 && isHex(data[0]) && isHex(data[1]) &&
-			isHex(data[2]) && isHex(data[3]) && isHex(data[4]) &&
-			isHex(data[5])) {
-		r = (charToHex(data[0]) << 4) | charToHex(data[1]);
-		g = (charToHex(data[2]) << 4) | charToHex(data[3]);
-		b = (charToHex(data[4]) << 4) | charToHex(data[5]);
+	} else if (len == 6 && hints_isHex(data[0]) && hints_isHex(data[1]) &&
+			hints_isHex(data[2]) && hints_isHex(data[3]) && hints_isHex(data[4]) &&
+			hints_isHex(data[5])) {
+		r = (hints_charToHex(data[0]) << 4) | hints_charToHex(data[1]);
+		g = (hints_charToHex(data[2]) << 4) | hints_charToHex(data[3]);
+		b = (hints_charToHex(data[4]) << 4) | hints_charToHex(data[5]);
 
 		*result = (0xff << 24) | (r << 16) | (g << 8) | b;
 
