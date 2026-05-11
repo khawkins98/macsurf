@@ -63,7 +63,7 @@ static const char css_default[] =
 	"caption{display:table-caption;text-align:center}"
 	"th{font-weight:bolder;text-align:center}"
 	/* Body + headings */
-	"body{margin:8px;line-height:1.12;color:#000;background-color:#fff}"
+	"body{margin:8px;line-height:1.12;color:#000;background-color:#FF0000}"
 	"h1{font-size:2em;margin:.67em 0;font-weight:bolder}"
 	"h2{font-size:1.5em;margin:.75em 0;font-weight:bolder}"
 	"h3{font-size:1.17em;margin:.83em 0;font-weight:bolder}"
