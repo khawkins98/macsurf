@@ -487,6 +487,36 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 
 	assert(ctx->n != NULL);
 
+	/* Skip non-rendered metadata elements unconditionally — these never
+	 * generate boxes regardless of the cascade's display value. Catches
+	 * the case where the UA stylesheet's display:none rules don't reach
+	 * the cascade and <style>/<script> content leaks into body as text. */
+	{
+		dom_string *tag_name = NULL;
+		if (dom_element_get_tag_name(ctx->n, &tag_name) == DOM_NO_ERR &&
+				tag_name != NULL) {
+			bool m;
+			bool skip = false;
+			if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_style, &m) == DOM_NO_ERR && m) skip = true;
+			else if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_title, &m) == DOM_NO_ERR && m) skip = true;
+			else if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_meta, &m) == DOM_NO_ERR && m) skip = true;
+			else if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_link, &m) == DOM_NO_ERR && m) skip = true;
+			else if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_base, &m) == DOM_NO_ERR && m) skip = true;
+			else if (dom_string_caseless_lwc_isequal(tag_name,
+					corestring_lwc_head, &m) == DOM_NO_ERR && m) skip = true;
+			dom_string_unref(tag_name);
+			if (skip) {
+				*convert_children = false;
+				return true;
+			}
+		}
+	}
+
 	box_extract_properties(ctx->n, &props);
 
 	if (props.containing_block != NULL) {
