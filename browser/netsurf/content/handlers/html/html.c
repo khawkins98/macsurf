@@ -934,6 +934,19 @@ html_begin_conversion(html_content *htmlc)
 		htmlc->parse_completed = true;
 	}
 
+	/* Walk DOM for <style> and <link rel=stylesheet> once parse is
+	 * done. The libdom DOMSubtreeModified / DOMNodeInserted event
+	 * chain that normally triggers stylesheet pickup is unreliable
+	 * in this build, so we discover them explicitly here. Any
+	 * stylesheets found will bump htmlc->base.active and cause
+	 * html_can_begin_conversion() to bail until they finish loading. */
+	if (htmlc->stylesheets_discovered == false) {
+		MS_LOG("html discover stylesheets");
+		html_css_discover_stylesheets(htmlc);
+		macsurf_debug_log_int("stylesheet count after discovery",
+			(long)htmlc->stylesheet_count);
+	}
+
 	if (html_can_begin_conversion(htmlc) == false) {
 		NSLOG(netsurf, INFO, "Can't begin conversion (%p)", htmlc);
 		/* We can't proceed (see commentary above) */

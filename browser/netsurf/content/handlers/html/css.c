@@ -712,6 +712,153 @@ html_css_new_selection_context(html_content *c, css_select_ctx **ret_select_ctx)
 }
 
 
+/**
+ * Synchronously start the fetch for one inline <style> element.
+ *
+ * Equivalent to html_css_update_style() followed by an immediate run of
+ * html_css_process_modified_styles(), but without bouncing through the
+ * scheduler.  Used by the post-parse DOM walker so c->base.active is
+ * already incremented by the time html_can_begin_conversion() runs.
+ */
+static nserror
+html_css_register_inline_style_sync(html_content *c, dom_node *style)
+{
+	unsigned int i;
+	struct html_stylesheet *s;
+	hlcache_handle *sheet = NULL;
+	nserror error;
+
+	for (i = 0, s = c->stylesheets;
+	     i != c->stylesheet_count;
+	     i++, s++) {
+		if (s->node == style)
+			break;
+	}
+	if (i == c->stylesheet_count) {
+		s = html_create_style_element(c, style);
+	}
+	if (s == NULL) {
+		return NSERROR_NOMEM;
+	}
+
+	error = html_stylesheet_from_domnode(c, s->node, &sheet);
+	if (error != NSERROR_OK) {
+		return error;
+	}
+
+	if (sheet != NULL) {
+		if (s->sheet != NULL) {
+			hlcache_handle_release(s->sheet);
+		}
+		s->sheet = sheet;
+	}
+	s->modified = false;
+	return NSERROR_OK;
+}
+
+
+/* exported function documented in html/css.h */
+nserror html_css_discover_stylesheets(html_content *c)
+{
+	dom_node *root = NULL;
+	dom_node *node = NULL;
+	dom_node *next = NULL;
+	dom_node *child = NULL;
+	dom_node *parent = NULL;
+	dom_exception exc;
+	dom_node_type ntype;
+	dom_string *tagname = NULL;
+	long style_found = 0;
+	long link_found = 0;
+
+	if (c == NULL) {
+		return NSERROR_BAD_PARAMETER;
+	}
+	if (c->stylesheets_discovered) {
+		return NSERROR_OK;
+	}
+	if (c->document == NULL) {
+		return NSERROR_OK;
+	}
+
+	exc = dom_document_get_document_element(c->document, &root);
+	if ((exc != DOM_NO_ERR) || (root == NULL)) {
+		return NSERROR_OK;
+	}
+
+	/* Iterative depth-first walk. We ref root and walk; every node
+	 * we leave is unref'd; we keep at most one ref outstanding besides
+	 * the current node. */
+	node = root;
+	while (node != NULL) {
+		exc = dom_node_get_node_type(node, &ntype);
+		if ((exc == DOM_NO_ERR) && (ntype == DOM_ELEMENT_NODE)) {
+			exc = dom_node_get_node_name(node, &tagname);
+			if ((exc == DOM_NO_ERR) && (tagname != NULL)) {
+				if (dom_string_caseless_lwc_isequal(
+						tagname,
+						corestring_lwc_style)) {
+					/* Inline <style> — start its fetch */
+					if (nsoption_bool(author_level_css)) {
+						(void)html_css_register_inline_style_sync(c, node);
+						style_found++;
+					}
+				} else if (dom_string_caseless_lwc_isequal(
+						tagname,
+						corestring_lwc_link)) {
+					(void)html_css_process_link(c, node);
+					link_found++;
+				}
+				dom_string_unref(tagname);
+				tagname = NULL;
+			}
+		}
+
+		/* Advance: depth-first, child -> sibling -> parent.sibling ... */
+		child = NULL;
+		exc = dom_node_get_first_child(node, &child);
+		if ((exc == DOM_NO_ERR) && (child != NULL)) {
+			dom_node_unref(node);
+			node = child;
+			continue;
+		}
+
+		next = NULL;
+		exc = dom_node_get_next_sibling(node, &next);
+		if ((exc == DOM_NO_ERR) && (next != NULL)) {
+			dom_node_unref(node);
+			node = next;
+			continue;
+		}
+
+		/* No child, no sibling: pop up until we find a sibling or root. */
+		for (;;) {
+			parent = NULL;
+			exc = dom_node_get_parent_node(node, &parent);
+			dom_node_unref(node);
+			node = NULL;
+			if ((exc != DOM_NO_ERR) || (parent == NULL)) {
+				break;
+			}
+			next = NULL;
+			exc = dom_node_get_next_sibling(parent, &next);
+			if ((exc == DOM_NO_ERR) && (next != NULL)) {
+				dom_node_unref(parent);
+				node = next;
+				break;
+			}
+			node = parent;
+		}
+	}
+
+	c->stylesheets_discovered = true;
+	NSLOG(netsurf, INFO,
+	      "discover: %ld <style> + %ld <link> elements found",
+	      style_found, link_found);
+	return NSERROR_OK;
+}
+
+
 /* exported function documented in html/css.h */
 nserror html_css_init(void)
 {

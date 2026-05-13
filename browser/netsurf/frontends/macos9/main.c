@@ -191,6 +191,15 @@ static void macos9_handle_update(const EventRecord *event) {
 			macos9_hrb_inline, macos9_hrb_text, macos9_hrb_other,
 			macos9_hrb_clip_skips,
 			macos9_plot_text_count, macos9_plot_rect_count);
+		/* Redraw chrome AFTER content so any stray plotter that
+		 * leaked outside content_rect can't leave the URL bar /
+		 * controls / status bar visually torn. Addresses the
+		 * 2026-04-18 survey hypothesis about URL field visual
+		 * blanking on the initial window. */
+		draw_url_bar(gw);
+		DrawControls(win);
+		draw_status_bar(gw);
+		if (gw->url_field_active && gw->url_te) TEActivate(gw->url_te);
 	} else if (gw->bw) {
 		MS_LOG("update: bw not ready, skip");
 	}
