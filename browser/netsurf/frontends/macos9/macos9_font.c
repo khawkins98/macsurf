@@ -183,6 +183,13 @@ macos9_font_measure(const struct plot_font_style *fstyle,
 
         width = TextWidth(mac_str, 0, (short)mac_len);
 
+        /* fixes42: letter-spacing inserted between glyph pairs.
+         * mac_len characters => mac_len - 1 gaps. */
+        if (fstyle != NULL && fstyle->letter_spacing != 0 && mac_len > 1) {
+                width += (int)(mac_len - 1) * fstyle->letter_spacing;
+                if (width < 0) width = 0;
+        }
+
         if (changed_port)
                 SetPort(old_port);
         return width;

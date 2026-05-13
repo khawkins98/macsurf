@@ -122,6 +122,10 @@ typedef struct plot_font_style {
 	plot_font_flags_t flags; /**< Font flags */
 	colour background; /**< Background colour to blend to, if appropriate */
 	colour foreground; /**< Colour of text */
+	/* fixes42: extra spacing inserted between glyphs in pixels.
+	 * 0 (the common case) keeps the fast-path text draw. Non-zero
+	 * routes through per-character draw + per-character width. */
+	int letter_spacing;
 } plot_font_style_t;
 
 

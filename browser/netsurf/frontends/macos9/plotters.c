@@ -654,12 +654,32 @@ macos9_plot_text(const struct redraw_context *ctx,
 		char mac_buf[1024];
 		size_t mac_len;
 		RgnHandle saved_clip;
+		int ls;
 
 		mac_len = macos9_utf8_to_macroman(text, length, mac_buf,
 				sizeof(mac_buf));
 		saved_clip = macos9_push_clip();
-		MoveTo((short)x, (short)y);
-		DrawText(mac_buf, 0, (short)mac_len);
+		ls = (fstyle != NULL) ? fstyle->letter_spacing : 0;
+		if (ls == 0 || mac_len <= 1) {
+			MoveTo((short)x, (short)y);
+			DrawText(mac_buf, 0, (short)mac_len);
+		} else {
+			/* fixes42: letter-spacing fast-fallback. QuickDraw
+			 * has no built-in CharExtra; draw one MacRoman
+			 * glyph at a time, advancing pen by the glyph width
+			 * plus letter-spacing pixels. Slower than the bulk
+			 * DrawText but exercised only when CSS specifies a
+			 * non-default letter-spacing. */
+			size_t i;
+			short pen_x = (short)x;
+			short cw;
+			for (i = 0; i < mac_len; i++) {
+				MoveTo(pen_x, (short)y);
+				DrawText(mac_buf, (short)i, 1);
+				cw = (short)CharWidth(mac_buf[i]);
+				pen_x = (short)(pen_x + cw + ls);
+			}
+		}
 		macos9_pop_clip(saved_clip);
 	}
 #else

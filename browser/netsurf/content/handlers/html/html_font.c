@@ -162,6 +162,21 @@ void font_plot_style_from_css(
 	css_computed_color(css, &col);
 	fstyle->foreground = nscss_color_to_ns(col);
 	fstyle->background = 0;
+	/* fixes42: letter-spacing. NORMAL or INHERIT => 0. SET emits a
+	 * pixel value the macos9 plotter inserts between glyphs. */
+	{
+		css_fixed ls_len = 0;
+		css_unit ls_unit = CSS_UNIT_PX;
+		uint8_t ls_status = css_computed_letter_spacing(css,
+				&ls_len, &ls_unit);
+		if (ls_status == CSS_LETTER_SPACING_SET) {
+			fstyle->letter_spacing = (int)FIXTOINT(
+				css_unit_len2device_px(css, unit_len_ctx,
+					ls_len, ls_unit));
+		} else {
+			fstyle->letter_spacing = 0;
+		}
+	}
 	/* Safety: when the CSS cascade produces a suspicious colour (white,
 	 * transparent, or otherwise garbage from an incomplete computed
 	 * style), force foreground to opaque black so text is always
