@@ -618,15 +618,26 @@ macos9_plot_text(const struct redraw_context *ctx,
 			snippet);
 	}
 
+	/* Convert UTF-8 to MacRoman so bullets, em-dashes, smart quotes,
+	 * etc. render as the right glyph instead of as `?` or garbage.
+	 * Without this, list-style-type:disc bullets (U+2022) appear
+	 * as `;` and most modern punctuation breaks. */
 #ifdef __MACOS9__
 	{
-		RgnHandle saved_clip = macos9_push_clip();
-#endif
-	MoveTo((short)x, (short)y);
-	DrawText(text, 0, (short)length);
-#ifdef __MACOS9__
+		char mac_buf[1024];
+		size_t mac_len;
+		RgnHandle saved_clip;
+
+		mac_len = macos9_utf8_to_macroman(text, length, mac_buf,
+				sizeof(mac_buf));
+		saved_clip = macos9_push_clip();
+		MoveTo((short)x, (short)y);
+		DrawText(mac_buf, 0, (short)mac_len);
 		macos9_pop_clip(saved_clip);
 	}
+#else
+	MoveTo((short)x, (short)y);
+	DrawText(text, 0, (short)length);
 #endif
 
 	return NSERROR_OK;
