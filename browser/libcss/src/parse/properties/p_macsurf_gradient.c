@@ -59,7 +59,11 @@ css_error css__parse_macsurf_gradient(css_language *c,
 		uint16_t set_value = 0x0080;
 		parserutils_vector_iterate(vector, ctx);
 
-		/* Optional `to <side>` direction prefix. */
+		/* Optional `to <side>` direction prefix.
+		 * fixes48a -- tokens are interleaved with CSS_TOKEN_S
+		 * whitespace; consumeWhitespace between each peek so the
+		 * direction parse doesn't miss the keywords. */
+		consumeWhitespace(vector, ctx);
 		token = parserutils_vector_peek(vector, *ctx);
 		if (token != NULL && token->type == CSS_TOKEN_IDENT) {
 			bool to_match = false;
@@ -67,6 +71,7 @@ css_error css__parse_macsurf_gradient(css_language *c,
 					c->strings[TO], &to_match)
 					== lwc_error_ok && to_match) {
 				parserutils_vector_iterate(vector, ctx);
+				consumeWhitespace(vector, ctx);
 				/* Next ident: right|left|top|bottom */
 				token = parserutils_vector_peek(vector, *ctx);
 				if (token != NULL &&
@@ -86,6 +91,7 @@ css_error css__parse_macsurf_gradient(css_language *c,
 					}
 					parserutils_vector_iterate(vector, ctx);
 				}
+				consumeWhitespace(vector, ctx);
 				/* Optional comma after direction. */
 				token = parserutils_vector_peek(vector, *ctx);
 				if (token != NULL && token->type == CSS_TOKEN_CHAR &&
