@@ -35,63 +35,99 @@
  */
 
 /* Each adjacent literal must stay under the 509-char C89 limit; the
- * compiler concatenates them into a single array at build time. */
+ * compiler concatenates them into a single array at build time.
+ *
+ * Modelled on NetSurf's resources/default.css but condensed and
+ * extended with HTML5 element coverage. */
 static const char css_default[] =
-	/* Block/flow display */
+	/* Block / flow display */
 	"html,address,blockquote,body,dd,div,dl,dt,fieldset,form,"
 	"frame,frameset,h1,h2,h3,h4,h5,h6,noframes,ol,p,ul,center,"
-	"dir,hr,menu,pre,header,footer,nav,section,article,aside,"
-	"main,figure,figcaption{display:block}"
+	"dir,hr,menu,pre{display:block}"
+	/* HTML5 sectioning */
+	"header,footer,nav,section,article,aside,main,figure,"
+	"figcaption,details,summary,hgroup,dialog,picture{display:block}"
 	"li{display:list-item}"
-	"head{display:none}"
-	"style{display:none}"
-	"script{display:none}"
-	"title{display:none}"
-	"meta{display:none}"
-	"link{display:none}"
-	"base{display:none}"
-	"template{display:none}"
+	"head,style,script,title,meta,link,base,template,"
+	"noembed,noscript,source,track{display:none}"
 	/* Tables */
-	"table{display:table;border-spacing:2px}"
-	"tr{display:table-row}"
-	"thead{display:table-header-group}"
-	"tbody{display:table-row-group}"
-	"tfoot{display:table-footer-group}"
+	"table{display:table;border-spacing:2px;border-collapse:separate}"
+	"tr{display:table-row;vertical-align:inherit}"
+	"thead{display:table-header-group;vertical-align:middle}"
+	"tbody{display:table-row-group;vertical-align:middle}"
+	"tfoot{display:table-footer-group;vertical-align:middle}"
 	"col{display:table-column}"
 	"colgroup{display:table-column-group}"
-	"td,th{display:table-cell}"
+	"td,th{display:table-cell;vertical-align:inherit;padding:1px}"
 	"caption{display:table-caption;text-align:center}"
-	"th{font-weight:bolder;text-align:center}"
+	"th{font-weight:bold;text-align:center}"
+	"table[border],table[border] td,table[border] tr{"
+	"border-color:#888;border-style:solid;border-width:1px}"
 	/* Body + headings */
-	"body{margin:8px;line-height:1.12;color:#000;background-color:#fff}"
-	"h1{font-size:2em;margin:.67em 0;font-weight:bolder}"
-	"h2{font-size:1.5em;margin:.75em 0;font-weight:bolder}"
-	"h3{font-size:1.17em;margin:.83em 0;font-weight:bolder}"
-	"h4{margin:1.12em 0;font-weight:bolder}"
-	"h5{font-size:.83em;margin:1.5em 0;font-weight:bolder}"
-	"h6{font-size:.75em;margin:1.67em 0;font-weight:bolder}"
-	/* Block-level margins */
-	"blockquote,figure{margin-left:40px;margin-right:40px}"
-	"hr{border:1px inset}"
-	"ol,ul,dir,menu,dd{margin-left:40px}"
-	"ol{list-style-type:decimal}"
+	"body{margin:8px;line-height:1.33;color:#000;background:#fff;"
+	"font-family:sans-serif;font-size:13px}"
+	"h1{font-size:2em;margin:.67em 0;font-weight:bold}"
+	"h2{font-size:1.5em;margin:.83em 0;font-weight:bold}"
+	"h3{font-size:1.17em;margin:1em 0;font-weight:bold}"
+	"h4{margin:1.33em 0;font-weight:bold}"
+	"h5{font-size:.83em;margin:1.67em 0;font-weight:bold}"
+	"h6{font-size:.67em;margin:2.33em 0;font-weight:bold}"
+	/* Paragraphs and block margins */
+	"p{margin:1em 0}"
+	"blockquote,figure{margin:1em 40px}"
+	"hr{margin:.5em auto;border:1px inset #888;height:0}"
+	"hr[noshade]{border-style:solid}"
+	/* Lists */
+	"ul{padding-left:40px;margin:1em 0;list-style-type:disc}"
+	"ol{padding-left:40px;margin:1em 0;list-style-type:decimal}"
+	"ul ul{list-style-type:circle}"
+	"ul ul ul{list-style-type:square}"
 	"ol ul,ul ol,ul ul,ol ol{margin-top:0;margin-bottom:0}"
+	"dir,menu{padding-left:1.5em;margin:1em 0}"
+	"dl{padding-left:1.5em;margin:1em 0}"
+	"dt{font-weight:bold}"
+	"dd{padding-left:1em;margin-bottom:.33em}"
 	/* Inline styling */
 	"u,ins{text-decoration:underline}"
+	"ins{color:green}"
 	"strike,s,del{text-decoration:line-through}"
-	"b,strong{font-weight:bolder}"
-	"i,cite,em,var,address{font-style:italic}"
-	"pre,tt,code,kbd,samp{font-family:monospace}"
-	"pre{white-space:pre;margin:1em 0}"
+	"del{color:#a00}"
+	"b,strong{font-weight:bold}"
+	"i,em,cite,var,dfn,q{font-style:italic}"
+	"address{font-style:italic;display:block}"
+	"abbr,acronym{font-variant:small-caps}"
+	/* Monospace */
+	"tt,code,kbd,samp,pre{font-family:monospace}"
+	"kbd{font-weight:bold}"
+	"pre{white-space:pre;margin:1em 0;font-family:monospace}"
+	/* Sizes */
 	"big{font-size:1.17em}"
 	"small,sub,sup{font-size:.83em}"
 	"sub{vertical-align:sub}"
 	"sup{vertical-align:super}"
 	/* Forms */
-	"button,textarea,input,select{display:inline-block}"
-	/* Links + images */
-	"img,embed,object{color:transparent}"
-	"a[href]{color:#00f;text-decoration:underline}";
+	"form{display:block;margin:0 0 1em}"
+	"button,textarea,input,select{display:inline-block;"
+	"font-family:sans-serif;font-size:13px}"
+	"textarea{font-family:monospace}"
+	"fieldset{display:block;border:1px solid #888;margin:1em 0;padding:.5em}"
+	"legend{padding:0 .5em}"
+	"label{display:inline}"
+	/* Images / replaced */
+	"img{color:#888}"
+	"iframe{width:19em;height:10em}"
+	/* Anchors */
+	"a:link{color:#00f;text-decoration:underline}"
+	"a:visited{color:#609;text-decoration:underline}"
+	"a:hover{color:#f00}"
+	"a:active{color:#f80}"
+	"a[href]{color:#00f;text-decoration:underline}"
+	/* Misc */
+	"center{display:block;text-align:center}"
+	"mark{background:#ff0;color:#000}"
+	"br[clear=left]{clear:left}"
+	"br[clear=right]{clear:right}"
+	"br[clear=all]{clear:both}";
 
 static const char css_internal[] =
 	"input,textarea,button,select{background:#fff;color:#000;"

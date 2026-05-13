@@ -104,6 +104,19 @@ bool html_css_process_style(struct html_content *htmlc, dom_node *node);
  */
 bool html_css_update_style(struct html_content *htmlc, dom_node *node);
 
+/**
+ * Walk the parsed DOM tree and discover every <style> and
+ * <link rel="stylesheet"> element. For each, start its CSS fetch
+ * synchronously so c->base.active is bumped before
+ * html_can_begin_conversion is checked. Idempotent — guarded by
+ * c->stylesheets_discovered. Used because the libdom DOMSubtreeModified /
+ * DOMNodeInserted event chain that normally feeds these callbacks is
+ * unreliable in the MacSurf build.
+ *
+ * \param c   The html content whose DOM should be walked.
+ * \return  NSERROR_OK on success or appropriate error.
+ */
+nserror html_css_discover_stylesheets(struct html_content *c);
 
 
 #endif

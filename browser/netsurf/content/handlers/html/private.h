@@ -97,6 +97,7 @@ typedef struct html_content {
 	dom_hubbub_parser *parser; /**< Parser object handle */
 	bool parse_completed; /**< Whether the parse has been completed */
 	bool conversion_begun; /**< Whether or not the conversion has begun */
+	bool stylesheets_discovered; /**< Whether explicit <style>/<link> walker has run */
 
 	/** Document tree */
 	dom_document *document;
