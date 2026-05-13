@@ -679,6 +679,11 @@ html_css_new_selection_context(html_content *c, css_select_ctx **ret_select_ctx)
 		css_stylesheet *sheet = NULL;
 		css_origin origin = CSS_ORIGIN_AUTHOR;
 
+		macsurf_debug_log_writef(
+			"slot[%d] handle=%p node=%p unused=%d modified=%d",
+			(int)i, hsheet->sheet, hsheet->node,
+			(int)hsheet->unused, (int)hsheet->modified);
+
 		/* Filter out stylesheets for non-screen media. */
 		/* TODO: We should probably pass the sheet in anyway, and let
 		 *       libcss handle the filtering.
@@ -696,6 +701,13 @@ html_css_new_selection_context(html_content *c, css_select_ctx **ret_select_ctx)
 
 		if (hsheet->sheet != NULL) {
 			sheet = nscss_get_stylesheet(hsheet->sheet);
+			macsurf_debug_log_writef(
+				"slot[%d] nscss_get=%p origin=%d",
+				(int)i, sheet, (int)origin);
+		} else {
+			macsurf_debug_log_writef(
+				"slot[%d] handle is NULL (origin=%d)",
+				(int)i, (int)origin);
 		}
 
 		if (sheet != NULL) {
@@ -739,6 +751,7 @@ static nserror
 html_css_register_inline_style_sync(html_content *c, dom_node *style)
 {
 	unsigned int i;
+	unsigned int slot_idx;
 	struct html_stylesheet *s;
 	hlcache_handle *sheet = NULL;
 	nserror error;
@@ -750,22 +763,54 @@ html_css_register_inline_style_sync(html_content *c, dom_node *style)
 			break;
 	}
 	if (i == c->stylesheet_count) {
+		macsurf_debug_log_writef(
+			"walker: <style> new, calling create_style_element (count=%d)",
+			(int)c->stylesheet_count);
 		s = html_create_style_element(c, style);
+	} else {
+		macsurf_debug_log_writef(
+			"walker: <style> existing slot[%d]", (int)i);
 	}
 	if (s == NULL) {
+		macsurf_debug_log_writef(
+			"walker: create_style_element returned NULL");
 		return NSERROR_NOMEM;
 	}
 
+	slot_idx = (unsigned int)(s - c->stylesheets);
+	macsurf_debug_log_writef(
+		"walker: slot[%d] node=%p before fetch",
+		(int)slot_idx, s->node);
+
 	error = html_stylesheet_from_domnode(c, s->node, &sheet);
 	if (error != NSERROR_OK) {
+		macsurf_debug_log_writef(
+			"walker: stylesheet_from_domnode err=%d", (int)error);
 		return error;
 	}
+
+	/* Re-fetch s pointer: html_stylesheet_from_domnode may have called
+	 * realloc on c->stylesheets via downstream fetcher callbacks.
+	 * slot_idx is the index, c->stylesheets is the (possibly new)
+	 * base. */
+	s = &c->stylesheets[slot_idx];
+
+	macsurf_debug_log_writef(
+		"walker: from_domnode returned sheet=%p (slot[%d])",
+		sheet, (int)slot_idx);
 
 	if (sheet != NULL) {
 		if (s->sheet != NULL) {
 			hlcache_handle_release(s->sheet);
 		}
 		s->sheet = sheet;
+		macsurf_debug_log_writef(
+			"walker: stored sheet=%p at slot[%d] (s->sheet=%p)",
+			sheet, (int)slot_idx, s->sheet);
+	} else {
+		macsurf_debug_log_writef(
+			"walker: from_domnode produced NULL sheet -- slot[%d] left at %p",
+			(int)slot_idx, s->sheet);
 	}
 	s->modified = false;
 	return NSERROR_OK;
