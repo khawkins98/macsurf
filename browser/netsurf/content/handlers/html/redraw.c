@@ -802,37 +802,20 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 
 		if (nscss_color_is_transparent(bgcol) == false) {
 			int32_t grad_col_late = 0;
-			uint8_t grad_status = 0;
 			*background_colour = nscss_color_to_ns(bgcol);
 			pstyle_fill_bg.fill_colour = *background_colour;
-			/* MacSurf: -macsurf-gradient takes precedence over
-			 * background-color when the rule also carries a real
-			 * `background: linear-gradient(...)` shorthand. fixes40 */
-			if (background && background->style) {
-				grad_status = css_computed_macsurf_gradient(
-					background->style, &grad_col_late);
-			}
-			/* fixes43 diagnostic: log the macsurf_gradient status
-			 * for every bg paint so we can see whether SET fires. */
-#ifdef __MWERKS__
-			{
-				extern void macsurf_debug_log_writef(const char *, ...);
-				macsurf_debug_log_writef(
-					"hrb_grad status=%d col=%d bgcol=%d",
-					(int)grad_status, (int)grad_col_late,
-					(int)*background_colour);
-			}
-#endif
-			if (grad_status == CSS_MACSURF_GRADIENT_SET) {
+			/* MacSurf fixes40+45 -- -macsurf-gradient takes
+			 * precedence over background-color when the rule
+			 * also carries a `background: linear-gradient(...)`
+			 * shorthand. Route the captured css_color through
+			 * nscss_color_to_ns so byte order matches what the
+			 * rectangle plotter expects (R in low byte). */
+			if (background && background->style &&
+			    css_computed_macsurf_gradient(background->style,
+			        &grad_col_late) == CSS_MACSURF_GRADIENT_SET) {
 				pstyle_fill_bg.fill_type = PLOT_OP_TYPE_SOLID;
 				pstyle_fill_bg.fill_colour =
 					nscss_color_to_ns((css_color)grad_col_late);
-#ifdef __MWERKS__
-				{
-					extern void macsurf_debug_log_write(const char *);
-					macsurf_debug_log_write("hrb_grad OVERRIDE fired");
-				}
-#endif
 			}
 			if (plot_colour) {
 				res = ctx->plot->rectangle(ctx, &pstyle_fill_bg, &r);
