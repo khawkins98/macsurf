@@ -407,6 +407,43 @@ static void layout_flex_ctx__populate_item_data(
 }
 
 /**
+ * fixes41 -- re-sort flex items by computed `order` property.
+ * Stable bubble sort: items with equal order retain DOM order.
+ * Items typically number < 20 so O(n^2) is fine.
+ */
+static void layout_flex__order_items(struct flex_ctx *ctx)
+{
+	size_t n = ctx->item.count;
+	size_t i;
+	size_t j;
+	if (n < 2) return;
+	for (i = 0; i + 1 < n; i++) {
+		for (j = 0; j + 1 + i < n; j++) {
+			int32_t order_a = 0;
+			int32_t order_b = 0;
+			struct flex_item_data tmp;
+			if (ctx->item.data[j].box != NULL &&
+			    ctx->item.data[j].box->style != NULL) {
+				css_computed_order(
+					ctx->item.data[j].box->style,
+					&order_a);
+			}
+			if (ctx->item.data[j + 1].box != NULL &&
+			    ctx->item.data[j + 1].box->style != NULL) {
+				css_computed_order(
+					ctx->item.data[j + 1].box->style,
+					&order_b);
+			}
+			if (order_a > order_b) {
+				tmp = ctx->item.data[j];
+				ctx->item.data[j] = ctx->item.data[j + 1];
+				ctx->item.data[j + 1] = tmp;
+			}
+		}
+	}
+}
+
+/**
  * Ensure context's lines array has a free space
  *
  * \param[in] ctx  Flex layout context
@@ -861,6 +898,10 @@ static bool layout_flex__place_line_items_main(
 	size_t item_count = line->first + line->count;
 	int extra_remainder = 0;
 	int extra = 0;
+	/* fixes41 -- justify-content distribution. */
+	int jc_free = 0;
+	int jc_between = 0;
+	uint8_t jc_v = CSS_JUSTIFY_CONTENT_FLEX_START;
 	size_t i;
 
 	if (ctx->main_reversed) {
@@ -876,6 +917,49 @@ static bool layout_flex__place_line_items_main(
 
 			extra_remainder = extra % line->main_auto_margin_count;
 			extra /= line->main_auto_margin_count;
+		} else {
+			/* fixes41 -- no auto-margin consumers, free main
+			 * space goes to justify-content. */
+			jc_free = ctx->available_main - line->used_main_size;
+		}
+	}
+
+	/* fixes41 -- read justify-content and compute initial offset +
+	 * between-item gap. flex-start is the default and adds nothing. */
+	if (ctx->flex->style != NULL) {
+		jc_v = css_computed_justify_content(ctx->flex->style);
+	}
+	if (jc_free > 0 && line->count > 0) {
+		int pre_gap = 0;
+		switch (jc_v) {
+		case CSS_JUSTIFY_CONTENT_FLEX_END:
+			pre_gap = jc_free;
+			break;
+		case CSS_JUSTIFY_CONTENT_CENTER:
+			pre_gap = jc_free / 2;
+			break;
+		case CSS_JUSTIFY_CONTENT_SPACE_BETWEEN:
+			if (line->count > 1) {
+				jc_between = jc_free /
+					(int)(line->count - 1);
+			}
+			break;
+		case CSS_JUSTIFY_CONTENT_SPACE_AROUND:
+			jc_between = jc_free / (int)line->count;
+			pre_gap = jc_between / 2;
+			break;
+		case CSS_JUSTIFY_CONTENT_SPACE_EVENLY:
+			jc_between = jc_free /
+				(int)(line->count + 1);
+			pre_gap = jc_between;
+			break;
+		default:
+			break;
+		}
+		if (ctx->main_reversed) {
+			main_pos -= pre_gap;
+		} else {
+			main_pos += pre_gap;
 		}
 	}
 
@@ -933,10 +1017,11 @@ static bool layout_flex__place_line_items_main(
 			 * main_pos backwards, so the gap flips sign. Skip
 			 * the gap after the last item on the line. */
 			if (i + 1 < item_count) {
+				int between_total = ctx->main_gap + jc_between;
 				if (ctx->main_reversed) {
-					main_pos -= ctx->main_gap;
+					main_pos -= between_total;
 				} else {
-					main_pos += ctx->main_gap;
+					main_pos += between_total;
 				}
 			}
 
@@ -1079,15 +1164,62 @@ static void layout_flex__place_lines(struct flex_ctx *ctx)
 	int pre_multiplier = reversed ? -1 : 0;
 	int extra_remainder = 0;
 	int extra = 0;
+	/* fixes41 -- align-content distribution. */
+	int ac_between = 0;
+	int ac_free = 0;
+	uint8_t ac_v = CSS_ALIGN_CONTENT_STRETCH;
 	size_t i;
+
+	if (ctx->flex->style != NULL) {
+		ac_v = css_computed_align_content(ctx->flex->style);
+	}
 
 	if (ctx->available_cross != AUTO &&
 	    ctx->available_cross > ctx->cross_size &&
 	    ctx->line.count > 0) {
-		extra = ctx->available_cross - ctx->cross_size;
-
-		extra_remainder = extra % ctx->line.count;
-		extra /= ctx->line.count;
+		ac_free = ctx->available_cross - ctx->cross_size;
+		/* STRETCH (default) distributes evenly across all lines —
+		 * the existing extra/extra_remainder path. fixes41 only
+		 * overrides this when align-content is not STRETCH. */
+		if (ac_v == CSS_ALIGN_CONTENT_STRETCH ||
+		    ac_v == CSS_ALIGN_CONTENT_INHERIT) {
+			extra = ac_free;
+			extra_remainder = extra % ctx->line.count;
+			extra /= ctx->line.count;
+		} else {
+			int pre_offset = 0;
+			switch (ac_v) {
+			case CSS_ALIGN_CONTENT_FLEX_END:
+				pre_offset = ac_free;
+				break;
+			case CSS_ALIGN_CONTENT_CENTER:
+				pre_offset = ac_free / 2;
+				break;
+			case CSS_ALIGN_CONTENT_SPACE_BETWEEN:
+				if (ctx->line.count > 1) {
+					ac_between = ac_free /
+						(int)(ctx->line.count - 1);
+				}
+				break;
+			case CSS_ALIGN_CONTENT_SPACE_AROUND:
+				ac_between = ac_free /
+						(int)ctx->line.count;
+				pre_offset = ac_between / 2;
+				break;
+			case CSS_ALIGN_CONTENT_SPACE_EVENLY:
+				ac_between = ac_free /
+						(int)(ctx->line.count + 1);
+				pre_offset = ac_between;
+				break;
+			default:
+				break;
+			}
+			if (reversed) {
+				line_pos -= pre_offset;
+			} else {
+				line_pos += pre_offset;
+			}
+		}
 	}
 
 	for (i = 0; i < ctx->line.count; i++) {
@@ -1100,12 +1232,14 @@ static void layout_flex__place_lines(struct flex_ctx *ctx)
 
 		/* fixes148 -- insert cross-axis gap between wrapped lines.
 		 * Skip after the last line. Reversed-wrap decrements
-		 * line_pos, so flip sign. */
+		 * line_pos, so flip sign. fixes41 stacks align-content
+		 * between-line gap on top of the cross-axis gap. */
 		if (i + 1 < ctx->line.count) {
+			int line_gap_total = ctx->cross_gap + ac_between;
 			if (reversed) {
-				line_pos -= ctx->cross_gap;
+				line_pos -= line_gap_total;
 			} else {
-				line_pos += ctx->cross_gap;
+				line_pos += line_gap_total;
 			}
 		}
 
@@ -1164,6 +1298,10 @@ bool layout_flex(struct box *flex, int available_width,
 			flex, ctx->available_cross);
 
 	layout_flex_ctx__populate_item_data(ctx, flex, available_width);
+
+	/* fixes41 -- re-order items by computed `order` before they go
+	 * onto lines. Stable so equal-order items keep DOM order. */
+	layout_flex__order_items(ctx);
 
 	/* Place items onto lines. */
 	success = layout_flex__collect_items_into_lines(ctx);
