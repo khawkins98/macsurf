@@ -31,6 +31,8 @@
 #include "content/content_factory.h"
 #include "content/fetch.h"
 #include "content/hlcache.h"
+#include "content/llcache.h"
+#include "utils/nsurl.h"
 #include "desktop/system_colour.h"
 
 #include "css/css.h"
@@ -145,6 +147,12 @@ nscss_create(const content_handler *handler,
 	nserror error;
 
 	MS_LOG("nscss create");
+	{
+		nsurl *u = llcache_handle_get_url(llcache);
+		macsurf_debug_log_writef(
+			"nscss create url=%s",
+			u ? nsurl_access(u) : "(null)");
+	}
 
 	result = calloc(1, sizeof(nscss_content));
 	if (result == NULL)
