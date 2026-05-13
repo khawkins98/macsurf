@@ -75,22 +75,63 @@ macos9_utf8_to_macroman(const char *utf8, size_t len, char *mac_out, size_t max_
                 if (ucs4 < 0x80) {
                         mac_out[out_len++] = (char)ucs4;
                 } else {
-                        /* Basic MacRoman mapping for common characters */
+                        /* Basic MacRoman mapping for common characters.
+                         * MacRoman has no native circle or square outline
+                         * glyphs, so we fall back to ASCII approximations
+                         * for list-style-type markers (circle, square). */
                         switch (ucs4) {
                                 case 0x00A0: mac_out[out_len++] = (char)0xCA; break; /* NBSP */
                                 case 0x00A3: mac_out[out_len++] = (char)0xA3; break; /* Pound */
                                 case 0x00A9: mac_out[out_len++] = (char)0xA9; break; /* Copyright */
                                 case 0x00AE: mac_out[out_len++] = (char)0xA8; break; /* Registered */
+                                case 0x00B0: mac_out[out_len++] = (char)0xA1; break; /* Degree */
+                                case 0x00B1: mac_out[out_len++] = (char)0xB1; break; /* Plus-minus */
+                                case 0x00B7: mac_out[out_len++] = (char)0xE1; break; /* Middle dot */
+                                case 0x00BC: mac_out[out_len++] = '1';
+                                             if (out_len < max_out) mac_out[out_len++] = '/';
+                                             if (out_len < max_out) mac_out[out_len++] = '4';
+                                             break; /* 1/4 */
+                                case 0x00BD: mac_out[out_len++] = '1';
+                                             if (out_len < max_out) mac_out[out_len++] = '/';
+                                             if (out_len < max_out) mac_out[out_len++] = '2';
+                                             break; /* 1/2 */
+                                case 0x00BE: mac_out[out_len++] = '3';
+                                             if (out_len < max_out) mac_out[out_len++] = '/';
+                                             if (out_len < max_out) mac_out[out_len++] = '4';
+                                             break; /* 3/4 */
                                 case 0x2013: mac_out[out_len++] = (char)0xD0; break; /* En dash */
                                 case 0x2014: mac_out[out_len++] = (char)0xD1; break; /* Em dash */
                                 case 0x2018: mac_out[out_len++] = (char)0xD4; break; /* Left single quote */
                                 case 0x2019: mac_out[out_len++] = (char)0xD5; break; /* Right single quote */
                                 case 0x201C: mac_out[out_len++] = (char)0xD2; break; /* Left double quote */
                                 case 0x201D: mac_out[out_len++] = (char)0xD3; break; /* Right double quote */
-                                case 0x2022: mac_out[out_len++] = (char)0xA5; break; /* Bullet */
+                                case 0x2022: mac_out[out_len++] = (char)0xA5; break; /* Bullet (disc) */
                                 case 0x2026: mac_out[out_len++] = (char)0xC9; break; /* Ellipsis */
-                                case 0x20AC: mac_out[out_len++] = (char)0xDB; break; /* Euro */
                                 case 0x2122: mac_out[out_len++] = (char)0xAA; break; /* Trademark */
+                                case 0x20AC: mac_out[out_len++] = (char)0xDB; break; /* Euro */
+                                /* Arrows */
+                                case 0x2190: mac_out[out_len++] = '<'; break; /* Left arrow */
+                                case 0x2192: mac_out[out_len++] = '>'; break; /* Right arrow */
+                                case 0x2191: mac_out[out_len++] = '^'; break; /* Up arrow */
+                                case 0x2193: mac_out[out_len++] = 'v'; break; /* Down arrow */
+                                /* Box drawing / list markers (no MacRoman glyph, ASCII fallback) */
+                                case 0x25A0: mac_out[out_len++] = (char)0xA5; break; /* Black square -> use bullet glyph */
+                                case 0x25AA: mac_out[out_len++] = (char)0xA5; break; /* Small square -> use bullet glyph */
+                                case 0x25CB: mac_out[out_len++] = 'o';        break; /* White circle */
+                                case 0x25CF: mac_out[out_len++] = (char)0xA5; break; /* Black circle -> bullet */
+                                case 0x25E6: mac_out[out_len++] = 'o';        break; /* White bullet (circle) */
+                                /* Check / cross */
+                                case 0x2713: mac_out[out_len++] = (char)0xA1; break; /* Check mark — use degree as nearest */
+                                case 0x2717: mac_out[out_len++] = 'x';        break; /* Ballot X */
+                                /* Common math */
+                                case 0x00D7: mac_out[out_len++] = 'x';        break; /* Multiplication */
+                                case 0x00F7: mac_out[out_len++] = (char)0xD6; break; /* Division */
+                                case 0x2260: mac_out[out_len++] = (char)0xAD; break; /* Not equal */
+                                case 0x2264: mac_out[out_len++] = (char)0xB2; break; /* Less or equal */
+                                case 0x2265: mac_out[out_len++] = (char)0xB3; break; /* Greater or equal */
+                                /* Currency */
+                                case 0x00A5: mac_out[out_len++] = (char)0xB4; break; /* Yen */
+                                case 0x00A2: mac_out[out_len++] = (char)0xA2; break; /* Cent */
                                 default:     mac_out[out_len++] = '?'; break;
                         }
                 }
