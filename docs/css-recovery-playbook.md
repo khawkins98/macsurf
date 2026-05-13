@@ -91,11 +91,12 @@ Total elapsed: 11 rounds. Each round shipped one or two probes, the user applied
 
 This was the second-biggest time sink across the session block. The pattern is identical for three pairs of files in the tree:
 
-| Canonical (per Linux `.mcp`) | Sibling (also present on disk) |
+| Canonical (per Linux `.mcp` or actual compiled file) | Sibling (also present on disk) |
 |---|---|
-| `content/handlers/html/css.c` | `content/handlers/html/html_css.c` |
-| `libcss/src/select/select.c` | `libcss/src/select/css_select.c` |
+| `content/handlers/html/css.c` | `content/handlers/html/html_css.c` (deleted at fixes23) |
+| `libcss/src/select/css_select.c` (per fixes30) | `libcss/src/select/select.c` |
 | `libcss/src/parse/parse.c` | `libcss/src/parse/css_parse.c` |
+| `frontends/macos9/macos9_font.c` (per fixes36) | `frontends/macos9/font.c` (deleted at fixes36 — stub only) |
 
 These pairs are NetSurf's normal files plus longer-named sibling copies that came in through some earlier rename / fix-round. **Both files define the same external symbols.** If both are in the CW8 project, the linker rejects "multiply-defined." So exactly one ends up in the build — but which one isn't always obvious from Linux.
 
@@ -110,9 +111,9 @@ Recovery path:
 3. Look at the next log to see which one fires
 4. Once you know, delete the obsolete sibling from the tree so future rounds don't re-hit the same trap
 
-fixes23 cleared `html_css.c`. fixes30 confirmed `css_select.c` was the compiled select file; we did NOT delete `select.c` after that, so the trap is still live for parse.c / css_parse.c.
+fixes23 cleared `html_css.c`. fixes30 confirmed `css_select.c` was the compiled select file; we did NOT delete `select.c` after that, so the trap is still live there. fixes36 cleared `font.c` after the gap-test screenshot showed `fixes35`'s circle/square UTF-8 mappings hadn't reached the rendered output (root cause was ambiguous between "not applied" and "wrong file in project", but deleting the stub eliminates the second possibility outright).
 
-**Recommendation:** in a quiet round, delete the obsolete siblings (`select.c`, `parse.c`, `font_face.c`) once we're sure the build is stable on the current canonical files.
+**Recommendation:** in a quiet round, delete the remaining obsolete siblings (`select.c`, `parse.c`, `font_face.c`) once we're sure the build is stable on the current canonical files. The trap will keep biting otherwise.
 
 ## How CSS flows end-to-end in MacSurf
 
