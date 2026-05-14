@@ -177,6 +177,37 @@ void font_plot_style_from_css(
 			fstyle->letter_spacing = 0;
 		}
 	}
+	/* fixes50: -macsurf-text-shadow packed value.
+	 *   bits 31..24 h-offset px (int8)
+	 *   bits 23..16 v-offset px (int8)
+	 *   bits 15..0  RGB565 colour (smear high bits down on decode) */
+	{
+		int32_t ts_packed = 0;
+		uint8_t ts_status = css_computed_macsurf_text_shadow(css,
+				&ts_packed);
+		if (ts_status == CSS_MACSURF_TEXT_SHADOW_SET) {
+			uint32_t u = (uint32_t)ts_packed;
+			int8_t hp = (int8_t)((u >> 24) & 0xff);
+			int8_t vp = (int8_t)((u >> 16) & 0xff);
+			uint16_t rgb565 = (uint16_t)(u & 0xffff);
+			uint8_t r5 = (uint8_t)((rgb565 >> 11) & 0x1f);
+			uint8_t g6 = (uint8_t)((rgb565 >>  5) & 0x3f);
+			uint8_t b5 = (uint8_t)((rgb565      ) & 0x1f);
+			uint8_t r = (uint8_t)((r5 << 3) | (r5 >> 2));
+			uint8_t g = (uint8_t)((g6 << 2) | (g6 >> 4));
+			uint8_t b = (uint8_t)((b5 << 3) | (b5 >> 2));
+			fstyle->shadow_x = (int)hp;
+			fstyle->shadow_y = (int)vp;
+			fstyle->shadow_color =
+				(colour)(((uint32_t)b << 16) |
+				         ((uint32_t)g <<  8) |
+				          (uint32_t)r);
+		} else {
+			fstyle->shadow_x = 0;
+			fstyle->shadow_y = 0;
+			fstyle->shadow_color = 0;
+		}
+	}
 	/* Safety: when the CSS cascade produces a suspicious colour (white,
 	 * transparent, or otherwise garbage from an incomplete computed
 	 * style), force foreground to opaque black so text is always

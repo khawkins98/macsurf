@@ -238,6 +238,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("border-radius"),
 	SMAP("box-shadow"),
 	SMAP("-macsurf-gradient"),
+	SMAP("-macsurf-text-shadow"),
 
 	SMAP("inherit"),
 	SMAP("unset"),

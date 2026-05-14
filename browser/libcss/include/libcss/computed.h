@@ -188,6 +188,10 @@ uint8_t css_computed_macsurf_gradient(
 		const css_computed_style *style,
 		int32_t *color);
 
+uint8_t css_computed_macsurf_text_shadow(
+		const css_computed_style *style,
+		int32_t *packed);
+
 uint8_t css_computed_background_image(
 		const css_computed_style *style,
 		lwc_string **url);

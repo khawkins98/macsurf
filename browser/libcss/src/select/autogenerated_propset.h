@@ -1554,6 +1554,28 @@ static inline css_error set_macsurf_gradient(css_computed_style *style, uint8_t
 #undef MACSURF_GRADIENT_SHIFT
 #undef MACSURF_GRADIENT_MASK
 
+/* fixes50 -- bits 0-1 of word 14 (previously unused) */
+#define MACSURF_TEXT_SHADOW_INDEX 14
+#define MACSURF_TEXT_SHADOW_SHIFT 0
+#define MACSURF_TEXT_SHADOW_MASK 0x3
+
+static inline css_error set_macsurf_text_shadow(css_computed_style *style,
+		uint8_t type, int32_t integer)
+{
+	uint32_t *bits = &style->i.bits[MACSURF_TEXT_SHADOW_INDEX];
+
+	/* 2bits: tt : type */
+	*bits = (*bits & ~MACSURF_TEXT_SHADOW_MASK) |
+			(((uint32_t)type & 0x3) << MACSURF_TEXT_SHADOW_SHIFT);
+
+	style->i.macsurf_text_shadow = integer;
+
+	return CSS_OK;
+}
+#undef MACSURF_TEXT_SHADOW_INDEX
+#undef MACSURF_TEXT_SHADOW_SHIFT
+#undef MACSURF_TEXT_SHADOW_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800

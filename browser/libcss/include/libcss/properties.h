@@ -143,6 +143,7 @@ enum css_properties_e {
 	CSS_PROP_BORDER_RADIUS			= 0x07e,
 	CSS_PROP_BOX_SHADOW			= 0x07f,
 	CSS_PROP_MACSURF_GRADIENT		= 0x080,
+	CSS_PROP_MACSURF_TEXT_SHADOW		= 0x081,
 
 	CSS_N_PROPERTIES
 };
@@ -162,6 +163,12 @@ enum css_macsurf_gradient_e {
 	CSS_MACSURF_GRADIENT_INHERIT		= 0x0,
 	CSS_MACSURF_GRADIENT_NONE		= 0x1,
 	CSS_MACSURF_GRADIENT_SET		= 0x2
+};
+
+enum css_macsurf_text_shadow_e {
+	CSS_MACSURF_TEXT_SHADOW_INHERIT		= 0x0,
+	CSS_MACSURF_TEXT_SHADOW_NONE		= 0x1,
+	CSS_MACSURF_TEXT_SHADOW_SET		= 0x2
 };
 
 enum css_align_content_e {

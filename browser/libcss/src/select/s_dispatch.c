@@ -534,5 +534,9 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 	        PROPERTY_FUNCS(macsurf_gradient),
 	        0,
+	},
+	{
+	        PROPERTY_FUNCS(macsurf_text_shadow),
+	        0,
 	}
 	};
