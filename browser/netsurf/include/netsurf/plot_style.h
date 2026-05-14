@@ -145,6 +145,12 @@ typedef struct plot_font_style {
 	 * 0 (the common case) keeps the fast-path text draw. Non-zero
 	 * routes through per-character draw + per-character width. */
 	int letter_spacing;
+	/* fixes50: text-shadow offset (signed pixels) and colour.
+	 * shadow_x == 0 && shadow_y == 0 means no shadow. Colour is
+	 * already in NetSurf BGR byte order (R in low byte). */
+	int shadow_x;
+	int shadow_y;
+	colour shadow_color;
 } plot_font_style_t;
 
 

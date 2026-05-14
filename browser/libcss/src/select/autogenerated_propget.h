@@ -1994,6 +1994,36 @@ static inline uint8_t get_macsurf_gradient(const css_computed_style *style,
 #undef MACSURF_GRADIENT_SHIFT
 #undef MACSURF_GRADIENT_MASK
 
+#define MACSURF_TEXT_SHADOW_INDEX 14
+#define MACSURF_TEXT_SHADOW_SHIFT 0
+#define MACSURF_TEXT_SHADOW_MASK 0x3
+static inline uint8_t get_macsurf_text_shadow_bits(const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[MACSURF_TEXT_SHADOW_INDEX];
+	bits &= MACSURF_TEXT_SHADOW_MASK;
+	bits >>= MACSURF_TEXT_SHADOW_SHIFT;
+
+	/* 2bits: tt : type */
+	return (bits & 0x3);
+}
+static inline uint8_t get_macsurf_text_shadow(const css_computed_style *style,
+		int32_t *integer)
+{
+	uint32_t bits = style->i.bits[MACSURF_TEXT_SHADOW_INDEX];
+	bits &= MACSURF_TEXT_SHADOW_MASK;
+	bits >>= MACSURF_TEXT_SHADOW_SHIFT;
+
+	/* 2bits: tt : type */
+	if ((bits & 0x3) == CSS_MACSURF_TEXT_SHADOW_SET) {
+		*integer = style->i.macsurf_text_shadow;
+	}
+
+	return (bits & 0x3);
+}
+#undef MACSURF_TEXT_SHADOW_INDEX
+#undef MACSURF_TEXT_SHADOW_SHIFT
+#undef MACSURF_TEXT_SHADOW_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800

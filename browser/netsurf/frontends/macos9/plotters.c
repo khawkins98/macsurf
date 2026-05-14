@@ -769,11 +769,51 @@ macos9_plot_text(const struct redraw_context *ctx,
 		size_t mac_len;
 		RgnHandle saved_clip;
 		int ls;
+		int sx;
+		int sy;
 
 		mac_len = macos9_utf8_to_macroman(text, length, mac_buf,
 				sizeof(mac_buf));
 		saved_clip = macos9_push_clip();
 		ls = (fstyle != NULL) ? fstyle->letter_spacing : 0;
+		sx = (fstyle != NULL) ? fstyle->shadow_x : 0;
+		sy = (fstyle != NULL) ? fstyle->shadow_y : 0;
+
+		/* fixes50 -- text-shadow pass. Paint the same glyphs at
+		 * (x+sx, y+sy) in the shadow colour before the main
+		 * pass paints them in the foreground colour. Skip the
+		 * shadow if both offsets are zero. Defensive clamp so
+		 * a pathological CSS value can't blow past the window. */
+		if ((sx != 0 || sy != 0) && fstyle != NULL) {
+			RGBColor shadow_rgb;
+			short clamped_sx = (short)sx;
+			short clamped_sy = (short)sy;
+			if (clamped_sx < -16) clamped_sx = -16;
+			if (clamped_sx >  16) clamped_sx =  16;
+			if (clamped_sy < -16) clamped_sy = -16;
+			if (clamped_sy >  16) clamped_sy =  16;
+			macos9_colour_to_rgb(fstyle->shadow_color, &shadow_rgb);
+			RGBForeColor(&shadow_rgb);
+			if (ls == 0 || mac_len <= 1) {
+				MoveTo((short)(x + clamped_sx),
+				       (short)(y + clamped_sy));
+				DrawText(mac_buf, 0, (short)mac_len);
+			} else {
+				size_t i;
+				short pen_x = (short)(x + clamped_sx);
+				short cw;
+				for (i = 0; i < mac_len; i++) {
+					MoveTo(pen_x,
+					       (short)(y + clamped_sy));
+					DrawText(mac_buf, (short)i, 1);
+					cw = (short)CharWidth(mac_buf[i]);
+					pen_x = (short)(pen_x + cw + ls);
+				}
+			}
+			/* Restore foreground for the main pass. */
+			RGBForeColor(&rgb);
+		}
+
 		if (ls == 0 || mac_len <= 1) {
 			MoveTo((short)x, (short)y);
 			DrawText(mac_buf, 0, (short)mac_len);
