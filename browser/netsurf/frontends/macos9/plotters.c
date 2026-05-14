@@ -100,17 +100,77 @@ macos9_rect_from_ns(const struct rect *src, Rect *dst)
 	dst->bottom = (short)src->y1;
 }
 
+/* fixes51 -- case-insensitive byte compare for the small set of
+ * CSS font names we recognise. Avoids pulling in tolower / strcasecmp
+ * dependencies; names are stable ASCII. */
+static int macos9_name_match(const char *s, size_t n, const char *name)
+{
+	size_t i;
+	for (i = 0; i < n; i++) {
+		char a = s[i];
+		char b = name[i];
+		if (b == '\0') return 0;
+		if (a >= 'A' && a <= 'Z') a = (char)(a + 32);
+		if (b >= 'A' && b <= 'Z') b = (char)(b + 32);
+		if (a != b) return 0;
+	}
+	return (name[n] == '\0');
+}
+
 short
 macos9_font_id_from_style(const plot_font_style_t *fstyle)
 {
+	/* fixes51 -- walk the CSS font-family list and match each name
+	 * against the four fonts installed in every Mac OS 9 system
+	 * (Geneva, Helvetica, Times, Monaco) plus the common Windows
+	 * names CSS authors throw at us ("Arial", "Times New Roman",
+	 * "Courier New", "Courier"). The first hit wins; the loop
+	 * ends if the families array is exhausted, at which point we
+	 * fall back to the generic-family bucket below.
+	 *
+	 * Helvetica and Times both ship with TrueType outlines on
+	 * Mac OS 9, so the SetOutlinePreferred call at startup makes
+	 * them render smoothly at any size. Geneva and Monaco are
+	 * bitmap-only and will still look rough at non-installed
+	 * sizes — but at least named CSS authors get what they asked
+	 * for. */
+	if (fstyle != NULL && fstyle->families != NULL) {
+		lwc_string * const *fp = fstyle->families;
+		while (*fp != NULL) {
+			const char *fname = lwc_string_data(*fp);
+			size_t flen = lwc_string_length(*fp);
+			if (macos9_name_match(fname, flen, "Helvetica") ||
+			    macos9_name_match(fname, flen, "Arial") ||
+			    macos9_name_match(fname, flen, "Helvetica Neue") ||
+			    macos9_name_match(fname, flen, "sans-serif"))
+				return kFontIDHelvetica;
+			if (macos9_name_match(fname, flen, "Times") ||
+			    macos9_name_match(fname, flen, "Times New Roman") ||
+			    macos9_name_match(fname, flen, "Georgia") ||
+			    macos9_name_match(fname, flen, "serif"))
+				return kFontIDTimes;
+			if (macos9_name_match(fname, flen, "Monaco") ||
+			    macos9_name_match(fname, flen, "Courier") ||
+			    macos9_name_match(fname, flen, "Courier New") ||
+			    macos9_name_match(fname, flen, "monospace"))
+				return kFontIDMonaco;
+			if (macos9_name_match(fname, flen, "Geneva"))
+				return kFontIDGeneva;
+			fp++;
+		}
+	}
+
 	if (fstyle == NULL)
-		return kFontIDGeneva;
+		return kFontIDHelvetica;
 
 	switch (fstyle->family) {
 	case PLOT_FONT_FAMILY_SERIF:      return kFontIDTimes;
 	case PLOT_FONT_FAMILY_MONOSPACE:  return kFontIDMonaco;
 	case PLOT_FONT_FAMILY_SANS_SERIF: return kFontIDHelvetica;
-	default:                          return kFontIDGeneva;
+	/* fixes51 -- unmatched fallback was Geneva (bitmap-only,
+	 * stretches at most sizes). Helvetica has TrueType so it
+	 * renders at any size cleanly. */
+	default:                          return kFontIDHelvetica;
 	}
 }
 
