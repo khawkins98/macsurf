@@ -447,28 +447,26 @@ int main(void) {
 	 *
 	 * SetOutlinePreferred(true) tells QuickDraw to render text from
 	 *   TrueType outlines instead of scaling a bitmap when the
-	 *   exact pt-size bitmap is missing. Helvetica and Times ship
-	 *   with TrueType outlines on Mac OS 9; without this call CSS
-	 *   font-size: 13px / 17px / 21px / 23px all produced lumpy
-	 *   stretched-bitmap glyphs.
-	 *
-	 * SetFractEnable(true) enables fractional character advance
-	 *   widths. Inter-glyph spacing stops rounding to integer
-	 *   pixels which removes most of the "loose" appearance of
-	 *   sans-serif body text.
+	 *   exact pt-size bitmap is missing.
 	 *
 	 * SetAntiAliasedTextEnabled(true, 8) turns on AA above 8 pt
 	 *   on color displays. Mac OS 8.5+ feature; works through
 	 *   CarbonLib. Below 8 pt the smoothing makes small UI text
-	 *   blurry, hence the floor. */
+	 *   blurry, hence the floor.
+	 *
+	 * fixes51a -- SetFractEnable removed. Fractional advances make
+	 *   DrawText consume sub-pixel widths while TextWidth (used by
+	 *   the layout-side font_width) still returns integer pixels.
+	 *   The mismatch under-allocates horizontal space per line,
+	 *   forcing NetSurf to wrap mid-line and produce overlapping
+	 *   text-box positions. Integer-only advance widths match what
+	 *   TextWidth reports. */
 	{
 		extern pascal void SetOutlinePreferred(Boolean);
-		extern pascal void SetFractEnable(Boolean);
 		extern OSStatus SetAntiAliasedTextEnabled(Boolean, SInt16);
 		SetOutlinePreferred(true);
-		SetFractEnable(true);
 		(void)SetAntiAliasedTextEnabled(true, 8);
-		MS_LOG("font quality: outline+fract+AA on");
+		MS_LOG("font quality: outline+AA on (fract off)");
 	}
 
 	macos9_init_menus();

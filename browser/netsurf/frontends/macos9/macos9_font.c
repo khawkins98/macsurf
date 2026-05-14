@@ -190,6 +190,19 @@ macos9_font_measure(const struct plot_font_style *fstyle,
                 if (width < 0) width = 0;
         }
 
+        /* fixes51a -- anti-aliased TrueType glyphs (fixes51) can paint
+         * a fringe pixel past the integer-pixel TextWidth value. NetSurf's
+         * inline layout uses font_width to choose line breaks, and any
+         * width underestimate cascades into subsequent lines being placed
+         * too close to or even on top of each other. Add a small slop
+         * proportional to character count so the layout always reserves
+         * at least the true painted width. 1 px per 24 chars + 1 floor
+         * is invisible at full-line widths but enough to absorb AA bleed
+         * and the occasional fractional-pixel drift. */
+        if (mac_len > 0) {
+                width += (int)(mac_len / 24) + 1;
+        }
+
         if (changed_port)
                 SetPort(old_port);
         return width;
