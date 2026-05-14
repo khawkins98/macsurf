@@ -3398,14 +3398,18 @@ layout_line(struct box *first,
 		static long ll_n = 0;
 		struct box *dd;
 		int idx = 0;
-		if (ll_n < 20) {
-			macsurf_debug_log_writef("ll y=%d uh=%d",
-				(int)*y, (int)used_height);
+		if (ll_n < 60) {
+			macsurf_debug_log_writef("ll y=%d uh=%d x1=%d",
+				(int)*y, (int)used_height,
+				(int)(x1 - x0));
 			for (dd = first; dd != b; dd = dd->next) {
-				if (idx >= 6) break;
-				macsurf_debug_log_writef("c t=%d y=%d h=%d",
+				if (idx >= 14) break;
+				macsurf_debug_log_writef(
+					"c t=%d y=%d h=%d w=%d x=%d len=%d",
 					(int)dd->type, (int)dd->y,
-					(int)dd->height);
+					(int)dd->height, (int)dd->width,
+					(int)dd->x,
+					(int)(dd->text ? dd->length : 0));
 				idx++;
 			}
 			ll_n++;
