@@ -2054,6 +2054,13 @@ static inline uint8_t get_macsurf_transform(const css_computed_style *style,
 #undef MACSURF_TRANSFORM_SHIFT
 #undef MACSURF_TRANSFORM_MASK
 
+/* fixes73: scale storage as a raw int32_t companion to macsurf_transform.
+ * 0x01000100 sentinel = identity (1.0, 1.0). */
+static inline int32_t get_macsurf_transform_b_raw(const css_computed_style *style)
+{
+	return style->i.macsurf_transform_b;
+}
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800

@@ -1598,6 +1598,15 @@ static inline css_error set_macsurf_transform(css_computed_style *style,
 #undef MACSURF_TRANSFORM_SHIFT
 #undef MACSURF_TRANSFORM_MASK
 
+/* fixes73: transform_b storage for scale_x / scale_y (no bit-pack type
+ * needed; identity = 0x01000100 sentinel, zero treated as scale(0)).
+ * Setter is a thin shim used by s_macsurf_transform.c. */
+static inline void set_macsurf_transform_b_raw(css_computed_style *style,
+		int32_t integer)
+{
+	style->i.macsurf_transform_b = integer;
+}
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800
