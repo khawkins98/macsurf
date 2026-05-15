@@ -31,6 +31,13 @@ extern size_t macos9_bitmap_get_rowstride(void *bitmap);
 long macos9_plot_text_count = 0;
 long macos9_plot_rect_count = 0;
 
+/* fixes74b: counters incremented by redraw.c when it detects
+ * CSS_MACSURF_GRADIENT_SET. Lets us see whether the cascade returned
+ * SET independently of whether the plotter painted a gradient. */
+long macos9_grad_set_count = 0;
+long macos9_grad_radial_unpack_count = 0;
+long macos9_grad_linear_unpack_count = 0;
+
 #include "macos9.h"
 #include "macsurf_debug.h"
 
@@ -542,6 +549,26 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 	}
 #endif
 
+	/* fixes74b diagnostic: log EVERY non-solid rectangle so we can see
+	 * whether gradients (linear or radial) are reaching the plotter.
+	 * If a swatch with -macsurf-gradient ends up with fill_type=1
+	 * (SOLID) here, the cascade dropped the SET status — parser or
+	 * cascade bug, not plotter. */
+	if (pstyle->fill_type == PLOT_OP_TYPE_LINEAR_GRADIENT ||
+	    pstyle->fill_type == PLOT_OP_TYPE_LINEAR_GRADIENT_H ||
+	    pstyle->fill_type == PLOT_OP_TYPE_RADIAL_GRADIENT) {
+		macsurf_debug_log_writef(
+			"GRADIENT plot_rect[%d] ft=%d fill=%d/%d/%d fill2=%d/%d/%d at (%d,%d,%d,%d)",
+			(int)macos9_plot_rect_count,
+			(int)pstyle->fill_type,
+			(int)((pstyle->fill_colour >>  0) & 0xff),
+			(int)((pstyle->fill_colour >>  8) & 0xff),
+			(int)((pstyle->fill_colour >> 16) & 0xff),
+			(int)((pstyle->fill_colour2 >>  0) & 0xff),
+			(int)((pstyle->fill_colour2 >>  8) & 0xff),
+			(int)((pstyle->fill_colour2 >> 16) & 0xff),
+			(int)r.left, (int)r.top, (int)r.right, (int)r.bottom);
+	}
 	/* Diagnostic: dump fill / stroke colour + rect for the first few
 	 * rectangles each redraw so we can compare what libcss decided
 	 * vs. what UA default would produce. */

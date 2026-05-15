@@ -162,6 +162,9 @@ static void macos9_handle_update(const EventRecord *event) {
 		extern long macos9_hrb_visits, macos9_hrb_block, macos9_hrb_inlinec,
 			    macos9_hrb_inline, macos9_hrb_text, macos9_hrb_other,
 			    macos9_hrb_clip_skips;
+		extern long macos9_grad_set_count,
+			    macos9_grad_radial_unpack_count,
+			    macos9_grad_linear_unpack_count;
 		macos9_plot_text_count = 0;
 		macos9_plot_rect_count = 0;
 		macos9_hrb_visits = 0;
@@ -171,6 +174,9 @@ static void macos9_handle_update(const EventRecord *event) {
 		macos9_hrb_text = 0;
 		macos9_hrb_other = 0;
 		macos9_hrb_clip_skips = 0;
+		macos9_grad_set_count = 0;
+		macos9_grad_radial_unpack_count = 0;
+		macos9_grad_linear_unpack_count = 0;
 		macsurf_debug_log_writef(
 			"update: redraw_ready, bw=%p scroll=(%d,%d) crect=(%d,%d,%d,%d)",
 			gw->bw, gw->scroll_x, gw->scroll_y,
@@ -192,6 +198,11 @@ static void macos9_handle_update(const EventRecord *event) {
 			macos9_hrb_inline, macos9_hrb_text, macos9_hrb_other,
 			macos9_hrb_clip_skips,
 			macos9_plot_text_count, macos9_plot_rect_count);
+		macsurf_debug_log_writef(
+			"GRADIENT DIAG: set=%ld radial_unpacks=%ld linear_unpacks=%ld",
+			macos9_grad_set_count,
+			macos9_grad_radial_unpack_count,
+			macos9_grad_linear_unpack_count);
 		/* Redraw chrome AFTER content so any stray plotter that
 		 * leaked outside content_rect can't leave the URL bar /
 		 * controls / status bar visually torn. Addresses the

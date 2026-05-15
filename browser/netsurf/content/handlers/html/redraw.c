@@ -95,11 +95,19 @@ char macos9_skipbox_info[160] = {0};
  *                 direction bit; smeared to 8 bits on decode)
  *
  * Returned colours are NetSurf BGR (R in low byte). */
+/* fixes74b diagnostic counters — defined in plotters.c. */
+extern long macos9_grad_set_count;
+extern long macos9_grad_radial_unpack_count;
+extern long macos9_grad_linear_unpack_count;
+
 static void macsurf_gradient_unpack(int32_t packed_signed,
 		colour *c1_out, colour *c2_out, bool *horizontal_out,
 		bool *radial_out)
 {
 	uint32_t packed = (uint32_t)packed_signed;
+	macos9_grad_set_count++;
+	if (packed & 0x4000U) macos9_grad_radial_unpack_count++;
+	else macos9_grad_linear_unpack_count++;
 	uint16_t p1 = (uint16_t)((packed >> 16) & 0xffff);
 	uint16_t p2 = (uint16_t)(packed & 0x3fff);
 	uint8_t r1 = (uint8_t)(((p1 >> 11) & 0x1f) << 3);
