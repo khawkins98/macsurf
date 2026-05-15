@@ -676,11 +676,79 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 		}
 		return NSERROR_OK;
 	}
+
+	/* fixes74 -- radial gradient. fill_colour is the centre colour,
+	 * fill_colour2 is the edge colour. Paint the bounding rectangle
+	 * with c2 first, then a stack of progressively smaller ovals from
+	 * the box bounds down toward zero size, each interpolating from
+	 * c2 (outer) to c1 (centre). 24 rings give visibly smooth
+	 * concentric banding on 8-bit displays. The ovals fit the box
+	 * bounds so non-square boxes render an ellipse, matching CSS
+	 * radial-gradient's default ellipse-farthest-corner shape. */
+	if (pstyle->fill_type == PLOT_OP_TYPE_RADIAL_GRADIENT) {
+		RGBColor c1;
+		RGBColor c2;
+		RGBColor cur;
+		RgnHandle saved_clip;
+		long width;
+		long height;
+		long rings = 24;
+		long i;
+		macos9_colour_to_rgb(pstyle->fill_colour,  &c1);
+		macos9_colour_to_rgb(pstyle->fill_colour2, &c2);
+		saved_clip = macos9_push_clip();
+		width  = (long)(r.right - r.left);
+		height = (long)(r.bottom - r.top);
+		if (width < 2 || height < 2) {
+			RGBForeColor(&c2);
+			PaintRect(&r);
+		} else {
+			/* Fill background with c2 first (so corners outside
+			 * the largest oval show the edge colour). */
+			RGBForeColor(&c2);
+			PaintRect(&r);
+			/* Concentric ovals from outer to inner. Ring 0 is
+			 * the full bounding rect; ring N-1 is a 1px speck
+			 * at the centre. Colour walks from c2 (outer) to c1
+			 * (centre). */
+			for (i = 0; i < rings; i++) {
+				Rect ring;
+				long inset_x = (width  * i) / (rings * 2);
+				long inset_y = (height * i) / (rings * 2);
+				long t = (i * 256L) / (rings - 1);  /* 0..256 */
+				long inv = 256L - t;
+				ring.left   = (short)(r.left   + inset_x);
+				ring.right  = (short)(r.right  - inset_x);
+				ring.top    = (short)(r.top    + inset_y);
+				ring.bottom = (short)(r.bottom - inset_y);
+				if (ring.right - ring.left < 1 ||
+				    ring.bottom - ring.top < 1) break;
+				cur.red   = (unsigned short)
+					(((long)c2.red   * inv + (long)c1.red   * t) >> 8);
+				cur.green = (unsigned short)
+					(((long)c2.green * inv + (long)c1.green * t) >> 8);
+				cur.blue  = (unsigned short)
+					(((long)c2.blue  * inv + (long)c1.blue  * t) >> 8);
+				RGBForeColor(&cur);
+				PaintOval(&ring);
+			}
+		}
+		macos9_pop_clip(saved_clip);
+		if (pstyle->stroke_type != PLOT_OP_TYPE_NONE) {
+			macos9_colour_to_rgb(pstyle->stroke_colour, &rgb);
+			RGBForeColor(&rgb);
+			saved_clip = macos9_push_clip();
+			FrameRect(&r);
+			macos9_pop_clip(saved_clip);
+		}
+		return NSERROR_OK;
+	}
 #endif
 
 	if (pstyle->fill_type != PLOT_OP_TYPE_NONE &&
 	    pstyle->fill_type != PLOT_OP_TYPE_LINEAR_GRADIENT &&
-	    pstyle->fill_type != PLOT_OP_TYPE_LINEAR_GRADIENT_H) {
+	    pstyle->fill_type != PLOT_OP_TYPE_LINEAR_GRADIENT_H &&
+	    pstyle->fill_type != PLOT_OP_TYPE_RADIAL_GRADIENT) {
 		/* fixes49 -- opacity bucket. plot_style_fixed value with
 		 * PLOT_STYLE_SCALE (=1024) for opaque. Below ~5% don't
 		 * paint at all. Between 5% and ~85% paint with a stipple

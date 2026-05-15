@@ -62,18 +62,87 @@ css_error css__parse_macsurf_gradient(css_language *c,
 		return css_stylesheet_style_flag_value(result, flag_value, CSS_PROP_MACSURF_GRADIENT);
 	}
 
-	if (token->type == CSS_TOKEN_FUNCTION &&
-	    lwc_string_caseless_isequal(token->idata,
-	        c->strings[LINEAR_GRADIENT], &match) == lwc_error_ok &&
-	    match) {
+	/* fixes74: also accept radial-gradient(...). The two-stop storage
+	 * is shared with linear-gradient; the difference is encoded in the
+	 * emitted OPV value (0x0100 = SET radial). Radial-gradient's
+	 * optional shape/position prefix (`circle at center`, etc.) is
+	 * silently consumed before the colour stops. */
+	{
+		bool is_linear = false;
+		bool is_radial = false;
+		if (token->type == CSS_TOKEN_FUNCTION) {
+			bool m_lin = false, m_rad = false;
+			(void)lwc_string_caseless_isequal(token->idata,
+			        c->strings[LINEAR_GRADIENT], &m_lin);
+			(void)lwc_string_caseless_isequal(token->idata,
+			        c->strings[RADIAL_GRADIENT], &m_rad);
+			is_linear = m_lin;
+			is_radial = m_rad;
+			match = m_lin || m_rad;
+		}
+	if (match) {
 		bool horizontal = false;
-		uint16_t set_value = 0x0080;
+		bool radial = is_radial;
+		uint16_t set_value = is_radial ? 0x0100 : 0x0080;
+		(void)is_linear;
 		parserutils_vector_iterate(vector, ctx);
 		consumeWhitespace(vector, ctx);
 
-		/* Optional direction prefix: `to <side>` or `<angle>deg`. */
+		/* Radial: optional shape/position prefix may appear before
+		 * the first colour stop (`circle`, `ellipse`, `circle at
+		 * center`, `closest-side`, etc.). Save ctx, try parsing a
+		 * colour at the current position; if that fails, it's a
+		 * prefix -- skip tokens up to and including the first
+		 * top-level comma. If it succeeds, rewind so the main colour
+		 * loop sees the same token first. */
+		if (radial) {
+			int32_t probe_ctx = *ctx;
+			css_color probe_color = 0;
+			uint16_t probe_type = 0;
+			css_error probe_err = css__parse_colour_specifier(c,
+					vector, &probe_ctx, &probe_type,
+					&probe_color);
+			if (probe_err != CSS_OK) {
+				/* Prefix present -- scan to first top-level
+				 * comma and consume it. Track paren depth so
+				 * nested function arguments don't confuse the
+				 * scan. */
+				int depth = 0;
+				while (1) {
+					token = parserutils_vector_peek(vector,
+							*ctx);
+					if (token == NULL) break;
+					if (token->type == CSS_TOKEN_CHAR &&
+					    token->idata != NULL) {
+						const char *s = lwc_string_data(
+								token->idata);
+						if (s != NULL && s[0] == '(') {
+							depth++;
+						} else if (s != NULL &&
+							   s[0] == ')') {
+							if (depth == 0) break;
+							depth--;
+						} else if (s != NULL &&
+							   s[0] == ',' &&
+							   depth == 0) {
+							parserutils_vector_iterate(
+								vector, ctx);
+							break;
+						}
+					}
+					parserutils_vector_iterate(vector, ctx);
+				}
+			}
+			/* If colour probe succeeded, ctx is unchanged --
+			 * main loop will reparse the colour. */
+			consumeWhitespace(vector, ctx);
+		}
+
+		/* Optional direction prefix: `to <side>` or `<angle>deg`.
+		 * Linear only — radial direction has already been consumed
+		 * above. */
 		token = parserutils_vector_peek(vector, *ctx);
-		if (token != NULL && token->type == CSS_TOKEN_IDENT) {
+		if (!radial && token != NULL && token->type == CSS_TOKEN_IDENT) {
 			bool to_match = false;
 			if (lwc_string_caseless_isequal(token->idata,
 					c->strings[TO], &to_match)
@@ -106,7 +175,7 @@ css_error css__parse_macsurf_gradient(css_language *c,
 				    lwc_string_data(token->idata)[0] == ',')
 					parserutils_vector_iterate(vector, ctx);
 			}
-		} else if (token != NULL &&
+		} else if (!radial && token != NULL &&
 		           token->type == CSS_TOKEN_DIMENSION) {
 			/* fixes49 -- angle prefix: NUMBERdeg. The dimension
 			 * token's idata holds the suffix; check that it's
@@ -172,9 +241,12 @@ css_error css__parse_macsurf_gradient(css_language *c,
 			}
 		}
 
-		if (horizontal) {
+		/* Radial keeps its 0x0100 set_value regardless of any
+		 * direction tokens; horizontal only applies to linear. */
+		if (!radial && horizontal) {
 			set_value = 0x00C0;
 		}
+		(void)radial;
 
 		/* fixes49 -- accept N colour stops. Only first and last
 		 * survive into bytecode (storage slot is 2 colours). */
@@ -223,6 +295,7 @@ css_error css__parse_macsurf_gradient(css_language *c,
 
 		return css__stylesheet_style_vappend(result, 2,
 				first_color, last_color);
+	}
 	}
 
 	return CSS_INVALID;

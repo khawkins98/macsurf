@@ -14,25 +14,26 @@
 #include "select/properties/properties.h"
 #include "select/properties/helpers.h"
 
-/* fixes47/48 -- pack two css_color endpoints plus a direction flag
- * into the single int32_t storage slot reserved for the
+/* fixes47/48/74 -- pack two css_color endpoints plus a 2-bit direction
+ * code into the single int32_t storage slot reserved for the
  * macsurf_gradient property.
  *
- * fixes47 packed RGB565 + RGB565 = 32 bits. fixes48 steals 1 bit
- * from c2's blue channel (drop to RGB564) for the direction flag.
- * Visually indistinguishable; 32 levels of blue → 16 still smooth
- * on 8-bit displays.
+ * fixes47 packed RGB565 + RGB565 = 32 bits. fixes48 stole bit 15 for
+ * horizontal-vs-vertical (c2 R5 stayed). fixes74 steals bit 14 for the
+ * radial flag, dropping c2's red channel from R5 to R4 (16 red levels
+ * instead of 32 -- still smooth on 8-bit displays).
  *
  * Format of returned int32_t:
- *   bits 31..16: RGB565 of c1 (start)
- *   bit 15:      direction (0 = vertical, 1 = horizontal)
- *   bits 14..10: R5 of c2
+ *   bits 31..16: RGB565 of c1 (start / centre)
+ *   bit 15:      horizontal flag (0 = vertical, 1 = horizontal)
+ *   bit 14:      radial flag (1 = radial; overrides horizontal)
+ *   bits 13..10: R4 of c2
  *   bits 9..4:   G6 of c2
- *   bits 3..0:   B4 of c2 (dropped LSB vs fixes47)
+ *   bits 3..0:   B4 of c2
  *
  * macsurf_gradient_unpack in redraw.c knows the same format. */
 static uint32_t macsurf_gradient_pack(css_color c1, css_color c2,
-		bool horizontal)
+		bool horizontal, bool radial)
 {
 	uint16_t p1;
 	uint16_t p2_lo;
@@ -45,12 +46,13 @@ static uint32_t macsurf_gradient_pack(css_color c1, css_color c2,
 	p1 = (uint16_t)((((uint32_t)r1 >> 3) << 11) |
 			(((uint32_t)g1 >> 2) <<  5) |
 			 ((uint32_t)b1 >> 3));
-	/* c2 lives in bits 14..0: R5 G6 B4. */
-	p2_lo = (uint16_t)((((uint32_t)r2 >> 3) << 10) |
+	/* c2 lives in bits 13..0: R4 G6 B4. */
+	p2_lo = (uint16_t)((((uint32_t)r2 >> 4) << 10) |
 			(((uint32_t)g2 >> 2) <<  4) |
 			 ((uint32_t)b2 >> 4));
 	return ((uint32_t)p1 << 16) |
 	       (horizontal ? 0x8000U : 0U) |
+	       (radial ? 0x4000U : 0U) |
 	       (uint32_t)p2_lo;
 }
 
@@ -61,11 +63,21 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 	css_color c1 = 0, c2 = 0;
 	uint32_t packed = 0;
 	bool horizontal = false;
+	bool radial = false;
 
 	if (hasFlagValue(opv) == false) {
 		switch (getValue(opv)) {
 		case 0x0000: /* NONE */
 			value = CSS_MACSURF_GRADIENT_NONE;
+			break;
+		case 0x0100: /* SET radial (fixes74) */
+			radial = true;
+			value = CSS_MACSURF_GRADIENT_SET;
+			c1 = *((css_color *) style->bytecode);
+			advance_bytecode(style, sizeof(css_color));
+			c2 = *((css_color *) style->bytecode);
+			advance_bytecode(style, sizeof(css_color));
+			packed = macsurf_gradient_pack(c1, c2, false, true);
 			break;
 		case 0x00C0: /* SET horizontal (fixes48) */
 			horizontal = true;
@@ -76,10 +88,12 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 			advance_bytecode(style, sizeof(css_color));
 			c2 = *((css_color *) style->bytecode);
 			advance_bytecode(style, sizeof(css_color));
-			packed = macsurf_gradient_pack(c1, c2, horizontal);
+			packed = macsurf_gradient_pack(c1, c2, horizontal,
+					false);
 			break;
 		}
 	}
+	(void)radial;
 
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
