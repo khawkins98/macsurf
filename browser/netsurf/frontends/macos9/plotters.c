@@ -484,7 +484,35 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 					cx, cy, rot_deg, tx, ty);
 			}
 
-			saved_clip = macos9_push_clip();
+			/* fixes73e: widen clip for transformed paint. The standard
+			 * push_clip narrows the clip to (current AND content_rect),
+			 * and NetSurf's redraw tightens the current clip to each
+			 * box's layout slot before plot.rectangle runs -- so a
+			 * scale > 1 fill paints outside the slot and immediately
+			 * gets cut. For transform we want to paint freely within
+			 * the whole content area; save the existing clip, replace
+			 * it with content_rect, then restore. Other plot paths
+			 * keep using the tight clip -- only the transform branch
+			 * needs the wider scope. */
+			{
+				GrafPtr port;
+				WindowRef win;
+				struct gui_window *gw;
+				RgnHandle wide_clip;
+
+				GetPort(&port);
+				win = (WindowRef)port;
+				gw = (struct gui_window *)GetWRefCon(win);
+
+				saved_clip = NewRgn();
+				GetClip(saved_clip);
+				if (gw != NULL) {
+					wide_clip = NewRgn();
+					RectRgn(wide_clip, &gw->content_rect);
+					SetClip(wide_clip);
+					DisposeRgn(wide_clip);
+				}
+			}
 			poly = OpenPoly();
 			if (poly != NULL) {
 				MoveTo((short)x[0], (short)y[0]);
@@ -505,7 +533,10 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 				}
 				KillPoly(poly);
 			}
-			macos9_pop_clip(saved_clip);
+			if (saved_clip != NULL) {
+				SetClip(saved_clip);
+				DisposeRgn(saved_clip);
+			}
 			return NSERROR_OK;
 		}
 	}
