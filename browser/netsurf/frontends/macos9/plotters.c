@@ -803,6 +803,24 @@ macos9_plot_text(const struct redraw_context *ctx,
 		sx = (fstyle != NULL) ? fstyle->shadow_x : 0;
 		sy = (fstyle != NULL) ? fstyle->shadow_y : 0;
 
+		/* fixes70: bold smear breathing room (the real fix).
+		 * QuickDraw fakes bold by drawing each glyph twice with a
+		 * 1-pixel right shift. The smear from glyph N paints into
+		 * glyph N+1's slot, fusing letter pairs like "OB"/"BE" in
+		 * tight bold runs (visible on PROBE card headings).
+		 *
+		 * font_width slop (fixes69) reserves enough space for the
+		 * whole bold run in layout, but within one DrawText call
+		 * QuickDraw still positions glyphs at their natural bold
+		 * advances and the smear collides. Real fix: add +1 to
+		 * effective letter-spacing for bold runs, which forces the
+		 * per-char draw path below and inserts a real pixel between
+		 * each glyph. Smear has its breathing room and "PROBE"
+		 * letters stop fusing. */
+		if ((face & 1) && mac_len > 1) {
+			ls += 1;
+		}
+
 		/* fixes50 -- text-shadow pass. Paint the same glyphs at
 		 * (x+sx, y+sy) in the shadow colour before the main
 		 * pass paints them in the foreground colour. Skip the
