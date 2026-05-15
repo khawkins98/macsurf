@@ -129,6 +129,13 @@ css_error css__set_macsurf_transform_from_hint(const css_hint *hint,
 
 css_error css__initial_macsurf_transform(css_select_state *state)
 {
+	/* fixes73d: initial value writes BOTH transform (NONE/0) AND
+	 * transform_b (identity 0x01000100). Without the _b write, every
+	 * cascade chain that doesn't overwrite transform_b sees zero in the
+	 * plotter, which the defensive sx_q88==0 → 256 path then quietly
+	 * coerces back to identity — so scale-only rules looked like they
+	 * never took effect. */
+	set_macsurf_transform_b_raw(state->computed, (int32_t)0x01000100);
 	return set_macsurf_transform(state->computed,
 			CSS_MACSURF_TRANSFORM_NONE, 0);
 }
@@ -138,11 +145,18 @@ css_error css__copy_macsurf_transform(
 		css_computed_style *to)
 {
 	int32_t integer = 0;
+	int32_t integer_b;
 	uint8_t type = get_macsurf_transform(from, &integer);
 
 	if (from == to) {
 		return CSS_OK;
 	}
+
+	/* fixes73d: copy transform_b alongside transform. The cascade's
+	 * finalisation walks copy → so without this every composed style
+	 * dropped the scale field and the plotter saw 0/identity. */
+	integer_b = get_macsurf_transform_b_raw(from);
+	set_macsurf_transform_b_raw(to, integer_b);
 
 	return set_macsurf_transform(to, type, integer);
 }
@@ -154,6 +168,8 @@ css_error css__compose_macsurf_transform(const css_computed_style *parent,
 	int32_t integer = 0;
 	uint8_t type = get_macsurf_transform(child, &integer);
 
+	/* fixes73d: copy carries transform_b through, so just route to the
+	 * right source (parent on INHERIT, child otherwise) as before. */
 	return css__copy_macsurf_transform(
 			type == CSS_MACSURF_TRANSFORM_INHERIT ? parent : child,
 			result);
