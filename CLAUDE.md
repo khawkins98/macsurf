@@ -103,7 +103,8 @@ A single Go binary that strips TLS — receives plain HTTP from the Mac, fetches
 ## Key Technical Constraints
 
 - Development environment: Mac OS 9.1 on a Power Macintosh G3 Minitower (beige). All verified-working results come from this machine.
-- Community compatibility target: Mac OS 9.2.2 on a Power Mac G4. Most-common active OS 9 setup today; not yet explicitly verified — open testing gap.
+- Community compatibility target: Mac OS 9.2.2 on a Power Mac G4. Most-common active OS 9 setup today; **font rendering verified clean on 9.2.2 G4 at fixes67 (2026-05-15)** — outline + AA path produces smooth, well-spaced text.
+- **Known visual delta between 9.1 and 9.2.2:** font rendering is noticeably rougher on 9.1 than on 9.2.2 even with identical binary and identical `SetOutlinePreferred(true)` / `SetAntiAliasedTextEnabled(true, 8)` calls (the fixes51 settings). QuickDraw's AA path was significantly improved in 9.2 — 9.1 implements `SetAntiAliasedTextEnabled` weakly above 8pt. This is an OS-side limitation, not a MacSurf bug; the same code emits noticeably crisper text on 9.2.2. When working on the dev 9.1 G3 and font output looks rough, don't chase it as a MacSurf regression — confirm on a 9.2.2 machine first.
 - Broader target range: Power Mac G3/G4, Mac OS 9.1-9.2.2, minimum 64MB RAM
 - Compiler: CodeWarrior 8 (on-machine) or cross-compile GCC PPC from Linux
 - No threading — OS 9 is cooperative multitasking, use WaitNextEvent loop
@@ -370,6 +371,19 @@ Features that remain unsupported and degrade gracefully to block layout or flat 
 
 ## Build State
 
+- **v0.4.1 FULL CSS3 RENDERING on G4 / OS 9.2.2 (2026-05-15).** Reached at fixes70. advanced.html renders cleanly with:
+  - **Text styling**: bold + italic inline on the same line (no fusion, no diagonal stair-step), `face=1` (bold), `face=2` (italic), `face=0` (regular) all distinct.
+  - **Colours**: navy headings (`#003366`), grey body, light-grey de-emphasised lines — author CSS resolving through libcss cascade.
+  - **Custom properties**: native `var()` resolution still in place (fixes133-139).
+  - **Linear gradients**: 3-stop vertical + horizontal via `linear-gradient(...)` (fixes49 multi-stop).
+  - **Text-shadow**: `-macsurf-text-shadow` libcss property, offset DrawText pass before main pass, four colour/offset variants visible (fixes50).
+  - **Opacity**: QuickDraw stipple via `GetIndPattern(sysPatListID, n)`, 1.0/0.80/0.50/0.25 graceful degradation (fixes49).
+  - **Box-shadow**: independent h/v offsets, custom colour, four variants (fixes175/178).
+  - **Flex order**: `order: 0..3` reorders DOM4/2/3/1 to PURPLE/GREEN/BLUE/RED visual L-R.
+  - **Flex justify-content**: start/end/center/between/around/evenly all distributing R/G/B items correctly.
+  - **Font quality**: outline + AA floor=12pt (fixes68), bold smear breathing room +1px (fixes69 layout + fixes70 draw).
+- **Recovery sprint complete (fixes55-70).** The build came back from the empty-box-tree state through fixes55 (libcss internal header wrappers), fixes60 (HFS case-insensitive `<Aliases.h>` shadow), fixes61 (duplicate sources), fixes62-64 (`__MACOS9__` guards on netsurf core fetcher_init / fetch_javascript_register), fixes65 (`MS_LOG` unconditional), fixes66 (pipeline diagnostics narrowed to css_new_sheets), fixes67 (register the resource/about/file/data/javascript stub fetchers — the actual one-line root cause of the blank window), fixes68 (AA floor 8→12), fixes69+70 (bold smear breathing).
+- **Known trade-off — bold spacing has a +1px tax per inter-glyph gap (fixes69+70).** This is the cost of QuickDraw smear-bold not collapsing letters in tight runs like "PROBE". Visual cost: bold runs read very slightly looser than ideal. If a future bug shows up as "bold text wrapping one word too early" or "bold and regular widths don't line up in a table cell" — this is the suspect. Per-character `+1` could be dropped to `+0.5` (every other gap) or scaled to font size if it becomes a problem; for now the spacing is uniform and tracked.
 - **v0.4 CSS APPLIES on G3 hardware (2026-05-13).** Reached at fixes33. simple.html now renders with author CSS and UA defaults both taking effect: H1 navy bold 15pt, H2 maroon bold 12pt, body background `#cccccc`, H1 card white background, 32 block boxes laid out properly. Screenshot + log in [docs/css-milestone-2026-05-13.md](docs/css-milestone-2026-05-13.md). Root cause and ten-round diagnostic chain documented there. Active known artefacts post-fix: list bullets render as `;` instead of disc glyphs; right-edge text wraps strangely on narrow viewports; some inline boxes duplicate. None of those block reading.
 - **v0.3 render path under reconstruction post fixes260-304 sprint.** The build links and launches; fetch / parse / convert / READY all flow after fixes306 restored the navigate path; fixes308 corrected the redraw scroll offset; fixes309 added the box-walker / plotter counters that produced the evidence summarised below. Rendered output is currently a grey window — `browser_window_redraw` walks the box tree and visits 3 BOX_BLOCK nodes total, no inline / text content. Diagnosis at [docs/research/fixes310-empty-box-tree.md](docs/research/fixes310-empty-box-tree.md). fixes310a ships narrowly-scoped MS_LOG instrumentation (HTTP body bytes, parser bytes, layout dimensions, post-convert tree counters); fixes311 is the actual render fix scoped from that evidence.
 - The earlier "MacSurf v0.3 renders MacTrove on G3 hardware (2026-04-19)" snapshot is from BEFORE the fixes260-304 build-environment recovery sprint and no longer reflects current behaviour. Treat that snapshot as a target to recover, not as current state.
