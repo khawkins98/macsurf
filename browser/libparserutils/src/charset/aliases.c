@@ -14,7 +14,7 @@
 
 #include <assert.h>
 
-#include "charset/aliases.h"
+#include "charset/ns_aliases.h"
 #include "utils/utils.h"
 
 /* Bring in the aliases tables */
