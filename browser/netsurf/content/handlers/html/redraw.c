@@ -711,14 +711,19 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	        } else {
 	                pstyle_fill_bg.opacity = (plot_style_fixed)PLOT_STYLE_SCALE;
 	        }
-	        /* fixes71 -- -macsurf-transform packed value to the plotter. */
+	        /* fixes71 -- -macsurf-transform packed value to the plotter.
+	         * fixes73 -- scale companion in transform_b. */
 	        {
 	                int32_t tfm = 0;
 	                if (css_computed_macsurf_transform(background->style, &tfm) ==
 	                                CSS_MACSURF_TRANSFORM_SET) {
 	                        pstyle_fill_bg.transform = (int)tfm;
+	                        pstyle_fill_bg.transform_b =
+	                                (int)css_computed_macsurf_transform_b(
+	                                        background->style);
 	                } else {
 	                        pstyle_fill_bg.transform = 0;
+	                        pstyle_fill_bg.transform_b = (int)0x01000100;
 	                }
 	        }
 	        if (css_computed_box_shadow(background->style, &bsh) == CSS_BOX_SHADOW_SET) {
@@ -1065,14 +1070,18 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	        } else {
 	                pstyle_fill_bg.opacity = (plot_style_fixed)PLOT_STYLE_SCALE;
 	        }
-	        /* fixes71 -- -macsurf-transform mirror for inline path. */
+	        /* fixes71 -- -macsurf-transform mirror for inline path.
+	         * fixes73 -- scale companion in transform_b. */
 	        {
 	                int32_t tfm_inl = 0;
 	                if (css_computed_macsurf_transform(box->style, &tfm_inl) ==
 	                                CSS_MACSURF_TRANSFORM_SET) {
 	                        pstyle_fill_bg.transform = (int)tfm_inl;
+	                        pstyle_fill_bg.transform_b =
+	                                (int)css_computed_macsurf_transform_b(box->style);
 	                } else {
 	                        pstyle_fill_bg.transform = 0;
+	                        pstyle_fill_bg.transform_b = (int)0x01000100;
 	                }
 	        }
 	        if (css_computed_box_shadow(box->style, &bsh) == CSS_BOX_SHADOW_SET) {

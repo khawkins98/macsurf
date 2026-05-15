@@ -106,6 +106,9 @@ typedef struct plot_style_s {
          *   bits 7..0   translate-y int8 px
          * Zero = no transform (identity). */
         int transform;
+        /* fixes73: scale companion. bits 31..16 sx_q88, bits 15..0 sy_q88.
+         * 0x01000100 = identity (1.0, 1.0). 0 = collapse. */
+        int transform_b;
 } plot_style_t;
 
 /**
@@ -161,6 +164,8 @@ typedef struct plot_font_style {
 	 * plot_style_t.transform). plot_text honours 90/180/270 rotations
 	 * by re-positioning glyphs; arbitrary angles render upright. */
 	int transform;
+	/* fixes73: scale companion (sx_q88, sy_q88) for text origin. */
+	int transform_b;
 } plot_font_style_t;
 
 

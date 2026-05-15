@@ -212,15 +212,19 @@ void font_plot_style_from_css(
 	 * so plot_text can honour 90/180/270 rotations. Layout below is
 	 *   bits 31..16 rotation Q10.6 deg
 	 *   bits 15..8  translate-x int8 px
-	 *   bits 7..0   translate-y int8 px */
+	 *   bits 7..0   translate-y int8 px
+	 * fixes73: scale companion in transform_b. */
 	{
 		int32_t tfm_packed = 0;
 		uint8_t tfm_status = css_computed_macsurf_transform(css,
 				&tfm_packed);
 		if (tfm_status == CSS_MACSURF_TRANSFORM_SET) {
 			fstyle->transform = (int)tfm_packed;
+			fstyle->transform_b =
+				(int)css_computed_macsurf_transform_b(css);
 		} else {
 			fstyle->transform = 0;
+			fstyle->transform_b = (int)0x01000100;
 		}
 	}
 	/* Safety: when the CSS cascade produces a suspicious colour (white,

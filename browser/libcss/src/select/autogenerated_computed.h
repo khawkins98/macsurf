@@ -260,6 +260,10 @@ struct css_computed_style_i {
 	int32_t macsurf_gradient;
 	int32_t macsurf_text_shadow;
 	int32_t macsurf_transform;
+	/* fixes73: macsurf_transform_b holds scale_x_q88 (bits 31..16)
+	 * and scale_y_q88 (bits 15..0). Identity = 0x01000100 (1.0, 1.0).
+	 * Zero = author wrote scale(0). */
+	int32_t macsurf_transform_b;
 	css_fixed margin_bottom;
 	css_fixed margin_left;
 	css_fixed margin_right;

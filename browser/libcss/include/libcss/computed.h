@@ -196,6 +196,12 @@ uint8_t css_computed_macsurf_transform(
 		const css_computed_style *style,
 		int32_t *packed);
 
+/* fixes73: scale companion. Returns the raw scale packing
+ * (bits 31..16 scale_x Q8.8, bits 15..0 scale_y Q8.8).
+ * Identity = 0x01000100. */
+int32_t css_computed_macsurf_transform_b(
+		const css_computed_style *style);
+
 uint8_t css_computed_background_image(
 		const css_computed_style *style,
 		lwc_string **url);

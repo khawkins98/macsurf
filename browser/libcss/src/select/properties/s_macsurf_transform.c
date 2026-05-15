@@ -14,6 +14,26 @@
 #include "select/properties/properties.h"
 #include "select/properties/helpers.h"
 
+/* fixes73 -- pack scale_x + scale_y into transform_b storage slot.
+ *   bits 31..16 scale_x Q8.8 unsigned (0..256.00 range, 1/256 precision)
+ *   bits 15..0  scale_y Q8.8 unsigned
+ *
+ * Identity = 0x01000100 (1.0, 1.0).  Zero scale means scale(0) — element
+ * collapses to nothing.  Scale values arrive as Q22.10; shift right by 2
+ * to land in Q8.8. */
+static int32_t macsurf_transform_b_pack(css_fixed scale_x, css_fixed scale_y)
+{
+	int32_t sx = (int32_t)(scale_x >> 2);
+	int32_t sy = (int32_t)(scale_y >> 2);
+	uint32_t out;
+	if (sx < 0) sx = 0;
+	if (sx > 0xffff) sx = 0xffff;
+	if (sy < 0) sy = 0;
+	if (sy > 0xffff) sy = 0xffff;
+	out = (((uint32_t)sx) << 16) | (uint32_t)sy;
+	return (int32_t)out;
+}
+
 /* fixes71 -- pack rotation + translate into one int32_t storage slot.
  *   bits 31..16 rotation angle Q10.6 deg (signed, treated mod 360)
  *   bits 15..8  translate-x int8 px (-128..127)
@@ -60,7 +80,11 @@ css_error css__cascade_macsurf_transform(uint32_t opv, css_style *style,
 	css_fixed rotation = 0;
 	css_fixed tx = 0;
 	css_fixed ty = 0;
+	css_fixed scale_x = (css_fixed)(1 << 10);  /* identity 1.0 in Q22.10 */
+	css_fixed scale_y = (css_fixed)(1 << 10);
 	int32_t packed = 0;
+	int32_t packed_b = (int32_t)0x01000100;    /* identity sentinel */
+	css_error err;
 
 	if (hasFlagValue(opv) == false) {
 		switch (getValue(opv)) {
@@ -75,14 +99,22 @@ css_error css__cascade_macsurf_transform(uint32_t opv, css_style *style,
 			advance_bytecode(style, sizeof(css_fixed));
 			ty = *((css_fixed *) style->bytecode);
 			advance_bytecode(style, sizeof(css_fixed));
+			scale_x = *((css_fixed *) style->bytecode);
+			advance_bytecode(style, sizeof(css_fixed));
+			scale_y = *((css_fixed *) style->bytecode);
+			advance_bytecode(style, sizeof(css_fixed));
 			packed = macsurf_transform_pack(rotation, tx, ty);
+			packed_b = macsurf_transform_b_pack(scale_x, scale_y);
 			break;
 		}
 	}
 
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
-		return set_macsurf_transform(state->computed, value, packed);
+		err = set_macsurf_transform(state->computed, value, packed);
+		if (err != CSS_OK) return err;
+		set_macsurf_transform_b_raw(state->computed, packed_b);
+		return CSS_OK;
 	}
 
 	return CSS_OK;

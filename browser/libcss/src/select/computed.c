@@ -473,6 +473,11 @@ uint8_t css_computed_macsurf_transform(const css_computed_style *style,
 	return get_macsurf_transform(style, packed);
 }
 
+int32_t css_computed_macsurf_transform_b(const css_computed_style *style)
+{
+	return get_macsurf_transform_b_raw(style);
+}
+
 uint8_t css_computed_background_image(const css_computed_style *style,
 		lwc_string **url)
 {

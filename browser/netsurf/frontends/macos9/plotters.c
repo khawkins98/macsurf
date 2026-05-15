@@ -439,23 +439,46 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 	 * rotated around the rectangle's centre, then fill/frame it.
 	 * Skipped for identity (transform == 0) so the fast path stays
 	 * untouched for the 99% case. */
-	if (pstyle->transform != 0) {
+	if (pstyle->transform != 0 ||
+	    (pstyle->transform_b != 0 && pstyle->transform_b != (int)0x01000100)) {
 		int rot_deg, tx, ty;
 		int cx, cy;
 		int x[4], y[4];
+		int sx_q88, sy_q88;
 		PolyHandle poly;
 		RgnHandle saved_clip;
 		int i;
 
 		macos9_transform_unpack(pstyle->transform, &rot_deg, &tx, &ty);
 
-		if (rot_deg != 0 || tx != 0 || ty != 0) {
+		/* fixes73: unpack scale from transform_b. Identity sentinel
+		 * 0x01000100 = (1.0, 1.0); zero = scale(0) author choice. */
+		sx_q88 = (int)((((uint32_t)pstyle->transform_b) >> 16) & 0xffff);
+		sy_q88 = (int)( ((uint32_t)pstyle->transform_b)        & 0xffff);
+		if (pstyle->transform_b == 0) {
+			/* author wrote scale(0) — skip drawing entirely */
+			return NSERROR_OK;
+		}
+		if (sx_q88 == 0) sx_q88 = 256;   /* defensive: treat 0 as identity */
+		if (sy_q88 == 0) sy_q88 = 256;
+
+		if (rot_deg != 0 || tx != 0 || ty != 0 ||
+		    sx_q88 != 256 || sy_q88 != 256) {
 			cx = (r.left + r.right) / 2;
 			cy = (r.top  + r.bottom) / 2;
 			x[0] = r.left;  y[0] = r.top;
 			x[1] = r.right; y[1] = r.top;
 			x[2] = r.right; y[2] = r.bottom;
 			x[3] = r.left;  y[3] = r.bottom;
+			/* fixes73: pre-rotation scale around centre. */
+			if (sx_q88 != 256 || sy_q88 != 256) {
+				for (i = 0; i < 4; i++) {
+					int dx = x[i] - cx;
+					int dy = y[i] - cy;
+					x[i] = cx + (dx * sx_q88) / 256;
+					y[i] = cy + (dy * sy_q88) / 256;
+				}
+			}
 			for (i = 0; i < 4; i++) {
 				macos9_transform_point(&x[i], &y[i],
 					cx, cy, rot_deg, tx, ty);

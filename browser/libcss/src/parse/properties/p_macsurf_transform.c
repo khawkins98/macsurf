@@ -73,6 +73,11 @@ css_error css__parse_macsurf_transform(css_language *c,
 	css_fixed rotation = 0;     /* Q22.10 deg */
 	css_fixed tx = 0;           /* Q22.10 px  */
 	css_fixed ty = 0;           /* Q22.10 px  */
+	/* fixes73: scale defaults to 1.0 (identity). Stored in Q22.10
+	 * for consistency with the other css_fixed values; cascade
+	 * packs both into the macsurf_transform_b storage slot. */
+	css_fixed scale_x = (css_fixed)(1 << 10);  /* 1.0 in Q22.10 */
+	css_fixed scale_y = (css_fixed)(1 << 10);
 	uint32_t unit = 0;
 	int got_any = 0;
 
@@ -103,12 +108,15 @@ css_error css__parse_macsurf_transform(css_language *c,
 		}
 	}
 
-	/* One or more transform functions. Walk them; recognise rotate
-	 * and translate, consume-and-ignore the rest. */
+	/* One or more transform functions. Walk them; recognise rotate,
+	 * translate, scale, plus the X/Y variants. skew/matrix are V4+. */
 	while (1) {
 		const char *fname;
 		bool is_rotate = false;
 		bool is_translate = false;
+		bool is_scale = false;     /* fixes73 */
+		bool scale_axis_x = false; /* scaleX only */
+		bool scale_axis_y = false; /* scaleY only */
 
 		consumeWhitespace(vector, ctx);
 
@@ -129,9 +137,18 @@ css_error css__parse_macsurf_transform(css_language *c,
 		} else if (strncasecmp(fname, "translate", 9) == 0 &&
 				(fname[9] == '(' || fname[9] == '\0')) {
 			is_translate = true;
+		} else if (strncasecmp(fname, "scaleX", 6) == 0 &&
+				(fname[6] == '(' || fname[6] == '\0')) {
+			is_scale = true; scale_axis_x = true;
+		} else if (strncasecmp(fname, "scaleY", 6) == 0 &&
+				(fname[6] == '(' || fname[6] == '\0')) {
+			is_scale = true; scale_axis_y = true;
+		} else if (strncasecmp(fname, "scale", 5) == 0 &&
+				(fname[5] == '(' || fname[5] == '\0')) {
+			is_scale = true;
 		}
-		/* translateX/Y, scale*, skew*, matrix → silently ignored
-		 * for V1. Consume tokens up to the matching ')'. */
+		/* translateX/Y, skew*, matrix → silently ignored
+		 * for V3. Consume tokens up to the matching ')'. */
 
 		parserutils_vector_iterate(vector, ctx);  /* eat function token */
 
@@ -190,6 +207,70 @@ css_error css__parse_macsurf_transform(css_language *c,
 				}
 				token = parserutils_vector_iterate(vector, ctx);
 			}
+		} else if (is_scale) {
+			css_fixed sv1 = 0, sv2 = 0;
+			consumeWhitespace(vector, ctx);
+			/* scale arg is a number (no unit). Read via the
+			 * unit_specifier path; on a bare number CSS gives
+			 * a unitless integer multiplied by 1024 (Q22.10),
+			 * which matches our scale_x / scale_y format. */
+			error = css__parse_unit_specifier(c, vector, ctx,
+					UNIT_PCT, &sv1, &unit);
+			if (error == CSS_OK) {
+				/* Bare number → arrives as Q22.10 with unit
+				 * set to NUMBER. PCT path returns Q22.10 in
+				 * 0..100 range, so we'd need to divide. Easiest
+				 * compromise: treat the parsed value as Q22.10
+				 * directly. CSS scale(1.5) parsed as a number
+				 * comes through as 1.5 * 1024 = 1536 — correct.
+				 * scale(150%) would arrive as 150 * 1024;
+				 * divide by 100 to get the proportional form. */
+				if ((unit & 0xff) == UNIT_PCT) {
+					sv1 = sv1 / 100;
+				}
+				sv2 = sv1;  /* default uniform */
+				consumeWhitespace(vector, ctx);
+				token = parserutils_vector_peek(vector, *ctx);
+				if (token != NULL && token->type == CSS_TOKEN_CHAR &&
+						token->idata != NULL) {
+					const char *s = lwc_string_data(token->idata);
+					if (s != NULL && s[0] == ',') {
+						parserutils_vector_iterate(vector, ctx);
+						consumeWhitespace(vector, ctx);
+						error = css__parse_unit_specifier(
+								c, vector, ctx,
+								UNIT_PCT, &sv2,
+								&unit);
+						if (error == CSS_OK) {
+							if ((unit & 0xff) == UNIT_PCT) {
+								sv2 = sv2 / 100;
+							}
+						} else {
+							sv2 = sv1;
+						}
+					}
+				}
+				if (scale_axis_x) {
+					scale_x = sv1;
+				} else if (scale_axis_y) {
+					scale_y = sv1;
+				} else {
+					scale_x = sv1;
+					scale_y = sv2;
+				}
+				got_any = 1;
+			}
+			/* skip until ')' */
+			consumeWhitespace(vector, ctx);
+			token = parserutils_vector_iterate(vector, ctx);
+			while (token != NULL) {
+				if (token->type == CSS_TOKEN_CHAR &&
+						token->idata != NULL) {
+					const char *s = lwc_string_data(token->idata);
+					if (s != NULL && s[0] == ')') break;
+				}
+				token = parserutils_vector_iterate(vector, ctx);
+			}
 		} else {
 			/* Unknown / unsupported function — consume to ')' */
 			skip_function_args(vector, ctx);
@@ -206,6 +287,9 @@ css_error css__parse_macsurf_transform(css_language *c,
 			CSS_PROP_MACSURF_TRANSFORM, 0, 0x0080 /* SET */);
 	if (error != CSS_OK) return error;
 
-	return css__stylesheet_style_vappend(result, 3,
-			(css_fixed)rotation, (css_fixed)tx, (css_fixed)ty);
+	/* fixes73: append scale_x and scale_y in addition to the
+	 * rotation/translate triple. Cascade reads all five. */
+	return css__stylesheet_style_vappend(result, 5,
+			(css_fixed)rotation, (css_fixed)tx, (css_fixed)ty,
+			(css_fixed)scale_x, (css_fixed)scale_y);
 }
