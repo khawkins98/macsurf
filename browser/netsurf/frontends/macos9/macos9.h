@@ -44,12 +44,17 @@ struct rect;
 
 	/* MacWindows.h (via LowMem.h→Carbon.h) uses AliasHandle before Aliases.h
 	 * has been processed. Pre-declare the minimal types and suppress the full
-	 * Aliases.h inclusion — MacSurf does not use the Alias Manager. */
+	 * Aliases.h inclusion — MacSurf does not use the Alias Manager.
+	 *
+	 * fixes58: simplified to void-based opaque typedefs. The previous
+	 * struct-based forward decl tripped CW8 with "illegal function definition"
+	 * inside MacWindows.h around SetWindowProxyAlias / GetWindowProxyAlias.
+	 * void-based opaque pointers parse cleanly in any function-parameter
+	 * position. MacSurf never dereferences these types so the opacity is fine. */
 	#ifndef __ALIASES__
 	#define __ALIASES__
-	struct AliasRecord;
-	typedef struct AliasRecord *AliasPtr;
-	typedef AliasPtr *AliasHandle;
+	typedef void *AliasPtr;
+	typedef void **AliasHandle;
 	#endif
 	/* MacSurf does not use the Keychain — suppress KeychainCore.h AND
 	 * KeychainHI.h (Carbon.h:210 chain) to avoid their C89-incompatible
