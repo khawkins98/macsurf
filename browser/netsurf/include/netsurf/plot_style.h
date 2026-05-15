@@ -74,7 +74,12 @@ typedef enum {
 	PLOT_OP_TYPE_LINEAR_GRADIENT,
 	/* fixes48: two-stop horizontal linear gradient. fill_colour is
 	 * the left/start colour, fill_colour2 is the right/end colour. */
-	PLOT_OP_TYPE_LINEAR_GRADIENT_H
+	PLOT_OP_TYPE_LINEAR_GRADIENT_H,
+	/* fixes74: two-stop radial gradient. fill_colour is the centre
+	 * colour, fill_colour2 is the edge colour. Plotter paints
+	 * concentric ellipses from edge (c2) to centre (c1) inside the
+	 * rectangle bounds. */
+	PLOT_OP_TYPE_RADIAL_GRADIENT
 } plot_operation_type_t;
 
 
