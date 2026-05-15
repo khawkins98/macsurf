@@ -100,6 +100,12 @@ typedef struct plot_style_s {
          * plotter switches to a QuickDraw stipple pattern to approximate
          * alpha blend on 8/16-bit displays. */
         plot_style_fixed opacity;
+        /* fixes71: -macsurf-transform packed value.
+         *   bits 31..16 rotation Q10.6 deg
+         *   bits 15..8  translate-x int8 px
+         *   bits 7..0   translate-y int8 px
+         * Zero = no transform (identity). */
+        int transform;
 } plot_style_t;
 
 /**
@@ -151,6 +157,10 @@ typedef struct plot_font_style {
 	int shadow_x;
 	int shadow_y;
 	colour shadow_color;
+	/* fixes71: -macsurf-transform packed value (same layout as
+	 * plot_style_t.transform). plot_text honours 90/180/270 rotations
+	 * by re-positioning glyphs; arbitrary angles render upright. */
+	int transform;
 } plot_font_style_t;
 
 

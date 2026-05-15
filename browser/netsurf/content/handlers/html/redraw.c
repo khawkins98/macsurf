@@ -711,6 +711,16 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	        } else {
 	                pstyle_fill_bg.opacity = (plot_style_fixed)PLOT_STYLE_SCALE;
 	        }
+	        /* fixes71 -- -macsurf-transform packed value to the plotter. */
+	        {
+	                int32_t tfm = 0;
+	                if (css_computed_macsurf_transform(background->style, &tfm) ==
+	                                CSS_MACSURF_TRANSFORM_SET) {
+	                        pstyle_fill_bg.transform = (int)tfm;
+	                } else {
+	                        pstyle_fill_bg.transform = 0;
+	                }
+	        }
 	        if (css_computed_box_shadow(background->style, &bsh) == CSS_BOX_SHADOW_SET) {
 	                /* MacSurf fixes48 -- bsh is now a packed value:
 	                 *   bits 31..24 h-offset px (int8_t signed)
@@ -1054,6 +1064,16 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                pstyle_fill_bg.opacity = (plot_style_fixed)op_fixed;
 	        } else {
 	                pstyle_fill_bg.opacity = (plot_style_fixed)PLOT_STYLE_SCALE;
+	        }
+	        /* fixes71 -- -macsurf-transform mirror for inline path. */
+	        {
+	                int32_t tfm_inl = 0;
+	                if (css_computed_macsurf_transform(box->style, &tfm_inl) ==
+	                                CSS_MACSURF_TRANSFORM_SET) {
+	                        pstyle_fill_bg.transform = (int)tfm_inl;
+	                } else {
+	                        pstyle_fill_bg.transform = 0;
+	                }
 	        }
 	        if (css_computed_box_shadow(box->style, &bsh) == CSS_BOX_SHADOW_SET) {
 	                /* MacSurf fixes48 -- mirror the html_redraw_background

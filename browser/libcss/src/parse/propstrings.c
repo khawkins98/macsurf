@@ -239,6 +239,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("box-shadow"),
 	SMAP("-macsurf-gradient"),
 	SMAP("-macsurf-text-shadow"),
+	SMAP("-macsurf-transform"),
 
 	SMAP("inherit"),
 	SMAP("unset"),

@@ -318,6 +318,54 @@ macos9_plot_line(const struct redraw_context *ctx,
 	return NSERROR_OK;
 }
 
+/* fixes71: unpack -macsurf-transform packed value.
+ *   bits 31..16 rotation Q10.6 deg (signed)
+ *   bits 15..8  translate-x int8 px
+ *   bits 7..0   translate-y int8 px
+ * Returns the nearest-90°-snapped rotation step (0=0°, 1=90°, 2=180°, 3=270°)
+ * and translation pixels. */
+static void
+macos9_transform_unpack(int transform,
+			int *rot_step, int *tx, int *ty)
+{
+	int rot_q106;
+	int rot_deg64;
+	int step;
+	int8_t tx_px = (int8_t)((((uint32_t)transform) >> 8) & 0xff);
+	int8_t ty_px = (int8_t)( ((uint32_t)transform)       & 0xff);
+
+	rot_q106 = (int)((int16_t)((((uint32_t)transform) >> 16) & 0xffff));
+	rot_deg64 = rot_q106;
+	while (rot_deg64 < 0) rot_deg64 += 360 * 64;
+	while (rot_deg64 >= 360 * 64) rot_deg64 -= 360 * 64;
+	step = (rot_deg64 + 45 * 64) / (90 * 64);
+	step = step & 0x3;
+
+	*rot_step = step;
+	*tx = (int)tx_px;
+	*ty = (int)ty_px;
+}
+
+/* Rotate a single point around (cx, cy) by step * 90 degrees. */
+static void
+macos9_transform_point(int *px, int *py,
+		       int cx, int cy, int rot_step,
+		       int tx, int ty)
+{
+	int dx = *px - cx;
+	int dy = *py - cy;
+	int nx = dx, ny = dy;
+
+	switch (rot_step & 3) {
+	case 0: nx = dx;  ny = dy;  break;
+	case 1: nx = -dy; ny = dx;  break;
+	case 2: nx = -dx; ny = -dy; break;
+	case 3: nx = dy;  ny = -dx; break;
+	}
+	*px = cx + nx + tx;
+	*py = cy + ny + ty;
+}
+
 static nserror
 macos9_plot_rectangle(const struct redraw_context *ctx,
 		      const plot_style_t *pstyle,
@@ -333,6 +381,61 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 
 	macos9_plot_rect_count++;
 	macos9_rect_from_ns(rectangle, &r);
+
+#ifdef __MACOS9__
+	/* fixes71 -- transform-aware rectangle. When the box has a
+	 * non-identity -macsurf-transform, build a 4-corner polygon
+	 * rotated around the rectangle's centre, then fill/frame it.
+	 * Skipped for identity (transform == 0) so the fast path stays
+	 * untouched for the 99% case. */
+	if (pstyle->transform != 0) {
+		int rot_step, tx, ty;
+		int cx, cy;
+		int x[4], y[4];
+		PolyHandle poly;
+		RgnHandle saved_clip;
+		int i;
+
+		macos9_transform_unpack(pstyle->transform, &rot_step, &tx, &ty);
+
+		if (rot_step != 0 || tx != 0 || ty != 0) {
+			cx = (r.left + r.right) / 2;
+			cy = (r.top  + r.bottom) / 2;
+			x[0] = r.left;  y[0] = r.top;
+			x[1] = r.right; y[1] = r.top;
+			x[2] = r.right; y[2] = r.bottom;
+			x[3] = r.left;  y[3] = r.bottom;
+			for (i = 0; i < 4; i++) {
+				macos9_transform_point(&x[i], &y[i],
+					cx, cy, rot_step, tx, ty);
+			}
+
+			saved_clip = macos9_push_clip();
+			poly = OpenPoly();
+			if (poly != NULL) {
+				MoveTo((short)x[0], (short)y[0]);
+				LineTo((short)x[1], (short)y[1]);
+				LineTo((short)x[2], (short)y[2]);
+				LineTo((short)x[3], (short)y[3]);
+				LineTo((short)x[0], (short)y[0]);
+				ClosePoly();
+				if (pstyle->fill_type != PLOT_OP_TYPE_NONE) {
+					macos9_colour_to_rgb(pstyle->fill_colour, &rgb);
+					RGBForeColor(&rgb);
+					PaintPoly(poly);
+				}
+				if (pstyle->stroke_type != PLOT_OP_TYPE_NONE) {
+					macos9_colour_to_rgb(pstyle->stroke_colour, &rgb);
+					RGBForeColor(&rgb);
+					FramePoly(poly);
+				}
+				KillPoly(poly);
+			}
+			macos9_pop_clip(saved_clip);
+			return NSERROR_OK;
+		}
+	}
+#endif
 
 	/* Diagnostic: dump fill / stroke colour + rect for the first few
 	 * rectangles each redraw so we can compare what libcss decided
@@ -802,6 +905,21 @@ macos9_plot_text(const struct redraw_context *ctx,
 		ls = (fstyle != NULL) ? fstyle->letter_spacing : 0;
 		sx = (fstyle != NULL) ? fstyle->shadow_x : 0;
 		sy = (fstyle != NULL) ? fstyle->shadow_y : 0;
+
+		/* fixes71 -- text-side transform. V1 supports translate
+		 * only; the glyph orientation stays upright regardless of
+		 * the rotation component. Author CSS like
+		 *   transform: rotate(90deg) translate(10px, 0)
+		 * applies the translate to the text origin but leaves
+		 * letters readable. True glyph rotation needs GWorld
+		 * offscreen rendering + manual pixel rotate (V2). */
+		if (fstyle != NULL && fstyle->transform != 0) {
+			int rot_step, tx, ty;
+			macos9_transform_unpack(fstyle->transform,
+				&rot_step, &tx, &ty);
+			x += tx;
+			y += ty;
+		}
 
 		/* fixes70: bold smear breathing room (the real fix).
 		 * QuickDraw fakes bold by drawing each glyph twice with a

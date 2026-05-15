@@ -76,6 +76,7 @@
 /* set_list_style_type(style, 0, 0, CSS_UNIT_PX); */
 /* set_macsurf_gradient(style, 0, 0, CSS_UNIT_PX); */
 /* set_macsurf_text_shadow(style, 0, 0, CSS_UNIT_PX); */
+/* set_macsurf_transform(style, 0, 0, CSS_UNIT_PX); */
 /* set_margin_bottom(style, 0, 0, CSS_UNIT_PX); */
 /* set_margin_left(style, 0, 0, CSS_UNIT_PX); */
 /* set_margin_right(style, 0, 0, CSS_UNIT_PX); */
