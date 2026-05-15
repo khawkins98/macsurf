@@ -203,6 +203,19 @@ macos9_font_measure(const struct plot_font_style *fstyle,
                 width += (int)(mac_len / 24) + 1;
         }
 
+        /* fixes69: bold-specific extra slop. QuickDraw fakes bold via
+         * smear — each glyph is rendered twice with a 1-pixel right
+         * shift to thicken the strokes. TextWidth(bold) returns the
+         * smeared total width, but the smear from glyph N still bleeds
+         * 1 pixel into glyph N+1's slot, causing letter pairs like "BE"
+         * or "OB" to look fused in tight bold runs (visible on PROBE
+         * card headings). Add 1 extra px per glyph-pair gap so the
+         * smear has breathing room. Only applies when bold face is
+         * active. */
+        if ((face & 1) && mac_len > 1) {
+                width += (int)(mac_len - 1);
+        }
+
         if (changed_port)
                 SetPort(old_port);
         return width;
