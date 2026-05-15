@@ -55,6 +55,7 @@ PROPERTY_FUNCS(border_radius);
 PROPERTY_FUNCS(box_shadow);
 PROPERTY_FUNCS(macsurf_gradient);
 PROPERTY_FUNCS(macsurf_text_shadow);
+PROPERTY_FUNCS(macsurf_transform);
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
 PROPERTY_FUNCS(break_after);

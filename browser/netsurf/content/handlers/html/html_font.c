@@ -208,6 +208,21 @@ void font_plot_style_from_css(
 			fstyle->shadow_color = 0;
 		}
 	}
+	/* fixes71: -macsurf-transform packed value flows into plot_font_style
+	 * so plot_text can honour 90/180/270 rotations. Layout below is
+	 *   bits 31..16 rotation Q10.6 deg
+	 *   bits 15..8  translate-x int8 px
+	 *   bits 7..0   translate-y int8 px */
+	{
+		int32_t tfm_packed = 0;
+		uint8_t tfm_status = css_computed_macsurf_transform(css,
+				&tfm_packed);
+		if (tfm_status == CSS_MACSURF_TRANSFORM_SET) {
+			fstyle->transform = (int)tfm_packed;
+		} else {
+			fstyle->transform = 0;
+		}
+	}
 	/* Safety: when the CSS cascade produces a suspicious colour (white,
 	 * transparent, or otherwise garbage from an incomplete computed
 	 * style), force foreground to opaque black so text is always

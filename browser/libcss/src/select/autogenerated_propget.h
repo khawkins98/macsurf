@@ -2024,6 +2024,36 @@ static inline uint8_t get_macsurf_text_shadow(const css_computed_style *style,
 #undef MACSURF_TEXT_SHADOW_SHIFT
 #undef MACSURF_TEXT_SHADOW_MASK
 
+#define MACSURF_TRANSFORM_INDEX 14
+#define MACSURF_TRANSFORM_SHIFT 2
+#define MACSURF_TRANSFORM_MASK 0xC
+static inline uint8_t get_macsurf_transform_bits(const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[MACSURF_TRANSFORM_INDEX];
+	bits &= MACSURF_TRANSFORM_MASK;
+	bits >>= MACSURF_TRANSFORM_SHIFT;
+
+	/* 2bits: tt : type */
+	return (bits & 0x3);
+}
+static inline uint8_t get_macsurf_transform(const css_computed_style *style,
+		int32_t *integer)
+{
+	uint32_t bits = style->i.bits[MACSURF_TRANSFORM_INDEX];
+	bits &= MACSURF_TRANSFORM_MASK;
+	bits >>= MACSURF_TRANSFORM_SHIFT;
+
+	/* 2bits: tt : type */
+	if ((bits & 0x3) == CSS_MACSURF_TRANSFORM_SET) {
+		*integer = style->i.macsurf_transform;
+	}
+
+	return (bits & 0x3);
+}
+#undef MACSURF_TRANSFORM_INDEX
+#undef MACSURF_TRANSFORM_SHIFT
+#undef MACSURF_TRANSFORM_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800

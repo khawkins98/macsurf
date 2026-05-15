@@ -259,6 +259,7 @@ struct css_computed_style_i {
 	lwc_string *list_style_image;
 	int32_t macsurf_gradient;
 	int32_t macsurf_text_shadow;
+	int32_t macsurf_transform;
 	css_fixed margin_bottom;
 	css_fixed margin_left;
 	css_fixed margin_right;

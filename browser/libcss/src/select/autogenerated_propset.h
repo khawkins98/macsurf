@@ -1576,6 +1576,28 @@ static inline css_error set_macsurf_text_shadow(css_computed_style *style,
 #undef MACSURF_TEXT_SHADOW_SHIFT
 #undef MACSURF_TEXT_SHADOW_MASK
 
+/* fixes71 -- bits 2-3 of word 14 (free slot adjacent to TEXT_SHADOW) */
+#define MACSURF_TRANSFORM_INDEX 14
+#define MACSURF_TRANSFORM_SHIFT 2
+#define MACSURF_TRANSFORM_MASK 0xC
+
+static inline css_error set_macsurf_transform(css_computed_style *style,
+		uint8_t type, int32_t integer)
+{
+	uint32_t *bits = &style->i.bits[MACSURF_TRANSFORM_INDEX];
+
+	/* 2bits: tt : type */
+	*bits = (*bits & ~MACSURF_TRANSFORM_MASK) |
+			(((uint32_t)type & 0x3) << MACSURF_TRANSFORM_SHIFT);
+
+	style->i.macsurf_transform = integer;
+
+	return CSS_OK;
+}
+#undef MACSURF_TRANSFORM_INDEX
+#undef MACSURF_TRANSFORM_SHIFT
+#undef MACSURF_TRANSFORM_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800
