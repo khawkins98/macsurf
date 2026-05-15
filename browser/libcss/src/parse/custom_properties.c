@@ -174,7 +174,7 @@ css_error css__sheet_add_custom_property(css_stylesheet *sheet,
 			lwc_string_unref(name);
 			if (!g_cp_def_logged) {
 				g_cp_def_logged = 1;
-				MS_LOG_STICKY("cp def OK");
+				/* MS_LOG_STICKY removed (fixes63) */
 			}
 			return CSS_OK;
 		}
@@ -204,7 +204,7 @@ css_error css__sheet_add_custom_property(css_stylesheet *sheet,
 
 	if (!g_cp_def_logged) {
 		g_cp_def_logged = 1;
-		MS_LOG_STICKY("cp def OK");
+		/* MS_LOG_STICKY removed (fixes63) */
 	}
 	return CSS_OK;
 }
@@ -834,7 +834,7 @@ css_error css__deferred_decl_resolve(const css_deferred_decl *dd,
 
 	if (!g_cp_res_logged) {
 		g_cp_res_logged = 1;
-		MS_LOG_STICKY("cp res OK");
+		/* MS_LOG_STICKY removed (fixes63) */
 	}
 
 	return CSS_OK;

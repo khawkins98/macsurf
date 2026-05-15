@@ -830,7 +830,7 @@ css_error handleDeclaration(css_language *c, const parserutils_vector *vector)
 			lwc_string *name_ref;
 			const css_token *colon;
 
-			MS_LOG_STICKY("hD -- IDENT");
+			/* MS_LOG_STICKY removed (fixes63) */
 
 			/* Skip IDENT('--foo'). */
 			(void)parserutils_vector_iterate(vector, &ctx);

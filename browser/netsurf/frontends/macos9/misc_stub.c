@@ -234,39 +234,6 @@ lwc_error lwc_string_caseless_hash_value(lwc_string *str, lwc_hash *hash)
 	return lwc_error_ok;
 }
 
-/* strcasestr — POSIX, not in MSL */
-char *strcasestr(const char *haystack, const char *needle)
-{
-	size_t nl;
-	if (!haystack || !needle) return NULL;
-	nl = strlen(needle);
-	if (nl == 0) return (char *)haystack;
-	for (; *haystack; haystack++) {
-		size_t i;
-		for (i = 0; i < nl; i++) {
-			char a = haystack[i], b = needle[i];
-			if (a >= 'A' && a <= 'Z') a += 32;
-			if (b >= 'A' && b <= 'Z') b += 32;
-			if (a != b) break;
-		}
-		if (i == nl) return (char *)haystack;
-	}
-	return NULL;
-}
-
-/* strndup — POSIX, not in MSL */
-#include <stdlib.h>
-char *strndup(const char *s, size_t n)
-{
-	size_t l = 0; char *r;
-	while (l < n && s[l]) l++;
-	r = malloc(l + 1);
-	if (!r) return NULL;
-	memcpy(r, s, l);
-	r[l] = '\0';
-	return r;
-}
-
 /* clamp — NetSurf utility, may not be linked */
 int clamp(int v, int lo, int hi)
 {
@@ -275,81 +242,13 @@ int clamp(int v, int lo, int hi)
 	return v;
 }
 
-/* cnv_space2nbsp — convert ASCII space to non-breaking space (0xA0 in
- * Latin-1; we leave it as a passthrough no-op stub for now). */
-char *cnv_space2nbsp(const char *s)
-{
-	return strdup(s);
-}
-
-/* squash_whitespace — collapse runs of whitespace into single spaces. */
-char *squash_whitespace(const char *s)
-{
-	char *r, *w;
-	int in_ws = 0;
-	if (!s) return NULL;
-	r = malloc(strlen(s) + 1);
-	if (!r) return NULL;
-	w = r;
-	while (*s) {
-		if (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') {
-			if (!in_ws) { *w++ = ' '; in_ws = 1; }
-		} else {
-			*w++ = *s; in_ws = 0;
-		}
-		s++;
-	}
-	*w = '\0';
-	return r;
-}
-
 /* NOF_ELEMENTS is a macro defined in macsurf_prefix.h.
  * Variable definition removed — was causing html_init to call 0(html_types). */
 
-/* inet_aton — POSIX, not in MSL */
-struct in_addr_stub_ { unsigned long s_addr; };
-int inet_aton(const char *cp, void *inp)
-{
-	unsigned long parts[4] = {0,0,0,0};
-	int i;
-	const char *p = cp;
-	for (i = 0; i < 4 && *p; i++) {
-		while (*p >= '0' && *p <= '9') { parts[i] = parts[i]*10 + (*p - '0'); p++; }
-		if (i < 3) { if (*p != '.') return 0; p++; }
-	}
-	if (inp) ((struct in_addr_stub_ *)inp)->s_addr =
-		(parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
-	return 1;
-}
-
-/* vsnstrjoin — used by ns_file.c posix_vmkpath. Simple stub that
- * concatenates with separator. */
-#include <stdarg.h>
-nserror vsnstrjoin(char **str, size_t *size, char sep, size_t nelm, va_list ap)
-{
-	size_t totlen = 0, i;
-	char *arg, *out, *p;
-	va_list ap2;
-	va_copy(ap2, ap);
-	for (i = 0; i < nelm; i++) {
-		arg = va_arg(ap, char *);
-		if (arg) totlen += strlen(arg) + 1;
-	}
-	out = malloc(totlen + 1);
-	if (!out) { va_end(ap2); return NSERROR_NOMEM; }
-	p = out;
-	for (i = 0; i < nelm; i++) {
-		arg = va_arg(ap2, char *);
-		if (!arg) continue;
-		if (p != out) *p++ = sep;
-		strcpy(p, arg); p += strlen(arg);
-	}
-	*p = '\0';
-	va_end(ap2);
-	*str = out;
-	if (size) *size = totlen;
-	return NSERROR_OK;
-}
+/* strcasestr, strndup, cnv_space2nbsp, squash_whitespace, inet_aton, vsnstrjoin
+ * were once stubs here. They now live in netsurf/utils/utils.c, which is part
+ * of the project. The stub copies were removed in fixes63 to resolve
+ * multiply-defined link errors. */
 
 /* nsmkdir / stat — POSIX stubs. mkdir not actually meaningful on OS 9
  * without HFS plumbing; return success and let later open() decide. */
