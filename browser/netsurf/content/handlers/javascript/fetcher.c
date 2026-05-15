@@ -199,6 +199,7 @@ static void fetch_javascript_poll(lwc_string *scheme)
  *
  * \return NSERROR_OK on success or appropriate error code on faliure.
 */
+#ifndef __MACOS9__
 nserror fetch_javascript_register(void)
 {
 	lwc_string *scheme = lwc_string_ref(corestring_lwc_javascript);
@@ -215,3 +216,4 @@ nserror fetch_javascript_register(void)
 
 	return fetcher_add(scheme, &fetcher_ops);
 }
+#endif /* !__MACOS9__ */

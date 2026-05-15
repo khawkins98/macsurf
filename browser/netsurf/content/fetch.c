@@ -282,6 +282,7 @@ static void fetcher_poll(void *unused)
  ******************************************************************************/
 
 /* exported interface documented in content/fetch.h */
+#ifndef __MACOS9__
 nserror fetcher_init(void)
 {
 	nserror ret;
@@ -317,6 +318,7 @@ nserror fetcher_init(void)
 
 	return ret;
 }
+#endif /* !__MACOS9__ */
 
 /* exported interface documented in content/fetchers.h */
 void fetcher_quit(void)
