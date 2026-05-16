@@ -17,9 +17,27 @@
 
 #include "macos9.h"
 
-#include <ImageCompression.h>
+/* Movies.h gives us HandleDataHandlerSubType (= 'hndl') and Component
+ * Manager basics. We deliberately do NOT include
+ * <QuickTimeComponents.h> or <ImageCompression.h> -- on CW8 the former
+ * chains into QuickTimeMusic.h which fails on undefined BigEndianLong
+ * types (Endian.h isn't seeded into the chain), and we don't need the
+ * music / streaming / VR subsystems. The six GraphicsImporter routines
+ * we need are declared by hand below. CloseComponent is in
+ * Components.h (already pulled in by Carbon.h). */
 #include <Movies.h>
-#include <QuickTimeComponents.h>
+
+typedef ComponentInstance GraphicsImportComponent;
+
+extern OSErr GetGraphicsImporterForDataRef(Handle dataRef,
+		OSType dataRefType, GraphicsImportComponent *importer);
+extern ComponentResult GraphicsImportGetNaturalBounds(
+		GraphicsImportComponent gi, Rect *naturalBounds);
+extern ComponentResult GraphicsImportSetGWorld(GraphicsImportComponent gi,
+		CGrafPtr port, GDHandle gdh);
+extern ComponentResult GraphicsImportSetBoundsRect(GraphicsImportComponent gi,
+		const Rect *bounds);
+extern ComponentResult GraphicsImportDraw(GraphicsImportComponent gi);
 
 #include <stdlib.h>
 #include <string.h>
