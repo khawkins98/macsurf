@@ -39,18 +39,26 @@ void macos9_window_layout(struct gui_window *g) {
 void macos9_window_invalidate_all(struct gui_window *g) { Rect r; if(!g||!g->window)return; GetWindowBounds(g->window, 33, &r); r.right=(short)(r.right-r.left); r.bottom=(short)(r.bottom-r.top); r.left=0; r.top=0; InvalWindowRect(g->window, &r); }
 void macos9_window_invalidate_content(struct gui_window *g) { if(!g||!g->window)return; InvalWindowRect(g->window, &g->content_rect); }
 
-/* fixes76b -- invalidate a single page-coord rect, mapped into window
- * coords and clipped to content_rect. Used by the animation tick to
- * avoid full-content redraws (whole-page flashing on OS 9 hardware). */
+/* fixes76c -- invalidate a single rect, clipped to content_rect.
+ * x, y are window coords (already include the content_rect.top /
+ * scroll offset because redraw.c receives that offset from main.c
+ * and walks the box tree adding it). Used by the animation tick to
+ * avoid full-content redraws (whole-page flashing on OS 9 hardware).
+ *
+ * fixes76b shipped this with a page-coord->window-coord conversion
+ * (`content_rect.top + (py - scroll_y)`) that double-applied the
+ * chrome offset: the invalidated rect ended up 38 px below the
+ * actual box. Visible symptom: top half of each animated badge
+ * never repainted, showing one frozen opacity above the live one. */
 void macos9_window_invalidate_rect(struct gui_window *g, int px, int py, int pw, int ph) {
 #ifdef __MACOS9__
 	Rect r;
 	int wx0, wy0, wx1, wy1;
 	if (!g || !g->window) return;
-	wx0 = g->content_rect.left + (px - g->scroll_x);
-	wy0 = g->content_rect.top  + (py - g->scroll_y);
-	wx1 = wx0 + pw;
-	wy1 = wy0 + ph;
+	wx0 = px;
+	wy0 = py;
+	wx1 = px + pw;
+	wy1 = py + ph;
 	if (wx0 < g->content_rect.left)  wx0 = g->content_rect.left;
 	if (wy0 < g->content_rect.top)   wy0 = g->content_rect.top;
 	if (wx1 > g->content_rect.right) wx1 = g->content_rect.right;
