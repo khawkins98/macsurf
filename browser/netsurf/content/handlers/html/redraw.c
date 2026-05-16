@@ -119,6 +119,44 @@ static int32_t macsurf_anim_opacity_resolve_plot_fixed(int32_t packed)
 	return result;
 }
 
+/* fixes77: -macsurf-animation-rotate resolver. Same packed layout as
+ * opacity (duration_ms<<16 | to<<8 | from) but bytes are degrees scaled
+ * by 256/360. Returns current rotation in degrees (0..359). Same linear
+ * ping-pong timing. */
+static int macsurf_anim_rotate_resolve_degrees(int32_t packed)
+{
+	int32_t from_b = packed & 0xff;
+	int32_t to_b = (packed >> 8) & 0xff;
+	int32_t duration_ms = (packed >> 16) & 0xffff;
+	uint32_t now_ticks;
+	uint32_t elapsed_ms;
+	uint32_t period_ms;
+	uint32_t t;
+	int32_t cur_byte;
+	int32_t cur_deg;
+
+	if (duration_ms < 1) duration_ms = 1;
+	macos9_animation_register();
+	now_ticks = macos9_animation_now_ticks();
+	elapsed_ms = (now_ticks * 1000u) / 60u;
+	period_ms = (uint32_t)duration_ms * 2u;
+	t = elapsed_ms % period_ms;
+
+	if ((int32_t)t < duration_ms) {
+		cur_byte = from_b + (((to_b - from_b) * (int32_t)t) /
+				duration_ms);
+	} else {
+		int32_t back_t = (int32_t)t - duration_ms;
+		cur_byte = to_b + (((from_b - to_b) * back_t) /
+				duration_ms);
+	}
+	if (cur_byte < 0) cur_byte = 0;
+	if (cur_byte > 255) cur_byte = 255;
+	/* Map byte back to degrees: 256 steps -> 360 deg. */
+	cur_deg = (cur_byte * 360) / 256;
+	return cur_deg;
+}
+
 /* Diagnostic counters */
 long macos9_html_redraw_text_box_calls = 0;
 long macos9_text_redraw_plot_calls = 0;
@@ -824,6 +862,42 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                        pstyle_fill_bg.transform_b = (int)0x01000100;
 	                }
 	        }
+	        /* fixes77 -- -macsurf-animation-rotate overrides the rotation
+	         * field of transform with the current tick's interpolated
+	         * angle. Preserves tx/ty/scale from any static transform. */
+	        {
+	                int32_t anim_rot = 0;
+	                if (css_computed_macsurf_animation_rotate(
+	                                background->style, &anim_rot) ==
+	                                CSS_MACSURF_ANIMATION_ROTATE_SET) {
+	                        int cur_deg =
+	                                macsurf_anim_rotate_resolve_degrees(
+	                                        anim_rot);
+	                        uint32_t cur_tfm =
+	                                (uint32_t)pstyle_fill_bg.transform;
+	                        int rw_box, rh_box, inflate;
+	                        /* Q10.6: integer degrees * 64 in upper 16 bits. */
+	                        cur_tfm = (cur_tfm & 0x0000ffffu) |
+	                                ((((uint32_t)cur_deg) << 6) << 16);
+	                        pstyle_fill_bg.transform = (int)cur_tfm;
+	                        if (pstyle_fill_bg.transform_b == 0) {
+	                                pstyle_fill_bg.transform_b =
+	                                        (int)0x01000100;
+	                        }
+	                        /* Inflate invalidate rect by half max dim so a
+	                         * 45-deg rotation's corners stay covered. */
+	                        rw_box = box->padding[LEFT] + box->width +
+	                                        box->padding[RIGHT];
+	                        rh_box = box->padding[TOP] + box->height +
+	                                        box->padding[BOTTOM];
+	                        inflate = (rw_box > rh_box ? rw_box : rh_box)
+	                                        / 2 + 4;
+	                        macos9_animation_register_rect(
+	                                x - inflate, y - inflate,
+	                                rw_box + 2 * inflate,
+	                                rh_box + 2 * inflate);
+	                }
+	        }
 	        if (css_computed_box_shadow(background->style, &bsh) == CSS_BOX_SHADOW_SET) {
 	                /* MacSurf fixes48 -- bsh is now a packed value:
 	                 *   bits 31..24 h-offset px (int8_t signed)
@@ -1202,6 +1276,36 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                } else {
 	                        pstyle_fill_bg.transform = 0;
 	                        pstyle_fill_bg.transform_b = (int)0x01000100;
+	                }
+	        }
+	        /* fixes77 -- animation-rotate override for inline path. */
+	        {
+	                int32_t anim_rot_il = 0;
+	                if (css_computed_macsurf_animation_rotate(
+	                                box->style, &anim_rot_il) ==
+	                                CSS_MACSURF_ANIMATION_ROTATE_SET) {
+	                        int cur_deg =
+	                                macsurf_anim_rotate_resolve_degrees(
+	                                        anim_rot_il);
+	                        uint32_t cur_tfm =
+	                                (uint32_t)pstyle_fill_bg.transform;
+	                        int bw_in, bh_in, inflate_in;
+	                        cur_tfm = (cur_tfm & 0x0000ffffu) |
+	                                ((((uint32_t)cur_deg) << 6) << 16);
+	                        pstyle_fill_bg.transform = (int)cur_tfm;
+	                        if (pstyle_fill_bg.transform_b == 0) {
+	                                pstyle_fill_bg.transform_b =
+	                                        (int)0x01000100;
+	                        }
+	                        bw_in = b.x1 - b.x0;
+	                        bh_in = b.y1 - b.y0;
+	                        inflate_in = (bw_in > bh_in ? bw_in : bh_in)
+	                                        / 2 + 4;
+	                        macos9_animation_register_rect(
+	                                b.x0 - inflate_in,
+	                                b.y0 - inflate_in,
+	                                bw_in + 2 * inflate_in,
+	                                bh_in + 2 * inflate_in);
 	                }
 	        }
 	        if (css_computed_box_shadow(box->style, &bsh) == CSS_BOX_SHADOW_SET) {

@@ -1653,6 +1653,30 @@ static inline css_error set_macsurf_animation_opacity(
 #undef MACSURF_ANIMATION_OPACITY_SHIFT
 #undef MACSURF_ANIMATION_OPACITY_MASK
 
+/* fixes77: -macsurf-animation-rotate uses bit 1 of word 15.
+ * Integer storage packs duration_ms (bits 31..16),
+ * to_deg_byte (bits 15..8), from_deg_byte (bits 7..0). */
+#define MACSURF_ANIMATION_ROTATE_INDEX 15
+#define MACSURF_ANIMATION_ROTATE_SHIFT 1
+#define MACSURF_ANIMATION_ROTATE_MASK 0x2
+
+static inline css_error set_macsurf_animation_rotate(
+		css_computed_style *style, uint8_t type, int32_t integer)
+{
+	uint32_t *bits = &style->i.bits[MACSURF_ANIMATION_ROTATE_INDEX];
+
+	*bits = (*bits & ~MACSURF_ANIMATION_ROTATE_MASK) |
+			(((uint32_t)type & 0x1) <<
+				MACSURF_ANIMATION_ROTATE_SHIFT);
+
+	style->i.macsurf_animation_rotate = integer;
+
+	return CSS_OK;
+}
+#undef MACSURF_ANIMATION_ROTATE_INDEX
+#undef MACSURF_ANIMATION_ROTATE_SHIFT
+#undef MACSURF_ANIMATION_ROTATE_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800

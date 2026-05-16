@@ -242,6 +242,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("-macsurf-transform"),
 	SMAP("-macsurf-grid"),
 	SMAP("-macsurf-animation-opacity"),
+	SMAP("-macsurf-animation-rotate"),
 
 	SMAP("inherit"),
 	SMAP("unset"),
