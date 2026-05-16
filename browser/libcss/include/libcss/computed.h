@@ -217,6 +217,13 @@ uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style,
 		int32_t *packed);
 
+/* fixes77: -macsurf-animation-rotate: <from_deg> <to_deg> <duration_ms>.
+ * from, to: rotation in 0..255 (each step = ~1.4 deg). Ping-pong cycle.
+ * packed: bits 0..7 from_byte, bits 8..15 to_byte, bits 16..31 duration_ms. */
+uint8_t css_computed_macsurf_animation_rotate(
+		const css_computed_style *style,
+		int32_t *packed);
+
 uint8_t css_computed_background_image(
 		const css_computed_style *style,
 		lwc_string **url);

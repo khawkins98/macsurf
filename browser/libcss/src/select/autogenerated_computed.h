@@ -272,6 +272,9 @@ struct css_computed_style_i {
 	 * bits 15..8:  to_opacity (uint8 0..255).
 	 * bits 7..0:   from_opacity (uint8 0..255). */
 	int32_t macsurf_animation_opacity;
+	/* fixes77: -macsurf-animation-rotate. Same packed layout as
+	 * animation_opacity but the bytes are degrees scaled by 256/360. */
+	int32_t macsurf_animation_rotate;
 	css_fixed margin_bottom;
 	css_fixed margin_left;
 	css_fixed margin_right;

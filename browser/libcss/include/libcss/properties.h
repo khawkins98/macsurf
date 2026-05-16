@@ -147,6 +147,7 @@ enum css_properties_e {
 	CSS_PROP_MACSURF_TRANSFORM		= 0x082,
 	CSS_PROP_MACSURF_GRID			= 0x083,
 	CSS_PROP_MACSURF_ANIMATION_OPACITY	= 0x084,
+	CSS_PROP_MACSURF_ANIMATION_ROTATE	= 0x085,
 
 	CSS_N_PROPERTIES
 };
@@ -194,6 +195,15 @@ enum css_macsurf_animation_opacity_e {
 	CSS_MACSURF_ANIMATION_OPACITY_INHERIT	= 0x0,
 	CSS_MACSURF_ANIMATION_OPACITY_NONE	= 0x0,
 	CSS_MACSURF_ANIMATION_OPACITY_SET	= 0x1
+};
+
+enum css_macsurf_animation_rotate_e {
+	/* fixes77: 1-bit storage at bit 1 of word 15. Companion int32
+	 * packs from_deg_byte(8) | to_deg_byte(8) | duration_ms(16).
+	 * deg_byte = (deg * 256 / 360). */
+	CSS_MACSURF_ANIMATION_ROTATE_INHERIT	= 0x0,
+	CSS_MACSURF_ANIMATION_ROTATE_NONE	= 0x0,
+	CSS_MACSURF_ANIMATION_ROTATE_SET	= 0x1
 };
 
 enum css_align_content_e {

@@ -2123,6 +2123,38 @@ static inline uint8_t get_macsurf_animation_opacity(
 #undef MACSURF_ANIMATION_OPACITY_SHIFT
 #undef MACSURF_ANIMATION_OPACITY_MASK
 
+/* fixes77: -macsurf-animation-rotate.
+ * 1-bit state at bit 1 of word 15. Integer field packs
+ * duration_ms (31..16), to_deg_byte (15..8), from_deg_byte (7..0). */
+#define MACSURF_ANIMATION_ROTATE_INDEX 15
+#define MACSURF_ANIMATION_ROTATE_SHIFT 1
+#define MACSURF_ANIMATION_ROTATE_MASK 0x2
+static inline uint8_t get_macsurf_animation_rotate_bits(
+		const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[MACSURF_ANIMATION_ROTATE_INDEX];
+	bits &= MACSURF_ANIMATION_ROTATE_MASK;
+	bits >>= MACSURF_ANIMATION_ROTATE_SHIFT;
+
+	return (bits & 0x1);
+}
+static inline uint8_t get_macsurf_animation_rotate(
+		const css_computed_style *style, int32_t *integer)
+{
+	uint32_t bits = style->i.bits[MACSURF_ANIMATION_ROTATE_INDEX];
+	bits &= MACSURF_ANIMATION_ROTATE_MASK;
+	bits >>= MACSURF_ANIMATION_ROTATE_SHIFT;
+
+	if ((bits & 0x1) == CSS_MACSURF_ANIMATION_ROTATE_SET) {
+		*integer = style->i.macsurf_animation_rotate;
+	}
+
+	return (bits & 0x1);
+}
+#undef MACSURF_ANIMATION_ROTATE_INDEX
+#undef MACSURF_ANIMATION_ROTATE_SHIFT
+#undef MACSURF_ANIMATION_ROTATE_MASK
+
 #define MARGIN_BOTTOM_INDEX 5
 #define MARGIN_BOTTOM_SHIFT 11
 #define MARGIN_BOTTOM_MASK 0x3f800
