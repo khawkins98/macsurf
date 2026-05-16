@@ -158,18 +158,93 @@ static void macos9_handle_update(const EventRecord *event) {
 #ifdef __MACOS9__
 	WindowRef win = (WindowRef)(unsigned long)event->message;
 	struct gui_window *gw = macos9_find_window(win);
+	CGrafPtr  saved_port = NULL;
+	GDHandle  saved_gdh  = NULL;
+	PixMapHandle gwpm    = NULL;
+	RgnHandle vr         = NULL;
+	Boolean   gworld_active = (Boolean)0;
+	Rect      off_bounds;
+	Rect      update_bounds;
+	int       off_w, off_h;
 	if (!gw || macos9_quitting) return;
 	SetPortWindowPort(win); BeginUpdate(win);
-	/* fixes77e -- revert fixes77c's offscreen-GWorld back buffer. The
-	 * GWorld-+-SetClip+CopyBits path interacted badly with plotters.c's
-	 * plot_clip bookkeeping (effective clip resolved to (0,0,0,0) on
-	 * real hardware, so PaintRect/DrawText calls were issued but never
-	 * landed pixels on screen -- the page "rendered" but stayed blank).
-	 * Restore direct-paint to the window port; flash returns but the
-	 * page displays. content_gworld stays NULL and the dispose stub in
-	 * window_destroy is a no-op. */
-	EraseRect(&gw->content_rect);
-	draw_url_bar(gw); DrawControls(win); draw_status_bar(gw);
+	/* fixes77f -- offscreen GWorld V2.
+	 *
+	 * Architecture (correcting fixes77c's failure mode):
+	 *   1. BeginUpdate has already set the window port's visRgn to the
+	 *      update region. Capture its bounding box -- this is the dirty
+	 *      area in window coords.
+	 *   2. Allocate / reuse a GWorld matching content_rect's size.
+	 *   3. SetGWorld + SetOrigin(content_rect.left, content_rect.top) so
+	 *      the GWorld's local coords are window coords. Pixel (0,0) of
+	 *      the GWorld pixmap is addressed as port coord
+	 *      (content_rect.left, content_rect.top).
+	 *   4. NO SetClip. plotters.c manages QD clip exclusively via its
+	 *      plot_clip callback. Calling SetClip here corrupts plotters.c's
+	 *      clip-tracking state machine -- that was fixes77c's bug.
+	 *   5. EraseRect the dirty bbox in window coords. After SetOrigin,
+	 *      QD subtracts the origin to find pixel coords, so the erased
+	 *      pixels line up 1:1 with the pixels plotters will overwrite.
+	 *   6. Pass update_bounds (cast to struct rect) as the clip arg to
+	 *      browser_window_redraw. NetSurf's box-tree walker uses this to
+	 *      prune branches: only boxes whose bbox intersects update_bounds
+	 *      visit plotters. For a per-rect animation tick this collapses
+	 *      the walk from ~60 boxes to ~5.
+	 *   7. SetGWorld back to window. Window's visRgn is still the update
+	 *      region (BeginUpdate set it). CopyBits content_rect to
+	 *      content_rect: QD intrinsically hardware-clips the blit to
+	 *      visRgn, so only dirty pixels reach the screen.
+	 *
+	 * The badge animation's old frame stays on screen until the new
+	 * frame is fully composed in the GWorld; the swap is atomic from
+	 * the user's perspective. No EraseRect-then-paint flash. */
+	vr = NewRgn();
+	if (vr != NULL) {
+		GetPortVisibleRegion(GetWindowPort(win), vr);
+		GetRegionBounds(vr, &update_bounds);
+		DisposeRgn(vr); vr = NULL;
+	} else {
+		/* Last-resort fallback: assume whole content area is dirty. */
+		update_bounds = gw->content_rect;
+	}
+	off_bounds = gw->content_rect;
+	off_w = off_bounds.right - off_bounds.left;
+	off_h = off_bounds.bottom - off_bounds.top;
+	if (gw->content_gworld != NULL &&
+	    (gw->content_gworld_rect.right  - gw->content_gworld_rect.left  != off_w ||
+	     gw->content_gworld_rect.bottom - gw->content_gworld_rect.top  != off_h)) {
+		DisposeGWorld(gw->content_gworld);
+		gw->content_gworld = NULL;
+	}
+	if (gw->content_gworld == NULL && off_w > 0 && off_h > 0) {
+		Rect r; r.left = 0; r.top = 0;
+		r.right = (short)off_w; r.bottom = (short)off_h;
+		if (NewGWorld(&gw->content_gworld, 0, &r, NULL, NULL, 0) != noErr) {
+			gw->content_gworld = NULL;
+		} else {
+			gw->content_gworld_rect = off_bounds;
+		}
+	}
+	if (gw->content_gworld != NULL) {
+		gwpm = GetGWorldPixMap(gw->content_gworld);
+		if (gwpm != NULL && LockPixels(gwpm)) {
+			GetGWorld(&saved_port, &saved_gdh);
+			SetGWorld(gw->content_gworld, NULL);
+			SetOrigin(off_bounds.left, off_bounds.top);
+			gworld_active = (Boolean)1;
+		} else {
+			gwpm = NULL;
+		}
+	}
+	if (gworld_active) {
+		/* Erase only the dirty bbox; window-coord rect lines up with
+		 * pixel rows correctly because SetOrigin already ran. */
+		EraseRect(&update_bounds);
+	} else {
+		/* Fallback path: paint directly into window. Flash returns. */
+		EraseRect(&gw->content_rect);
+		draw_url_bar(gw); DrawControls(win); draw_status_bar(gw);
+	}
 	if (gw->bw && browser_window_redraw_ready(gw->bw)) {
 		struct rect clip; struct redraw_context ctx;
 		extern long macos9_plot_text_count, macos9_plot_rect_count;
@@ -192,12 +267,17 @@ static void macos9_handle_update(const EventRecord *event) {
 		macos9_grad_radial_unpack_count = 0;
 		macos9_grad_linear_unpack_count = 0;
 		macsurf_debug_log_writef(
-			"update: redraw_ready, bw=%p scroll=(%d,%d) crect=(%d,%d,%d,%d)",
+			"update: redraw_ready, bw=%p scroll=(%d,%d) crect=(%d,%d,%d,%d) ub=(%d,%d,%d,%d) gw=%d",
 			gw->bw, gw->scroll_x, gw->scroll_y,
 			(int)gw->content_rect.left, (int)gw->content_rect.top,
-			(int)gw->content_rect.right, (int)gw->content_rect.bottom);
-		clip.x0 = gw->content_rect.left; clip.y0 = gw->content_rect.top;
-		clip.x1 = gw->content_rect.right; clip.y1 = gw->content_rect.bottom;
+			(int)gw->content_rect.right, (int)gw->content_rect.bottom,
+			(int)update_bounds.left, (int)update_bounds.top,
+			(int)update_bounds.right, (int)update_bounds.bottom,
+			(int)gworld_active);
+		/* Clip = update_bounds (the dirty bbox), in window coords.
+		 * NetSurf's box-tree walker prunes branches outside this. */
+		clip.x0 = update_bounds.left; clip.y0 = update_bounds.top;
+		clip.x1 = update_bounds.right; clip.y1 = update_bounds.bottom;
 		memset(&ctx, 0, sizeof(ctx));
 		ctx.interactive = (bool)1;
 		ctx.background_images = (bool)1;
@@ -221,17 +301,38 @@ static void macos9_handle_update(const EventRecord *event) {
 			macos9_grad_set_count,
 			macos9_grad_radial_unpack_count,
 			macos9_grad_linear_unpack_count);
-		/* Redraw chrome AFTER content so any stray plotter that
-		 * leaked outside content_rect can't leave the URL bar /
-		 * controls / status bar visually torn. Addresses the
-		 * 2026-04-18 survey hypothesis about URL field visual
-		 * blanking on the initial window. */
+		if (gworld_active) {
+			const BitMap *src_bm;
+			const BitMap *dst_bm;
+			RGBColor blk; RGBColor wht;
+			blk.red = 0; blk.green = 0; blk.blue = 0;
+			wht.red = 0xFFFF; wht.green = 0xFFFF; wht.blue = 0xFFFF;
+			SetGWorld(saved_port, saved_gdh);
+			src_bm = GetPortBitMapForCopyBits(
+				(CGrafPtr)gw->content_gworld);
+			dst_bm = GetPortBitMapForCopyBits(GetWindowPort(win));
+			RGBForeColor(&blk); RGBBackColor(&wht);
+			/* Dst port visRgn is BeginUpdate's update region; QD
+			 * hardware-clips the blit so only dirty pixels reach
+			 * the screen even though src/dst rects span the full
+			 * content area. */
+			CopyBits(src_bm, dst_bm, &off_bounds, &off_bounds,
+			         srcCopy, NULL);
+			if (gwpm != NULL) UnlockPixels(gwpm);
+			gworld_active = (Boolean)0;
+		}
 		draw_url_bar(gw);
 		DrawControls(win);
 		draw_status_bar(gw);
 		if (gw->url_field_active && gw->url_te) TEActivate(gw->url_te);
 	} else if (gw->bw) {
 		MS_LOG("update: bw not ready, skip");
+	}
+	if (gworld_active) {
+		/* Defensive: bw branch didn't run; tear down GWorld port. */
+		SetGWorld(saved_port, saved_gdh);
+		if (gwpm != NULL) UnlockPixels(gwpm);
+		gworld_active = (Boolean)0;
 	}
 	EndUpdate(win);
 #endif
