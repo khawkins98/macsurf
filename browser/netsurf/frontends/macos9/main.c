@@ -154,15 +154,21 @@ static void macos9_handle_update(const EventRecord *event) {
 	struct gui_window *gw = macos9_find_window(win);
 	if (!gw || macos9_quitting) return;
 	SetPortWindowPort(win); BeginUpdate(win);
-	/* fixes76b -- EraseRect(&content_rect) used to live here. Removed
-	 * because html_redraw paints body background as its first plot,
-	 * which fully covers the invalid region. The redundant erase pass
-	 * was the source of the whole-page flash on animation ticks: each
-	 * per-box invalidate took the box through background-gray for one
-	 * frame before the new opacity stipple landed. With the erase gone,
-	 * html_redraw paints directly over the previous frame's pixels --
-	 * no flicker. The empty/loading branch below still erases so the
-	 * window has a clean background before any content lands. */
+	/* fixes77b -- EraseRect(&content_rect) restored after fixes76b
+	 * removed it. The removal assumed each animation frame would
+	 * paint over the same pixels as the previous frame, which is true
+	 * for fixed-rect cases (opacity stipple) but FALSE for
+	 * shifting-rect cases like -macsurf-animation-rotate: the rotated
+	 * paint at frame N covers different pixels than frame N-1, so
+	 * previous-frame pixels persist as ghost shapes around each box.
+	 *
+	 * The QuickDraw clip region during BeginUpdate is the union of
+	 * the per-box invalidate rects (fixes76b's per-rect path), so
+	 * EraseRect only clears those small rects -- not the whole page.
+	 * The old "whole-page flash" was caused by whole-content invalidate
+	 * upstream, which is no longer happening. Net result: tiny gray
+	 * flash within each animated box's bbox each tick, no ghosts. */
+	EraseRect(&gw->content_rect);
 	draw_url_bar(gw); DrawControls(win); draw_status_bar(gw);
 	if (gw->bw && browser_window_redraw_ready(gw->bw)) {
 		struct rect clip; struct redraw_context ctx;
@@ -225,13 +231,7 @@ static void macos9_handle_update(const EventRecord *event) {
 		draw_status_bar(gw);
 		if (gw->url_field_active && gw->url_te) TEActivate(gw->url_te);
 	} else if (gw->bw) {
-		/* No html_redraw will run -- erase the content area so the
-		 * window has a clean background while the page loads. */
-		EraseRect(&gw->content_rect);
 		MS_LOG("update: bw not ready, skip");
-	} else {
-		/* No browser window at all (e.g. fresh window with no nav). */
-		EraseRect(&gw->content_rect);
 	}
 	EndUpdate(win);
 #endif
