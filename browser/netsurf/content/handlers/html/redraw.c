@@ -152,10 +152,22 @@ static bool html_redraw_box_has_background(struct box *box)
 
 	if (box->style != NULL) {
 		css_color colour;
+		int32_t grad_col;
 
 		css_computed_background_color(box->style, &colour);
 
 		if (nscss_color_is_transparent(colour) == false)
+			return true;
+
+		/* fixes74d: -macsurf-gradient: radial/linear-gradient(...)
+		 * makes the element render a background even without an
+		 * explicit background-color. Without this, every TU that
+		 * uses only -macsurf-gradient gets bg_box=NULL and
+		 * html_redraw_background never runs -- gradient drops on
+		 * the floor. Caught when fixes74's radial-gradient test
+		 * page had no background-color on the swatches. */
+		if (css_computed_macsurf_gradient(box->style, &grad_col)
+				== CSS_MACSURF_GRADIENT_SET)
 			return true;
 	}
 
