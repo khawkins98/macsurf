@@ -154,7 +154,15 @@ static void macos9_handle_update(const EventRecord *event) {
 	struct gui_window *gw = macos9_find_window(win);
 	if (!gw || macos9_quitting) return;
 	SetPortWindowPort(win); BeginUpdate(win);
-	EraseRect(&gw->content_rect);
+	/* fixes76b -- EraseRect(&content_rect) used to live here. Removed
+	 * because html_redraw paints body background as its first plot,
+	 * which fully covers the invalid region. The redundant erase pass
+	 * was the source of the whole-page flash on animation ticks: each
+	 * per-box invalidate took the box through background-gray for one
+	 * frame before the new opacity stipple landed. With the erase gone,
+	 * html_redraw paints directly over the previous frame's pixels --
+	 * no flicker. The empty/loading branch below still erases so the
+	 * window has a clean background before any content lands. */
 	draw_url_bar(gw); DrawControls(win); draw_status_bar(gw);
 	if (gw->bw && browser_window_redraw_ready(gw->bw)) {
 		struct rect clip; struct redraw_context ctx;
@@ -188,10 +196,14 @@ static void macos9_handle_update(const EventRecord *event) {
 		ctx.interactive = (bool)1;
 		ctx.background_images = (bool)1;
 		ctx.plot = &macos9_plotters;
+		{ extern struct gui_window *macos9_paint_gw;
+		  macos9_paint_gw = gw; }
 		browser_window_redraw(gw->bw,
 			gw->content_rect.left - gw->scroll_x,
 			gw->content_rect.top  - gw->scroll_y,
 			&clip, &ctx);
+		{ extern struct gui_window *macos9_paint_gw;
+		  macos9_paint_gw = NULL; }
 		macsurf_debug_log_writef(
 			"update: bw_redraw done visits=%ld block=%ld inlinec=%ld inline=%ld text=%ld other=%ld skips=%ld plot_text=%ld plot_rect=%ld",
 			macos9_hrb_visits, macos9_hrb_block, macos9_hrb_inlinec,
@@ -213,7 +225,13 @@ static void macos9_handle_update(const EventRecord *event) {
 		draw_status_bar(gw);
 		if (gw->url_field_active && gw->url_te) TEActivate(gw->url_te);
 	} else if (gw->bw) {
+		/* No html_redraw will run -- erase the content area so the
+		 * window has a clean background while the page loads. */
+		EraseRect(&gw->content_rect);
 		MS_LOG("update: bw not ready, skip");
+	} else {
+		/* No browser window at all (e.g. fresh window with no nav). */
+		EraseRect(&gw->content_rect);
 	}
 	EndUpdate(win);
 #endif
