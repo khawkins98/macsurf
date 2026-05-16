@@ -67,7 +67,6 @@ static bool layout_grid_item(
 {
 	bool success = false;
 	int dummy_w = cell_width;
-	int dummy_h = -1;
 	int dummy_min_w = -1;
 	int dummy_max_w = -1;
 	int dummy_min_h = -1;
@@ -75,9 +74,17 @@ static bool layout_grid_item(
 
 	if (item->style != NULL) {
 		item->float_container = item->parent;
+		/* Pass &item->height so layout_find_dimensions writes the
+		 * resolved CSS height (typically AUTO) back into the box.
+		 * layout_block_context's height-finalisation step at the
+		 * end of the function only fires when block->height == AUTO,
+		 * and box_create initialises height to 0 (not AUTO), so
+		 * without this the item's height stays 0 and row_max_height
+		 * in layout_grid can't track the tallest item -- bug from
+		 * fixes75b that manifested in PROBE G4. */
 		layout_find_dimensions(&content->unit_len_ctx,
 				cell_width, -1, item, item->style,
-				&dummy_w, &dummy_h,
+				&dummy_w, &item->height,
 				&dummy_max_w, &dummy_min_w,
 				&dummy_max_h, &dummy_min_h,
 				item->margin, item->padding, item->border);
@@ -123,8 +130,6 @@ static bool layout_grid_item(
 }
 
 
-extern void macsurf_debug_log_writef(const char *fmt, ...);
-
 bool layout_grid(struct box *grid, int available_width, html_content *content)
 {
 	int32_t packed = 0;
@@ -140,7 +145,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	int row_y = 0;
 	int row_max_height = 0;
 	int row_index = 0;
-	int child_count = 0;
 	struct box *child;
 	const css_unit_ctx *unit_len_ctx;
 	uint8_t grid_status;
@@ -148,9 +152,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	css_unit gap_unit = CSS_UNIT_PX;
 
 	if (grid == NULL || grid->style == NULL) return false;
-
-	macsurf_debug_log_writef("grid: ENTER grid=%p av_w=%d gw=%d",
-			grid, available_width, grid->width);
 
 	unit_len_ctx = &content->unit_len_ctx;
 
@@ -198,9 +199,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		col_width = container_width;
 	}
 
-	macsurf_debug_log_writef("grid: status=%d cols=%d cw=%d gap=%d",
-			(int)grid_status, cols, col_width, col_gap);
-
 	/* Walk children. */
 	child = grid->children;
 	while (child != NULL) {
@@ -211,9 +209,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 
 		col = child_index % cols;
 		x_pos = col * (col_width + col_gap);
-
-		macsurf_debug_log_writef("grid: ch[%d] type=%d w_before=%d",
-				child_index, (int)child->type, child->width);
 
 		/* fixes75a: Temporarily narrow the grid container's width to
 		 * col_width while laying out the child. layout_block_context
@@ -241,13 +236,9 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			child->width = col_width;
 		}
 
-		macsurf_debug_log_writef("grid: ch[%d] w_after=%d h=%d",
-				child_index, child->width, child->height);
-
 		/* Position the child. */
 		child->x = x_pos;
 		child->y = row_y;
-		child_count++;
 
 		/* Track tallest child in current row. */
 		child_total_h = child->height;
