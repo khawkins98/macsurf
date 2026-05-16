@@ -218,6 +218,24 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 			(int)dst.right, (int)dst.bottom,
 			(long)cr_sg, (long)cr_sb, (long)cr_d);
 
+		/* fixes78i diagnostic: outline the destination rect with a
+		 * pure-QuickDraw FrameRect. If we see the rectangle but no
+		 * image, QT's draw is silently failing. If we see neither, the
+		 * GWorld -> window CopyBits at the end of main.c's update path
+		 * isn't picking up pixels written from this call site. */
+		{
+			RGBColor save_fg, marker;
+			GetForeColor(&save_fg);
+			marker.red = 0xFFFF;
+			marker.green = 0x0000;
+			marker.blue = 0x0000;
+			RGBForeColor(&marker);
+			PenSize(2, 2);
+			FrameRect(&dst);
+			PenSize(1, 1);
+			RGBForeColor(&save_fg);
+		}
+
 		if (saved_clip != NULL) {
 			SetClip(saved_clip);
 			DisposeRgn(saved_clip);
