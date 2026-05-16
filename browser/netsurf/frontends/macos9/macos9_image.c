@@ -1,30 +1,26 @@
-/* macos9_image.c -- QuickTime Graphics Importers as NetSurf image
- * content handler. fixes78.
+/* macos9_image.c -- NetSurf image content handler backed by QuickTime
+ * Graphics Importers. fixes78.
  *
- * Registers one shared handler for image/jpeg, image/png, image/gif,
- * image/bmp and aliases. The handler:
- *   create        -- allocate per-content state
- *   process_data  -- accumulate raw bytes into a Mac Handle
- *   data_complete -- wrap Handle in a QT data ref, ask QT for an
- *                    importer component, query natural bounds
- *   redraw        -- GraphicsImportSetGWorld + SetBoundsRect + Draw
- *                    into the active QD port (already set up by the
- *                    fixes77f offscreen composite path)
- *   destroy       -- CloseComponent + DisposeHandle
+ * Architecture (fixes78j refactor):
  *
- * No NetSurf bitmap intermediate. QT decodes straight into the active
- * port and respects its clipRgn for hardware clipping. */
+ *   process_data: accumulate raw bytes into a Mac Handle.
+ *   data_complete: ask QT for an importer, query natural bounds, decode
+ *                  ONCE into a 32-bit GWorld, byte-swap into a NetSurf
+ *                  struct bitmap (RGBA), free importer + Handle + temp
+ *                  GWorld.
+ *   redraw:       one-liner into ctx->plot->bitmap (= macos9_plot_bitmap).
+ *   destroy:      drop the bitmap via guit->bitmap->destroy.
+ *
+ * Why not call GraphicsImportDraw at redraw time? content_redraw for
+ * images is dispatched outside the html_redraw box walker's plot_clip
+ * scope, so a direct QT draw lands at an undefined clip / port state.
+ * Routing through ctx->plot->bitmap puts the actual blit inside the
+ * box walker's clip context (the path Atari / RISC OS / Amiga
+ * frontends use), which is fixes77f's offscreen GWorld during paint.
+ */
 
 #include "macos9.h"
 
-/* Movies.h pulls in Components.h, the GraphicsImportComponent typedef,
- * and the pascal-tagged GraphicsImporter / Component Manager prototypes
- * we need (GetGraphicsImporterForDataRef, GraphicsImportGetNaturalBounds,
- * GraphicsImportSetGWorld, GraphicsImportSetBoundsRect,
- * GraphicsImportDraw, CloseComponent) plus HandleDataHandlerSubType.
- * We deliberately do NOT include <QuickTimeComponents.h> -- on CW8 it
- * chains into QuickTimeMusic.h which fails on undefined BigEndianLong
- * types, and we don't need the music / streaming / VR subsystems. */
 #include <Movies.h>
 
 #include <stdlib.h>
@@ -34,16 +30,20 @@
 #include "netsurf/types.h"
 #include "netsurf/plotters.h"
 #include "netsurf/content.h"
+#include "netsurf/bitmap.h"
 #include "content/content_protected.h"
 #include "content/content_factory.h"
+#include "desktop/gui_internal.h"
+#include "desktop/gui_table.h"
 
 #include "macsurf_debug.h"
 
+typedef ComponentInstance GraphicsImportComponent;
+
 typedef struct macos9_qt_image_content {
-	struct content base;     /* MUST be first -- NetSurf casts to this */
+	struct content base;     /* MUST be first */
 	Handle compressed;       /* raw bytes, grown by process_data */
-	GraphicsImportComponent gi; /* importer instance; NULL until convert */
-	Rect natural_bounds;     /* set at data_complete */
+	void *bitmap;            /* struct macos9_bitmap (RGBA pixels) */
 } macos9_qt_image_content;
 
 static nserror
@@ -69,11 +69,7 @@ macos9_qt_image_create(const struct content_handler *handler,
 	}
 
 	qti->compressed = NULL;
-	qti->gi = NULL;
-	qti->natural_bounds.top = 0;
-	qti->natural_bounds.left = 0;
-	qti->natural_bounds.bottom = 0;
-	qti->natural_bounds.right = 0;
+	qti->bitmap = NULL;
 
 	*c = (struct content *)qti;
 	return NSERROR_OK;
@@ -114,6 +110,117 @@ macos9_qt_image_process(struct content *c, const char *data,
 	return true;
 }
 
+/* Decode the importer into a freshly-allocated NetSurf bitmap.
+ * Returns NSERROR_OK on success. On failure the bitmap is freed and
+ * *out_bitmap is left NULL. */
+static nserror
+macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
+		int bw, int bh, void **out_bitmap)
+{
+	void *bm;
+	unsigned char *dst_buf;
+	GWorldPtr temp_gw;
+	Rect tmp_bounds;
+	PixMapHandle tmp_pm;
+	OSErr err;
+	long row_bytes;
+	long src_rowbytes;
+	int row, col;
+	unsigned char *src_base;
+	unsigned char *src_row;
+	unsigned char *dst_row;
+	CGrafPtr save_port;
+	GDHandle save_gdh;
+
+	*out_bitmap = NULL;
+
+	if (guit == NULL || guit->bitmap == NULL ||
+			guit->bitmap->create == NULL) {
+		return NSERROR_INIT_FAILED;
+	}
+
+	bm = guit->bitmap->create(bw, bh, BITMAP_CLEAR);
+	if (bm == NULL) {
+		return NSERROR_NOMEM;
+	}
+
+	dst_buf = (unsigned char *)guit->bitmap->get_buffer(bm);
+	row_bytes = (long)guit->bitmap->get_rowstride(bm);
+	if (dst_buf == NULL || row_bytes <= 0) {
+		guit->bitmap->destroy(bm);
+		return NSERROR_NOMEM;
+	}
+
+	tmp_bounds.left = 0;
+	tmp_bounds.top = 0;
+	tmp_bounds.right = (short)bw;
+	tmp_bounds.bottom = (short)bh;
+
+	temp_gw = NULL;
+	err = NewGWorld(&temp_gw, 32, &tmp_bounds, NULL, NULL, 0);
+	if (err != noErr || temp_gw == NULL) {
+		guit->bitmap->destroy(bm);
+		return NSERROR_NOMEM;
+	}
+
+	tmp_pm = GetGWorldPixMap(temp_gw);
+	if (tmp_pm == NULL || !LockPixels(tmp_pm)) {
+		DisposeGWorld(temp_gw);
+		guit->bitmap->destroy(bm);
+		return NSERROR_NOMEM;
+	}
+
+	/* Prime the GWorld to white so JPEG decode (no alpha) shows on
+	 * non-image pixels and alpha stays well-defined. */
+	GetGWorld(&save_port, &save_gdh);
+	SetGWorld(temp_gw, NULL);
+	{
+		RGBColor white;
+		white.red = 0xFFFF;
+		white.green = 0xFFFF;
+		white.blue = 0xFFFF;
+		RGBBackColor(&white);
+		EraseRect(&tmp_bounds);
+	}
+
+	GraphicsImportSetGWorld(gi, temp_gw, NULL);
+	GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+	GraphicsImportDraw(gi);
+
+	SetGWorld(save_port, save_gdh);
+
+	/* GWorld pixels are 32-bit ARGB on PPC. NetSurf bitmap expects
+	 * RGBA byte order. Force alpha = 0xFF (opaque) regardless of what
+	 * QT wrote -- alpha-bearing formats (PNG) will lose transparency
+	 * for this first cut, but the images render. Real alpha pass is a
+	 * later fix. */
+	src_rowbytes = (*tmp_pm)->rowBytes & 0x3FFF;
+	src_base = (unsigned char *)GetPixBaseAddr(tmp_pm);
+	for (row = 0; row < bh; row++) {
+		src_row = src_base + row * src_rowbytes;
+		dst_row = dst_buf + row * row_bytes;
+		for (col = 0; col < bw; col++) {
+			dst_row[col * 4 + 0] = src_row[col * 4 + 1]; /* R */
+			dst_row[col * 4 + 1] = src_row[col * 4 + 2]; /* G */
+			dst_row[col * 4 + 2] = src_row[col * 4 + 3]; /* B */
+			dst_row[col * 4 + 3] = 0xFF;                  /* A */
+		}
+	}
+
+	UnlockPixels(tmp_pm);
+	DisposeGWorld(temp_gw);
+
+	if (guit->bitmap->set_opaque != NULL) {
+		guit->bitmap->set_opaque(bm, true);
+	}
+	if (guit->bitmap->modified != NULL) {
+		guit->bitmap->modified(bm);
+	}
+
+	*out_bitmap = bm;
+	return NSERROR_OK;
+}
+
 static bool
 macos9_qt_image_convert(struct content *c)
 {
@@ -123,6 +230,8 @@ macos9_qt_image_convert(struct content *c)
 	ComponentResult cr;
 	GraphicsImportComponent importer;
 	Rect bounds;
+	int bw, bh;
+	nserror err;
 
 	if (qti->compressed == NULL ||
 			GetHandleSize(qti->compressed) == 0) {
@@ -157,13 +266,31 @@ macos9_qt_image_convert(struct content *c)
 		return false;
 	}
 
-	qti->gi = importer;
-	qti->natural_bounds = bounds;
+	bw = (int)(bounds.right - bounds.left);
+	bh = (int)(bounds.bottom - bounds.top);
+	if (bw <= 0 || bh <= 0) {
+		CloseComponent(importer);
+		content_broadcast_error(c, NSERROR_INVALID, NULL);
+		return false;
+	}
 
-	c->width = (int)(bounds.right - bounds.left);
-	c->height = (int)(bounds.bottom - bounds.top);
+	err = macos9_qt_decode_to_bitmap(importer, bw, bh, &qti->bitmap);
+	CloseComponent(importer);
+	/* Compressed source no longer needed once decoded. */
+	if (qti->compressed != NULL) {
+		DisposeHandle(qti->compressed);
+		qti->compressed = NULL;
+	}
 
-	MS_LOG("img convert OK");
+	if (err != NSERROR_OK || qti->bitmap == NULL) {
+		content_broadcast_error(c, err, NULL);
+		return false;
+	}
+
+	c->width = bw;
+	c->height = bh;
+
+	MS_LOG("img decoded to bitmap");
 	content_set_ready(c);
 	content_set_done(c);
 	content_set_status(c, "");
@@ -175,75 +302,24 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 		const struct rect *clip, const struct redraw_context *ctx)
 {
 	macos9_qt_image_content *qti = (macos9_qt_image_content *)c;
-	Rect dst;
-	CGrafPtr save_port;
-	GDHandle save_gdh;
+	bitmap_flags_t flags;
 
 	(void)clip;
-	(void)ctx;
 
-	if (qti->gi == NULL) {
-		MS_LOG("img redraw: gi NULL");
+	if (qti->bitmap == NULL || ctx == NULL ||
+			ctx->plot == NULL || ctx->plot->bitmap == NULL) {
 		return true;
 	}
 
-	dst.left = (short)data->x;
-	dst.top = (short)data->y;
-	dst.right = (short)(data->x + data->width);
-	dst.bottom = (short)(data->y + data->height);
+	flags = 0;
+	if (data->repeat_x) flags |= BITMAPF_REPEAT_X;
+	if (data->repeat_y) flags |= BITMAPF_REPEAT_Y;
 
-	GetGWorld(&save_port, &save_gdh);
-	{
-		ComponentResult cr_sg, cr_sb, cr_d;
-		RgnHandle saved_clip;
-
-		/* The image-redraw dispatch path runs BEFORE the box-tree
-		 * walker's first plot_clip of the redraw pass, so the GWorld's
-		 * clipRgn still carries whatever clip was set by the LAST
-		 * operation of the previous redraw -- frequently an empty
-		 * (0,0,0,0) clip from a chrome/scrollbar fill. QT returns noErr
-		 * and silently clips out the entire image. Save the current
-		 * clip, set a clip that covers our destination, draw, restore. */
-		saved_clip = NewRgn();
-		if (saved_clip != NULL) {
-			GetClip(saved_clip);
-		}
-		ClipRect(&dst);
-
-		cr_sg = GraphicsImportSetGWorld(qti->gi, save_port, save_gdh);
-		cr_sb = GraphicsImportSetBoundsRect(qti->gi, &dst);
-		cr_d = GraphicsImportDraw(qti->gi);
-		macsurf_debug_log_writef("img dst=(%d,%d,%d,%d) sg=%ld sb=%ld d=%ld",
-			(int)dst.left, (int)dst.top,
-			(int)dst.right, (int)dst.bottom,
-			(long)cr_sg, (long)cr_sb, (long)cr_d);
-
-		/* fixes78i diagnostic: outline the destination rect with a
-		 * pure-QuickDraw FrameRect. If we see the rectangle but no
-		 * image, QT's draw is silently failing. If we see neither, the
-		 * GWorld -> window CopyBits at the end of main.c's update path
-		 * isn't picking up pixels written from this call site. */
-		{
-			RGBColor save_fg, marker;
-			GetForeColor(&save_fg);
-			marker.red = 0xFFFF;
-			marker.green = 0x0000;
-			marker.blue = 0x0000;
-			RGBForeColor(&marker);
-			PenSize(2, 2);
-			FrameRect(&dst);
-			PenSize(1, 1);
-			RGBForeColor(&save_fg);
-		}
-
-		if (saved_clip != NULL) {
-			SetClip(saved_clip);
-			DisposeRgn(saved_clip);
-		}
-	}
-
-	SetGWorld(save_port, save_gdh);
-	return true;
+	return ctx->plot->bitmap(ctx, (struct bitmap *)qti->bitmap,
+			data->x, data->y,
+			data->width, data->height,
+			data->background_colour,
+			flags) == NSERROR_OK;
 }
 
 static void
@@ -251,9 +327,12 @@ macos9_qt_image_destroy(struct content *c)
 {
 	macos9_qt_image_content *qti = (macos9_qt_image_content *)c;
 
-	if (qti->gi != NULL) {
-		CloseComponent(qti->gi);
-		qti->gi = NULL;
+	if (qti->bitmap != NULL) {
+		if (guit != NULL && guit->bitmap != NULL &&
+				guit->bitmap->destroy != NULL) {
+			guit->bitmap->destroy(qti->bitmap);
+		}
+		qti->bitmap = NULL;
 	}
 	if (qti->compressed != NULL) {
 		DisposeHandle(qti->compressed);
@@ -278,11 +357,15 @@ macos9_qt_image_type(void)
 static bool
 macos9_qt_image_is_opaque(struct content *c)
 {
-	(void)c;
+	macos9_qt_image_content *qti = (macos9_qt_image_content *)c;
+	if (qti->bitmap != NULL && guit != NULL && guit->bitmap != NULL &&
+			guit->bitmap->get_opaque != NULL) {
+		return guit->bitmap->get_opaque(qti->bitmap);
+	}
 	return false;
 }
 
-/* Vtable -- positional init only (CW8 C89, no designated initialisers).
+/* Vtable -- positional init (CW8 C89 has no designated initialisers).
  * Field order MUST match struct content_handler in
  * content/content_protected.h. */
 static const struct content_handler macos9_qt_image_handler = {
@@ -338,8 +421,6 @@ static const char *macos9_qt_image_mime[] = {
 	"image/x-tiff"
 };
 
-/* Replaces the no-op stub in misc_stub.c. NetSurf core's
- * desktop/netsurf.c:netsurf_init -> image_init() chain. */
 nserror image_init(void)
 {
 	nserror err;
