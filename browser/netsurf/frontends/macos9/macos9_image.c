@@ -38,6 +38,10 @@
 
 #include "macsurf_debug.h"
 
+#ifndef graphicsModeStraightAlpha
+#define graphicsModeStraightAlpha 256
+#endif
+
 typedef ComponentInstance GraphicsImportComponent;
 
 typedef struct macos9_qt_image_content {
@@ -110,12 +114,35 @@ macos9_qt_image_process(struct content *c, const char *data,
 	return true;
 }
 
+/* Sniff the compressed bytes for an alpha-capable format.
+ *   PNG  -> 89 50 4E 47 0D 0A 1A 0A
+ *   GIF  -> 47 49 46 38 (7|9) 61
+ *   TIFF -> 49 49 2A 00 (LE) or 4D 4D 00 2A (BE)
+ * 24-bit BMP and JPEG have no alpha; render opaque. */
+static bool
+macos9_qt_format_has_alpha(const unsigned char *p, long n)
+{
+	if (n < 4) return false;
+	if (p[0] == 0x89 && p[1] == 0x50 && p[2] == 0x4E && p[3] == 0x47) {
+		return true;
+	}
+	if (p[0] == 'G' && p[1] == 'I' && p[2] == 'F' && p[3] == '8') {
+		return true;
+	}
+	if ((p[0] == 'I' && p[1] == 'I' && p[2] == 0x2A && p[3] == 0x00) ||
+			(p[0] == 'M' && p[1] == 'M' &&
+			 p[2] == 0x00 && p[3] == 0x2A)) {
+		return true;
+	}
+	return false;
+}
+
 /* Decode the importer into a freshly-allocated NetSurf bitmap.
  * Returns NSERROR_OK on success. On failure the bitmap is freed and
  * *out_bitmap is left NULL. */
 static nserror
 macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
-		int bw, int bh, void **out_bitmap)
+		int bw, int bh, bool wants_alpha, void **out_bitmap)
 {
 	void *bm;
 	unsigned char *dst_buf;
@@ -136,17 +163,20 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 
 	if (guit == NULL || guit->bitmap == NULL ||
 			guit->bitmap->create == NULL) {
+		MS_LOG("img decode: guit bitmap NULL");
 		return NSERROR_INIT_FAILED;
 	}
 
 	bm = guit->bitmap->create(bw, bh, BITMAP_CLEAR);
 	if (bm == NULL) {
+		MS_LOG("img decode: bitmap create FAIL");
 		return NSERROR_NOMEM;
 	}
 
 	dst_buf = (unsigned char *)guit->bitmap->get_buffer(bm);
 	row_bytes = (long)guit->bitmap->get_rowstride(bm);
 	if (dst_buf == NULL || row_bytes <= 0) {
+		MS_LOG("img decode: bitmap buf/stride bad");
 		guit->bitmap->destroy(bm);
 		return NSERROR_NOMEM;
 	}
@@ -159,41 +189,54 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 	temp_gw = NULL;
 	err = NewGWorld(&temp_gw, 32, &tmp_bounds, NULL, NULL, 0);
 	if (err != noErr || temp_gw == NULL) {
+		MS_LOG("img decode: NewGWorld FAIL");
 		guit->bitmap->destroy(bm);
 		return NSERROR_NOMEM;
 	}
 
 	tmp_pm = GetGWorldPixMap(temp_gw);
 	if (tmp_pm == NULL || !LockPixels(tmp_pm)) {
+		MS_LOG("img decode: LockPixels FAIL");
 		DisposeGWorld(temp_gw);
 		guit->bitmap->destroy(bm);
 		return NSERROR_NOMEM;
 	}
 
-	/* Prime the GWorld to white so JPEG decode (no alpha) shows on
-	 * non-image pixels and alpha stays well-defined. */
 	GetGWorld(&save_port, &save_gdh);
 	SetGWorld(temp_gw, NULL);
 	{
-		RGBColor white;
-		white.red = 0xFFFF;
-		white.green = 0xFFFF;
-		white.blue = 0xFFFF;
-		RGBBackColor(&white);
+		RGBColor c;
+		if (wants_alpha) {
+			/* Prime to fully transparent: QT's unwritten / source-
+			 * transparent regions stay alpha=0 in the GWorld so the
+			 * byte-swap reads zero through them. */
+			c.red = 0; c.green = 0; c.blue = 0;
+		} else {
+			/* Opaque-only formats: white bg so JPEG / 24-bit BMP
+			 * fill the whole rect. */
+			c.red = 0xFFFF; c.green = 0xFFFF; c.blue = 0xFFFF;
+		}
+		RGBBackColor(&c);
 		EraseRect(&tmp_bounds);
 	}
 
 	GraphicsImportSetGWorld(gi, temp_gw, NULL);
 	GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+	if (wants_alpha) {
+		/* Preserve straight (non-premultiplied) alpha through the
+		 * draw so the alpha byte in the resulting ARGB pixmap is
+		 * the file's actual alpha channel. */
+		(void)GraphicsImportSetGraphicsMode(gi,
+				graphicsModeStraightAlpha, NULL);
+	}
 	GraphicsImportDraw(gi);
 
 	SetGWorld(save_port, save_gdh);
 
-	/* GWorld pixels are 32-bit ARGB on PPC. NetSurf bitmap expects
-	 * RGBA byte order. Force alpha = 0xFF (opaque) regardless of what
-	 * QT wrote -- alpha-bearing formats (PNG) will lose transparency
-	 * for this first cut, but the images render. Real alpha pass is a
-	 * later fix. */
+	/* GWorld pixels are 32-bit ARGB on PPC (byte 0 = A, 1 = R, 2 = G,
+	 * 3 = B). NetSurf bitmap is RGBA (byte 0 = R, 1 = G, 2 = B,
+	 * 3 = A). When the source has alpha, copy it through; otherwise
+	 * force 0xFF (opaque). */
 	src_rowbytes = (*tmp_pm)->rowBytes & 0x3FFF;
 	src_base = (unsigned char *)GetPixBaseAddr(tmp_pm);
 	for (row = 0; row < bh; row++) {
@@ -203,7 +246,11 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 			dst_row[col * 4 + 0] = src_row[col * 4 + 1]; /* R */
 			dst_row[col * 4 + 1] = src_row[col * 4 + 2]; /* G */
 			dst_row[col * 4 + 2] = src_row[col * 4 + 3]; /* B */
-			dst_row[col * 4 + 3] = 0xFF;                  /* A */
+			if (wants_alpha) {
+				dst_row[col * 4 + 3] = src_row[col * 4 + 0];
+			} else {
+				dst_row[col * 4 + 3] = 0xFF;
+			}
 		}
 	}
 
@@ -211,7 +258,7 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 	DisposeGWorld(temp_gw);
 
 	if (guit->bitmap->set_opaque != NULL) {
-		guit->bitmap->set_opaque(bm, true);
+		guit->bitmap->set_opaque(bm, !wants_alpha);
 	}
 	if (guit->bitmap->modified != NULL) {
 		guit->bitmap->modified(bm);
@@ -231,17 +278,29 @@ macos9_qt_image_convert(struct content *c)
 	GraphicsImportComponent importer;
 	Rect bounds;
 	int bw, bh;
+	long src_size;
+	bool wants_alpha;
 	nserror err;
 
 	if (qti->compressed == NULL ||
 			GetHandleSize(qti->compressed) == 0) {
+		MS_LOG("img convert: no bytes");
 		content_broadcast_error(c, NSERROR_INVALID, NULL);
 		return false;
 	}
 
+	src_size = GetHandleSize(qti->compressed);
+	HLock(qti->compressed);
+	wants_alpha = macos9_qt_format_has_alpha(
+			(const unsigned char *)*qti->compressed, src_size);
+	HUnlock(qti->compressed);
+	MS_LOG(wants_alpha ? "img convert: alpha format" :
+			"img convert: opaque format");
+
 	data_ref = NULL;
 	osr = PtrToHand(&qti->compressed, &data_ref, (long)sizeof(Handle));
 	if (osr != noErr || data_ref == NULL) {
+		MS_LOG("img convert: PtrToHand FAIL");
 		content_broadcast_error(c, NSERROR_NOMEM, NULL);
 		return false;
 	}
@@ -251,6 +310,7 @@ macos9_qt_image_convert(struct content *c)
 			HandleDataHandlerSubType, &importer);
 	DisposeHandle(data_ref);
 	if (cr != noErr || importer == NULL) {
+		MS_LOG("img convert: no importer for data");
 		content_broadcast_error(c, NSERROR_INVALID, NULL);
 		return false;
 	}
@@ -261,6 +321,7 @@ macos9_qt_image_convert(struct content *c)
 	bounds.right = 0;
 	cr = GraphicsImportGetNaturalBounds(importer, &bounds);
 	if (cr != noErr) {
+		MS_LOG("img convert: GetNaturalBounds FAIL");
 		CloseComponent(importer);
 		content_broadcast_error(c, NSERROR_INVALID, NULL);
 		return false;
@@ -269,20 +330,23 @@ macos9_qt_image_convert(struct content *c)
 	bw = (int)(bounds.right - bounds.left);
 	bh = (int)(bounds.bottom - bounds.top);
 	if (bw <= 0 || bh <= 0) {
+		MS_LOG("img convert: bad bounds");
 		CloseComponent(importer);
 		content_broadcast_error(c, NSERROR_INVALID, NULL);
 		return false;
 	}
+	MS_LOG("img convert: bounds OK, decoding");
 
-	err = macos9_qt_decode_to_bitmap(importer, bw, bh, &qti->bitmap);
+	err = macos9_qt_decode_to_bitmap(importer, bw, bh, wants_alpha,
+			&qti->bitmap);
 	CloseComponent(importer);
-	/* Compressed source no longer needed once decoded. */
 	if (qti->compressed != NULL) {
 		DisposeHandle(qti->compressed);
 		qti->compressed = NULL;
 	}
 
 	if (err != NSERROR_OK || qti->bitmap == NULL) {
+		MS_LOG("img convert: decode FAIL");
 		content_broadcast_error(c, err, NULL);
 		return false;
 	}
