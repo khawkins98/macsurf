@@ -53,6 +53,12 @@
  * Lay out a single grid item into a cell of given width. Mirrors the
  * dispatch in layout_flex_item but for grid children. The item's height
  * is determined by its own content/layout.
+ *
+ * fixes75b: resolve margins / padding / borders / height via
+ * layout_find_dimensions before dispatching, the way layout_flex's
+ * populate_item_data does. Without this the item's padding and borders
+ * stay at whatever default the box-construct phase left them at and
+ * the rendered cell has no breathing room and no border.
  */
 static bool layout_grid_item(
 		struct box *item,
@@ -60,7 +66,27 @@ static bool layout_grid_item(
 		html_content *content)
 {
 	bool success = false;
+	int dummy_w = cell_width;
+	int dummy_h = -1;
+	int dummy_min_w = -1;
+	int dummy_max_w = -1;
+	int dummy_min_h = -1;
+	int dummy_max_h = -1;
 
+	if (item->style != NULL) {
+		item->float_container = item->parent;
+		layout_find_dimensions(&content->unit_len_ctx,
+				cell_width, -1, item, item->style,
+				&dummy_w, &dummy_h,
+				&dummy_max_w, &dummy_min_w,
+				&dummy_max_h, &dummy_min_h,
+				item->margin, item->padding, item->border);
+		item->float_container = NULL;
+	}
+
+	/* Force the cell width regardless of what CSS resolved to. V1 grid
+	 * always uses equal-width columns; CSS width overrides are ignored
+	 * (clamped below). */
 	item->width = cell_width;
 
 	switch (item->type) {
@@ -97,6 +123,8 @@ static bool layout_grid_item(
 }
 
 
+extern void macsurf_debug_log_writef(const char *fmt, ...);
+
 bool layout_grid(struct box *grid, int available_width, html_content *content)
 {
 	int32_t packed = 0;
@@ -112,6 +140,7 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	int row_y = 0;
 	int row_max_height = 0;
 	int row_index = 0;
+	int child_count = 0;
 	struct box *child;
 	const css_unit_ctx *unit_len_ctx;
 	uint8_t grid_status;
@@ -119,6 +148,9 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	css_unit gap_unit = CSS_UNIT_PX;
 
 	if (grid == NULL || grid->style == NULL) return false;
+
+	macsurf_debug_log_writef("grid: ENTER grid=%p av_w=%d gw=%d",
+			grid, available_width, grid->width);
 
 	unit_len_ctx = &content->unit_len_ctx;
 
@@ -166,6 +198,9 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		col_width = container_width;
 	}
 
+	macsurf_debug_log_writef("grid: status=%d cols=%d cw=%d gap=%d",
+			(int)grid_status, cols, col_width, col_gap);
+
 	/* Walk children. */
 	child = grid->children;
 	while (child != NULL) {
@@ -176,6 +211,9 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 
 		col = child_index % cols;
 		x_pos = col * (col_width + col_gap);
+
+		macsurf_debug_log_writef("grid: ch[%d] type=%d w_before=%d",
+				child_index, (int)child->type, child->width);
 
 		/* fixes75a: Temporarily narrow the grid container's width to
 		 * col_width while laying out the child. layout_block_context
@@ -203,9 +241,13 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			child->width = col_width;
 		}
 
+		macsurf_debug_log_writef("grid: ch[%d] w_after=%d h=%d",
+				child_index, child->width, child->height);
+
 		/* Position the child. */
 		child->x = x_pos;
 		child->y = row_y;
+		child_count++;
 
 		/* Track tallest child in current row. */
 		child_total_h = child->height;
