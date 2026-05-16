@@ -878,7 +878,9 @@ static void layout_minmax_block(
 
 	assert(block->type == BOX_BLOCK ||
 			block->type == BOX_FLEX ||
+			block->type == BOX_GRID ||
 			block->type == BOX_INLINE_FLEX ||
+			block->type == BOX_INLINE_GRID ||
 			block->type == BOX_INLINE_BLOCK ||
 			block->type == BOX_TABLE_CELL);
 
@@ -3664,6 +3666,7 @@ bool layout_block_context(
 		lm = rm = 0;
 
 		if (box->type == BOX_FLEX ||
+		    box->type == BOX_GRID ||
 		    box->type == BOX_BLOCK ||
 		    box->flags & IFRAME) {
 			if (lh__box_is_object(box) == false &&
