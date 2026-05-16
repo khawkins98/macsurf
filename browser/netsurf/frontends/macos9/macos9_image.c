@@ -195,15 +195,33 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 	GetGWorld(&save_port, &save_gdh);
 	{
 		ComponentResult cr_sg, cr_sb, cr_d;
-		macsurf_debug_log_writef("img dst=(%d,%d,%d,%d) port=%p",
-			(int)dst.left, (int)dst.top,
-			(int)dst.right, (int)dst.bottom,
-			(void *)save_port);
+		RgnHandle saved_clip;
+
+		/* The image-redraw dispatch path runs BEFORE the box-tree
+		 * walker's first plot_clip of the redraw pass, so the GWorld's
+		 * clipRgn still carries whatever clip was set by the LAST
+		 * operation of the previous redraw -- frequently an empty
+		 * (0,0,0,0) clip from a chrome/scrollbar fill. QT returns noErr
+		 * and silently clips out the entire image. Save the current
+		 * clip, set a clip that covers our destination, draw, restore. */
+		saved_clip = NewRgn();
+		if (saved_clip != NULL) {
+			GetClip(saved_clip);
+		}
+		ClipRect(&dst);
+
 		cr_sg = GraphicsImportSetGWorld(qti->gi, save_port, save_gdh);
 		cr_sb = GraphicsImportSetBoundsRect(qti->gi, &dst);
 		cr_d = GraphicsImportDraw(qti->gi);
-		macsurf_debug_log_writef("img sg=%ld sb=%ld d=%ld",
+		macsurf_debug_log_writef("img dst=(%d,%d,%d,%d) sg=%ld sb=%ld d=%ld",
+			(int)dst.left, (int)dst.top,
+			(int)dst.right, (int)dst.bottom,
 			(long)cr_sg, (long)cr_sb, (long)cr_d);
+
+		if (saved_clip != NULL) {
+			SetClip(saved_clip);
+			DisposeRgn(saved_clip);
+		}
 	}
 
 	SetGWorld(save_port, save_gdh);
