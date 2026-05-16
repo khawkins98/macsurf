@@ -71,6 +71,7 @@ bool html_redraw_debug = false;
  * Returns ticks (Mac OS 9 60Hz units). Stubbed elsewhere. */
 extern uint32_t macos9_animation_now_ticks(void);
 extern void macos9_animation_register(void);
+extern void macos9_animation_register_rect(int x, int y, int w, int h);
 
 /*
  * fixes76: resolve current opacity for a box that has
@@ -794,9 +795,18 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                if (css_computed_macsurf_animation_opacity(
 	                                background->style, &anim_packed) ==
 	                                CSS_MACSURF_ANIMATION_OPACITY_SET) {
+	                        int rw, rh;
 	                        pstyle_fill_bg.opacity = (plot_style_fixed)
 	                                macsurf_anim_opacity_resolve_plot_fixed(
 	                                        anim_packed);
+	                        /* fixes76b -- queue a per-box rect invalidate
+	                         * so the tick refreshes only this badge, not
+	                         * the whole page. */
+	                        rw = box->padding[LEFT] + box->width +
+	                                        box->padding[RIGHT];
+	                        rh = box->padding[TOP] + box->height +
+	                                        box->padding[BOTTOM];
+	                        macos9_animation_register_rect(x, y, rw, rh);
 	                }
 	        }
 	        /* fixes71 -- -macsurf-transform packed value to the plotter.
@@ -1174,6 +1184,10 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                        pstyle_fill_bg.opacity = (plot_style_fixed)
 	                                macsurf_anim_opacity_resolve_plot_fixed(
 	                                        anim_packed_il);
+	                        /* fixes76b -- queue a per-box rect invalidate.
+	                         * `b` is the border edge rect in page coords. */
+	                        macos9_animation_register_rect(b.x0, b.y0,
+	                                        b.x1 - b.x0, b.y1 - b.y0);
 	                }
 	        }
 	        /* fixes71 -- -macsurf-transform mirror for inline path.
