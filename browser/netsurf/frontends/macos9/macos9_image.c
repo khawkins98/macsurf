@@ -285,7 +285,9 @@ static const char *macos9_qt_image_mime[] = {
 	"image/gif",
 	"image/bmp",
 	"image/x-bmp",
-	"image/x-ms-bmp"
+	"image/x-ms-bmp",
+	"image/tiff",
+	"image/x-tiff"
 };
 
 /* Replaces the no-op stub in misc_stub.c. NetSurf core's
