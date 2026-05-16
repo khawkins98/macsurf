@@ -3614,6 +3614,7 @@ bool layout_block_context(
 
 		assert(box->type == BOX_BLOCK ||
 				box->type == BOX_FLEX ||
+				box->type == BOX_GRID ||
 				box->type == BOX_TABLE ||
 				box->type == BOX_INLINE_CONTAINER);
 
@@ -3755,6 +3756,7 @@ bool layout_block_context(
 		/* Vertical margin */
 		if (((box->type == BOX_BLOCK && (box->flags & HAS_HEIGHT)) ||
 		     box->type == BOX_FLEX ||
+		     box->type == BOX_GRID ||
 		     box->type == BOX_TABLE ||
 		     (box->type == BOX_INLINE_CONTAINER &&
 		      !box_is_first_child(box)) ||
@@ -4596,7 +4598,9 @@ layout_absolute(struct box *box,
 	assert(box->type == BOX_BLOCK || box->type == BOX_TABLE ||
 			box->type == BOX_INLINE_BLOCK ||
 			box->type == BOX_FLEX ||
-			box->type == BOX_INLINE_FLEX);
+			box->type == BOX_INLINE_FLEX ||
+			box->type == BOX_GRID ||
+			box->type == BOX_INLINE_GRID);
 
 	/* The static position is where the box would be if it was not
 	 * absolutely positioned. The x and y are filled in by
@@ -4983,7 +4987,9 @@ layout_position_absolute(struct box *box,
 		if ((c->type == BOX_BLOCK || c->type == BOX_TABLE ||
 				c->type == BOX_INLINE_BLOCK ||
 				c->type == BOX_FLEX ||
-				c->type == BOX_INLINE_FLEX) &&
+				c->type == BOX_INLINE_FLEX ||
+				c->type == BOX_GRID ||
+				c->type == BOX_INLINE_GRID) &&
 				(css_computed_position(c->style) ==
 						CSS_POSITION_ABSOLUTE ||
 				 css_computed_position(c->style) ==
