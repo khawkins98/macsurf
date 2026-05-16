@@ -172,13 +172,35 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		int col;
 		int x_pos;
 		int child_total_h;
+		int saved_grid_width;
 
 		col = child_index % cols;
 		x_pos = col * (col_width + col_gap);
 
-		/* Lay out the child INTO a cell of width col_width. */
+		/* fixes75a: Temporarily narrow the grid container's width to
+		 * col_width while laying out the child. layout_block_context
+		 * resolves the child's auto-width against parent->width, so
+		 * without this every child grows to the full container width
+		 * and the grid degenerates into a single-column stack.
+		 * Restore after the child is laid out so subsequent siblings
+		 * see the same starting state, and the final grid->width is
+		 * set correctly at the end of the loop. */
+		saved_grid_width = grid->width;
+		grid->width = col_width;
+
 		if (!layout_grid_item(child, col_width, content)) {
+			grid->width = saved_grid_width;
 			return false;
+		}
+
+		grid->width = saved_grid_width;
+
+		/* Defensive: if the child still came out wider than the
+		 * cell (e.g. an explicit fixed CSS width override), clamp.
+		 * Children narrower than the cell are fine -- the cell is
+		 * an upper bound, not a forced fill. */
+		if (child->width > col_width) {
+			child->width = col_width;
 		}
 
 		/* Position the child. */
