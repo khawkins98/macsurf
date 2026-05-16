@@ -48,9 +48,9 @@ nserror image_cache_fini(void) { return NSERROR_OK; }
  * dom_namespace_initialise has no real definition we link, so stub it. */
 nserror dom_namespace_initialise(void) { return NSERROR_OK; }
 
-/* Content handler init — image / textplain handlers not yet linked. */
+/* textplain handler not yet linked. image_init lives in macos9_image.c
+ * (fixes78 -- QuickTime Graphics Importers handler). */
 nserror textplain_init(void) { return NSERROR_OK; }
-nserror image_init(void) { return NSERROR_OK; }
 
 /* nsutils base64 — used only by ssl_certs.c for cert query strings.
  * MacSurf strips TLS at the proxy, so cert chain queries never fire.
