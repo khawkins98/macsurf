@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -56,9 +57,34 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// fixes93 — buffer the full upstream body and emit a fixed
+	// Content-Length so the MacSurf-side keep-alive pool can reuse
+	// the front connection. Previously io.Copy(w, resp.Body) made
+	// Go's net/http server fall back to Transfer-Encoding: chunked
+	// for any streamed response (i.e. anything not pre-buffered by
+	// upstream), and MacSurf treats chunked as not-keep-aliveable
+	// (no framing to know where the response ends), so >75% of
+	// responses closed their socket. Most page resources are well
+	// under 10 MB, so full-buffer is safe; the proxy is the only
+	// place we can bound the body cheaply.
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
 	copyHeaders(w.Header(), resp.Header)
+	// Strip transfer headers that Go would otherwise re-emit. We
+	// want the response framed by Content-Length only.
+	w.Header().Del("Transfer-Encoding")
+	w.Header().Del("Content-Length")
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	// Encourage keep-alive on the front side. Go honours
+	// `Connection: keep-alive` from HTTP/1.1 clients by default,
+	// but make it explicit in case the upstream injected close.
+	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	w.Write(body)
 }
 
 func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {

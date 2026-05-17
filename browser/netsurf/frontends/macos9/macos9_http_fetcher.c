@@ -83,10 +83,15 @@ ep_pool_take(void)
 		 * pending events — healthy idle, safe to reuse. */
 		look = OTLook(ep);
 		if (look == 0) {
+			macsurf_debug_log_writef(
+				"ep_pool: REUSE remaining=%d", ep_pool_count);
 			return ep;
 		}
 		/* Peer signalled shutdown / leftover bytes / etc.
 		 * Close cleanly and try the next pooled endpoint. */
+		macsurf_debug_log_writef(
+			"ep_pool: discard look=%ld remaining=%d",
+			(long)look, ep_pool_count);
 		if (look == T_ORDREL) {
 			OTRcvOrderlyDisconnect(ep);
 		} else if (look == T_DISCONNECT) {
@@ -103,9 +108,12 @@ ep_pool_return(EndpointRef ep)
 {
 	char drain[256];
 	OTResult n;
+	long drained = 0;
 
 	if (ep == NULL) return;
 	if (ep_pool_count >= POOL_SIZE) {
+		macsurf_debug_log_writef(
+			"ep_pool: full, closing (count=%d)", ep_pool_count);
 		OTSndOrderlyDisconnect(ep);
 		OTCloseProvider(ep);
 		return;
@@ -116,9 +124,13 @@ ep_pool_return(EndpointRef ep)
 	OTSetNonBlocking(ep);
 	do {
 		n = OTRcv(ep, drain, sizeof(drain), NULL);
+		if (n > 0) drained += n;
 	} while (n > 0);
 
 	ep_pool[ep_pool_count++] = ep;
+	macsurf_debug_log_writef(
+		"ep_pool: STORED count=%d drained=%ld",
+		ep_pool_count, drained);
 }
 #endif /* __MACOS9__ */
 
