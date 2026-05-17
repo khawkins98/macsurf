@@ -218,59 +218,83 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 		return NSERROR_NOMEM;
 	}
 
-	GetGWorld(&save_port, &save_gdh);
-	SetGWorld(temp_gw, NULL);
-	{
-		RGBColor c;
-		if (wants_alpha) {
-			/* Prime to fully transparent: QT's unwritten / source-
-			 * transparent regions stay alpha=0 in the GWorld so the
-			 * byte-swap reads zero through them. */
-			c.red = 0; c.green = 0; c.blue = 0;
-		} else {
-			/* Opaque-only formats: white bg so JPEG / 24-bit BMP
-			 * fill the whole rect. */
-			c.red = 0xFFFF; c.green = 0xFFFF; c.blue = 0xFFFF;
-		}
-		RGBBackColor(&c);
-		EraseRect(&tmp_bounds);
-	}
-
-	GraphicsImportSetGWorld(gi, temp_gw, NULL);
-	GraphicsImportSetBoundsRect(gi, &tmp_bounds);
-	if (wants_alpha) {
-		/* Preserve straight (non-premultiplied) alpha through the
-		 * draw so the alpha byte in the resulting ARGB pixmap is
-		 * the file's actual alpha channel. */
-		(void)GraphicsImportSetGraphicsMode(gi,
-				graphicsModeStraightAlpha, NULL);
-	}
-	GraphicsImportDraw(gi);
-
-	SetGWorld(save_port, save_gdh);
-
-	/* GWorld pixels are 32-bit ARGB on PPC (byte 0 = A, 1 = R, 2 = G,
-	 * 3 = B). NetSurf bitmap is RGBA. For alpha-capable formats, any
-	 * pixel whose source alpha < 128 is rewritten as magenta; the
-	 * bitmap plotter color-keys magenta to skip those pixels through
-	 * CopyBits' transparent transfer mode (the destination -- typically
-	 * the element's background -- shows through). For opaque formats
-	 * the alpha byte is forced to 0xFF and the original RGB stands. */
 	src_rowbytes = (*tmp_pm)->rowBytes & 0x3FFF;
 	src_base = (unsigned char *)GetPixBaseAddr(tmp_pm);
-	for (row = 0; row < bh; row++) {
-		src_row = src_base + row * src_rowbytes;
-		dst_row = dst_buf + row * row_bytes;
-		for (col = 0; col < bw; col++) {
-			unsigned char a;
-			if (wants_alpha) {
-				a = src_row[col * 4 + 0];
-				if (a < 128) {
-					/* alpha byte = 0xFF so the 32-bit
-					 * source word matches QuickDraw's
-					 * 32-bit bgColor representation
-					 * regardless of how it stores the
-					 * alpha component for RGBBackColor. */
+
+	GetGWorld(&save_port, &save_gdh);
+
+	if (wants_alpha) {
+		/* Two-pass alpha detection. Classic QuickDraw GWorlds don't
+		 * have a real alpha channel -- the high byte of a 32-bit
+		 * pixel is filler. So graphicsModeStraightAlpha on a GWorld
+		 * destination is a no-op, and we can't read alpha from the
+		 * decoded pixmap directly. Instead, render the image twice
+		 * against different backgrounds (white then black). Where
+		 * the resulting RGB matches between the two passes, the
+		 * pixel is fully opaque (background didn't bleed through).
+		 * Where RGB differs, the source had alpha < 255 -- mark
+		 * those pixels with the magenta sentinel for color-key
+		 * transparency at blit time. */
+
+		/* Pass 1: prime to WHITE, decode, byte-swap into NetSurf
+		 * bitmap (R, G, B at +0..+2; A=0xFF placeholder). */
+		SetGWorld(temp_gw, NULL);
+		{
+			RGBColor white;
+			white.red = 0xFFFF;
+			white.green = 0xFFFF;
+			white.blue = 0xFFFF;
+			RGBBackColor(&white);
+			EraseRect(&tmp_bounds);
+		}
+		GraphicsImportSetGWorld(gi, temp_gw, NULL);
+		GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+		GraphicsImportDraw(gi);
+
+		for (row = 0; row < bh; row++) {
+			src_row = src_base + row * src_rowbytes;
+			dst_row = dst_buf + row * row_bytes;
+			for (col = 0; col < bw; col++) {
+				dst_row[col * 4 + 0] = src_row[col * 4 + 1];
+				dst_row[col * 4 + 1] = src_row[col * 4 + 2];
+				dst_row[col * 4 + 2] = src_row[col * 4 + 3];
+				dst_row[col * 4 + 3] = 0xFF;
+			}
+		}
+
+		/* Pass 2: prime to BLACK, decode again. Compare each pixel
+		 * against the stored white-bg version; differences indicate
+		 * source alpha < 255 -- rewrite those pixels as magenta. */
+		{
+			RGBColor black;
+			black.red = 0;
+			black.green = 0;
+			black.blue = 0;
+			RGBBackColor(&black);
+			EraseRect(&tmp_bounds);
+		}
+		GraphicsImportSetGWorld(gi, temp_gw, NULL);
+		GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+		GraphicsImportDraw(gi);
+
+		for (row = 0; row < bh; row++) {
+			src_row = src_base + row * src_rowbytes;
+			dst_row = dst_buf + row * row_bytes;
+			for (col = 0; col < bw; col++) {
+				int dr, dg, db;
+				dr = (int)dst_row[col * 4 + 0]
+						- (int)src_row[col * 4 + 1];
+				dg = (int)dst_row[col * 4 + 1]
+						- (int)src_row[col * 4 + 2];
+				db = (int)dst_row[col * 4 + 2]
+						- (int)src_row[col * 4 + 3];
+				if (dr < 0) dr = -dr;
+				if (dg < 0) dg = -dg;
+				if (db < 0) db = -db;
+				/* Threshold > 3 absorbs minor JPEG-style
+				 * decoder jitter while still catching real
+				 * alpha-driven differences. */
+				if (dr > 3 || dg > 3 || db > 3) {
 					dst_row[col * 4 + 0] =
 						MACOS9_IMG_TRANSPARENT_R;
 					dst_row[col * 4 + 1] =
@@ -278,15 +302,38 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 					dst_row[col * 4 + 2] =
 						MACOS9_IMG_TRANSPARENT_B;
 					dst_row[col * 4 + 3] = 0xFF;
-					continue;
 				}
 			}
-			dst_row[col * 4 + 0] = src_row[col * 4 + 1];
-			dst_row[col * 4 + 1] = src_row[col * 4 + 2];
-			dst_row[col * 4 + 2] = src_row[col * 4 + 3];
-			dst_row[col * 4 + 3] = 0xFF;
+		}
+	} else {
+		/* Opaque-only formats: single decode on a white bg.
+		 * (JPEG and 24-bit BMP have no alpha info to preserve.) */
+		SetGWorld(temp_gw, NULL);
+		{
+			RGBColor white;
+			white.red = 0xFFFF;
+			white.green = 0xFFFF;
+			white.blue = 0xFFFF;
+			RGBBackColor(&white);
+			EraseRect(&tmp_bounds);
+		}
+		GraphicsImportSetGWorld(gi, temp_gw, NULL);
+		GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+		GraphicsImportDraw(gi);
+
+		for (row = 0; row < bh; row++) {
+			src_row = src_base + row * src_rowbytes;
+			dst_row = dst_buf + row * row_bytes;
+			for (col = 0; col < bw; col++) {
+				dst_row[col * 4 + 0] = src_row[col * 4 + 1];
+				dst_row[col * 4 + 1] = src_row[col * 4 + 2];
+				dst_row[col * 4 + 2] = src_row[col * 4 + 3];
+				dst_row[col * 4 + 3] = 0xFF;
+			}
 		}
 	}
+
+	SetGWorld(save_port, save_gdh);
 
 	UnlockPixels(tmp_pm);
 	DisposeGWorld(temp_gw);
