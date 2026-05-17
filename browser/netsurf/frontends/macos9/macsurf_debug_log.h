@@ -22,6 +22,12 @@
 void macsurf_debug_log_init(void);
 void macsurf_debug_log_close(void);
 void macsurf_debug_log_write(const char *msg);
+/* fixes96 — explicit volume flush. _write no longer FlushVols per
+ * line (~10-50 ms HFS sync per call was destroying perf — ~80
+ * MS_LOG calls / page load = 1-4 s of disk wait). Call this only
+ * after critical messages that must survive a crash. Clean shutdown
+ * via _close already flushes the volume implicitly. */
+void macsurf_debug_log_flush(void);
 
 /*
  * Minimal printf-style helper. Supports only the format specifiers
