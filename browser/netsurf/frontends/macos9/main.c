@@ -246,6 +246,11 @@ static void macos9_handle_update(const EventRecord *event) {
 		EraseRect(&gw->content_rect);
 		draw_url_bar(gw); DrawControls(win); draw_status_bar(gw);
 	}
+	{ extern struct hlcache_handle *browser_window_get_content(struct browser_window *);
+	  struct hlcache_handle *cur = gw->bw ? browser_window_get_content(gw->bw) : NULL;
+	  macsurf_debug_log_writef("update: bw=%p current_content=%p ready=%d",
+	    gw->bw, cur,
+	    (gw->bw && browser_window_redraw_ready(gw->bw)) ? 1 : 0); }
 	if (gw->bw && browser_window_redraw_ready(gw->bw)) {
 		struct rect clip; struct redraw_context ctx;
 		extern long macos9_plot_text_count, macos9_plot_rect_count;

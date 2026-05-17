@@ -268,15 +268,28 @@ void macos9_window_destroy(struct gui_window *g) { struct gui_window **p; for(p=
 	if(g->content_gworld) { DisposeGWorld(g->content_gworld); g->content_gworld = NULL; }
 #endif
 	if(g->window) DisposeWindow(g->window); free(g); }
-static nserror macos9_gw_invalidate(struct gui_window *g, const struct rect *r) { if(!g||!g->window)return 0; InvalWindowRect(g->window, &g->content_rect); return 0; }
+static nserror macos9_gw_invalidate(struct gui_window *g, const struct rect *r) {
+	if(!g||!g->window)return 0;
+	if(r) macsurf_debug_log_writef("gw_invalidate: r=(%d,%d,%d,%d)", r->x0, r->y0, r->x1, r->y1);
+	else MS_LOG("gw_invalidate: r=NULL (full)");
+	InvalWindowRect(g->window, &g->content_rect);
+	return 0;
+}
 static bool macos9_gw_get_scroll(struct gui_window *g, int *x, int *y) { if(x) *x=g->scroll_x; if(y) *y=g->scroll_y; return 1; }
 static nserror macos9_gw_set_scroll(struct gui_window *g, const struct rect *r) { if(r) macos9_window_scroll_to(g,r->x0,r->y0); return 0; }
 static nserror macos9_gw_get_dimensions(struct gui_window *g, int *w, int *h) { if(!g) return 0; if(w) *w=g->content_rect.right-g->content_rect.left; if(h) *h=g->content_rect.bottom-g->content_rect.top; return 0; }
 static nserror macos9_gw_event(struct gui_window *g, enum gui_window_event e) {
-	macsurf_debug_log_writef("gw_event: e=%d", (int)e);
+	struct hlcache_handle *cur = (g && g->bw) ? browser_window_get_content(g->bw) : NULL;
+	macsurf_debug_log_writef("gw_event: e=%d current_content=%p", (int)e, cur);
 	if(e==GW_EVENT_UPDATE_EXTENT||e==GW_EVENT_NEW_CONTENT||e==GW_EVENT_STOP_THROBBER) {
 		int w=0, h=0; if(g->bw && browser_window_get_extents(g->bw, false, &w, &h)==NSERROR_OK) { g->content_width=w; g->content_height=h; }
-		if(e==GW_EVENT_NEW_CONTENT) { g->scroll_x=0; g->scroll_y=0; }
+		if(e==GW_EVENT_NEW_CONTENT) {
+			g->scroll_x=0; g->scroll_y=0;
+			if(g->bw) {
+				browser_window_schedule_reformat(g->bw);
+				MS_LOG("gw_event: NEW_CONTENT -> schedule_reformat");
+			}
+		}
 		macsurf_debug_log_writef("gw_event: invalidate w=%d h=%d scroll=(%d,%d)", g->content_width, g->content_height, g->scroll_x, g->scroll_y);
 		macos9_window_update_scrollbars(g); macos9_window_update_button_states(g); macos9_window_invalidate_all(g);
 	}
