@@ -539,6 +539,14 @@ void macos9_poll(void) {
 	}
 	if (!macos9_quitting) {
 		{ extern bool macos9_schedule_run(void); macos9_schedule_run(); }
+		/* fixes90: unconditional fetcher pump. NetSurf core's
+		 * scheduler-driven fetcher_poll only re-arms while a fetch
+		 * is active; after the first nav's HTTP fetch finishes,
+		 * the chain goes dormant, stranding queued stub fetches
+		 * and synchronous cache-hit broadcasts. Pumping here
+		 * keeps queued jobs dispatching and per-scheme polls
+		 * running every loop iteration. */
+		{ extern void fetch_pump(void); fetch_pump(); }
 		macos9_windows_te_idle(); macos9_windows_process_deferred();
 		macos9_poll_mouse_hover();
 		{ extern void macos9_animation_tick(void);
