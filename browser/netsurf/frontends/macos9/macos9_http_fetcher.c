@@ -48,6 +48,23 @@ enum mfs_state {
 	MFS_NOTIFIED
 };
 
+/* fixes98 — chunked transfer-encoding decoder states.
+ *   CS_SIZE    — reading hex chunk-size line up to \n
+ *   CS_DATA    — copying chunk_remaining bytes as FETCH_DATA
+ *   CS_CRLF    — consuming the \r\n that terminates a chunk's data
+ *   CS_TRAILER — after final 0-size chunk, eating trailer headers
+ *                until an empty line
+ *   CS_DONE    — full body received; mfs_poll_one will transition the
+ *                fetch to MFS_DONE on the next pass
+ */
+enum chunk_state {
+	CS_SIZE = 0,
+	CS_DATA,
+	CS_CRLF,
+	CS_TRAILER,
+	CS_DONE
+};
+
 /* fixes94 — pool_key remembers which (host, port) this slot's endpoint
  * was opened to. Returned to the matching bucket on close. Direct
  * origins ("frogfind.com:80") and the proxy ("PROXY") each get their
@@ -66,6 +83,17 @@ struct macos9_fetch_ctx {
 	int keep_alive_ok;   /* fixes91: 1 if endpoint can be reused after response */
 	int chunked;         /* fixes91: 1 if Transfer-Encoding: chunked */
 	char pool_key[POOL_KEY_LEN]; /* fixes94: host:port of this fetch's endpoint */
+	/* fixes98 — 3xx auto-follow. Location header captured during header
+	 * parsing; if status is 3xx we emit FETCH_REDIRECT instead of body
+	 * delivery and NetSurf's llcache opens a fresh fetch against this
+	 * URL (relative resolution happens in llcache). */
+	char redirect_url[512];
+	/* fixes98 — chunked decoder. Active when chunked==1. */
+	int chunk_state;            /* enum chunk_state */
+	long chunk_remaining;       /* bytes left in current chunk's data */
+	char chunk_size_buf[16];    /* hex line buffer */
+	int chunk_size_len;
+	int trailer_just_after_eol; /* tracks empty-line in CS_TRAILER */
 };
 static struct macos9_fetch_ctx f_slots[MAX_F];
 
@@ -347,16 +375,17 @@ static int mfs_open(struct macos9_fetch_ctx *c) {
 		}
 		macsurf_debug_log_writef("mfs_open: GET (direct) %s %s",
 				target, path_buf);
-		/* fixes95: force connection-close on direct so origin
-		 * servers signal end-of-response by closing the socket
-		 * (we have no chunked decoder). Also disables pooling. */
-		c->keep_alive_ok = 0;
+		/* fixes98: direct requests now use keep-alive — the chunked
+		 * decoder in mfs_poll_one / process_chunked_bytes frames
+		 * Transfer-Encoding: chunked responses correctly so we don't
+		 * need the server to close after each. Pool reuse on direct
+		 * origins eliminates per-fetch TCP setup latency. */
 		sprintf(req,
 			"GET %s HTTP/1.1\r\n"
 			"Host: %.*s\r\n"
 			"User-Agent: MacSurf/0.2\r\n"
 			"Accept: */*\r\n"
-			"Connection: close\r\n\r\n",
+			"Connection: keep-alive\r\n\r\n",
 			path_buf, (int)host_len, host_str);
 	}
 
@@ -395,6 +424,103 @@ fail_unref:
 #endif
 }
 
+/* fixes98 — chunked decoder. Drives the chunk_state state machine over
+ * a buffer of raw post-header bytes. Emits FETCH_DATA for the data
+ * regions; consumes the size lines, CRLFs, and trailer headers without
+ * forwarding them. Reentrant across calls — partial chunks are
+ * remembered in c->chunk_state / chunk_remaining / chunk_size_buf, so
+ * an OTRcv that splits mid-line works correctly on the next pass.
+ * When the terminating empty trailer line is seen, sets chunk_state to
+ * CS_DONE; mfs_poll_one then transitions state to MFS_DONE. */
+static void
+process_chunked_bytes(struct macos9_fetch_ctx *c, const char *b, long len)
+{
+	fetch_msg msg;
+	long pos;
+	char ch;
+
+	pos = 0;
+	while (pos < len && c->chunk_state != CS_DONE) {
+		switch (c->chunk_state) {
+		case CS_SIZE: {
+			while (pos < len) {
+				ch = b[pos++];
+				if (ch == '\n') {
+					long sz;
+					c->chunk_size_buf[c->chunk_size_len] = '\0';
+					sz = strtol(c->chunk_size_buf, NULL, 16);
+					c->chunk_size_len = 0;
+					c->chunk_remaining = sz;
+					if (sz == 0) {
+						c->chunk_state = CS_TRAILER;
+						c->trailer_just_after_eol = 1;
+					} else {
+						c->chunk_state = CS_DATA;
+					}
+					break;
+				}
+				if (ch == '\r') continue;
+				/* Drop chunk extensions after ';' — stay
+				 * inside the buffer so strtol stops at the
+				 * first non-hex char anyway, but avoid
+				 * overflowing chunk_size_buf on a long ext. */
+				if (c->chunk_size_len <
+				    (int)sizeof(c->chunk_size_buf) - 1) {
+					c->chunk_size_buf[c->chunk_size_len++] = ch;
+				}
+			}
+			break;
+		}
+		case CS_DATA: {
+			long avail;
+			long deliver;
+			avail = len - pos;
+			deliver = (avail < c->chunk_remaining) ? avail : c->chunk_remaining;
+			if (deliver > 0) {
+				msg.type = FETCH_DATA;
+				msg.data.header_or_data.buf = (const uint8_t *)(b + pos);
+				msg.data.header_or_data.len = (size_t)deliver;
+				fetch_send_callback(&msg, c->parent);
+				c->body_bytes += deliver;
+				pos += deliver;
+				c->chunk_remaining -= deliver;
+			}
+			if (c->chunk_remaining == 0) {
+				c->chunk_state = CS_CRLF;
+			}
+			break;
+		}
+		case CS_CRLF: {
+			while (pos < len) {
+				ch = b[pos++];
+				if (ch == '\n') {
+					c->chunk_state = CS_SIZE;
+					break;
+				}
+				/* skip \r and any stray bytes */
+			}
+			break;
+		}
+		case CS_TRAILER: {
+			while (pos < len) {
+				ch = b[pos++];
+				if (ch == '\r') continue;
+				if (ch == '\n') {
+					if (c->trailer_just_after_eol) {
+						c->chunk_state = CS_DONE;
+						break;
+					}
+					c->trailer_just_after_eol = 1;
+				} else {
+					c->trailer_just_after_eol = 0;
+				}
+			}
+			break;
+		}
+		}
+	}
+}
+
 static void mfs_parse_headers(struct macos9_fetch_ctx *c) {
 	char *sep = strstr(c->h_buf, "\r\n\r\n"), *p, *cur; long cur_len; fetch_msg msg;
 	if(!sep) return;
@@ -427,27 +553,63 @@ static void mfs_parse_headers(struct macos9_fetch_ctx *c) {
 			char *v=p+11; while(*v==' ')v++;
 			if(strncasecmp(v,"close",5)==0) c->keep_alive_ok = 0;
 		}
+		/* fixes98 — capture Location: for 3xx auto-follow. */
+		if(strncasecmp(p,"Location:",9)==0) {
+			char *v=p+9; size_t lv;
+			while(*v==' '||*v=='\t')v++;
+			lv = strlen(v);
+			if (lv >= sizeof(c->redirect_url)) lv = sizeof(c->redirect_url) - 1;
+			memcpy(c->redirect_url, v, lv);
+			c->redirect_url[lv] = '\0';
+		}
 		msg.type=FETCH_HEADER; msg.data.header_or_data.buf=(const uint8_t*)p;
 		msg.data.header_or_data.len=strlen(p); fetch_send_callback(&msg,c->parent);
 	}
-	/* fixes91 — keep-alive only if we know the body length and it isn't
-	 * chunked. Without Content-Length we can't tell where one response
-	 * ends and the next begins on a reused socket. */
-	if (c->content_length < 0 || c->chunked) c->keep_alive_ok = 0;
+	/* fixes98 — 3xx with Location: hand the redirect target to llcache
+	 * via FETCH_REDIRECT and stop the body delivery. We don't bother
+	 * draining the (usually-tiny "301 Moved Permanently") body because
+	 * we're closing the socket — pool reuse on a 3xx isn't worth the
+	 * decoder complexity. */
+	if (c->status >= 300 && c->status < 400 && c->redirect_url[0] != '\0') {
+		msg.type = FETCH_REDIRECT;
+		msg.data.redirect = c->redirect_url;
+		fetch_send_callback(&msg, c->parent);
+		macsurf_debug_log_writef("http: redirect %d -> %s",
+			c->status, c->redirect_url);
+		c->state = MFS_NOTIFIED;
+		c->keep_alive_ok = 0;
+		free(c->h_buf); c->h_buf = NULL;
+		return;
+	}
+	/* fixes98 — keep-alive is now compatible with chunked (the decoder
+	 * tells us where the body ends). Only Content-Length-less *plain*
+	 * responses force close. */
+	if (c->content_length < 0 && !c->chunked) c->keep_alive_ok = 0;
+	/* fixes98 — init chunked decoder state. */
+	if (c->chunked) {
+		c->chunk_state = CS_SIZE;
+		c->chunk_size_len = 0;
+		c->chunk_remaining = 0;
+	}
 	c->state=MFS_BODY;
 	if(sep+4 < c->h_buf+c->h_len) {
 		long initial_body = (long)((c->h_buf+c->h_len)-(sep+4));
-		long deliver = initial_body;
-		if (c->content_length >= 0 && c->body_bytes + deliver > c->content_length)
-			deliver = c->content_length - c->body_bytes;
-		if (deliver > 0) {
-			msg.type=FETCH_DATA; msg.data.header_or_data.buf=(const uint8_t*)(sep+4);
-			msg.data.header_or_data.len=(size_t)deliver;
-			fetch_send_callback(&msg,c->parent);
-			c->body_bytes += deliver;
-		}
-		if (c->content_length >= 0 && c->body_bytes >= c->content_length) {
-			c->state = MFS_DONE;
+		if (c->chunked) {
+			process_chunked_bytes(c, sep+4, initial_body);
+			if (c->chunk_state == CS_DONE) c->state = MFS_DONE;
+		} else {
+			long deliver = initial_body;
+			if (c->content_length >= 0 && c->body_bytes + deliver > c->content_length)
+				deliver = c->content_length - c->body_bytes;
+			if (deliver > 0) {
+				msg.type=FETCH_DATA; msg.data.header_or_data.buf=(const uint8_t*)(sep+4);
+				msg.data.header_or_data.len=(size_t)deliver;
+				fetch_send_callback(&msg,c->parent);
+				c->body_bytes += deliver;
+			}
+			if (c->content_length >= 0 && c->body_bytes >= c->content_length) {
+				c->state = MFS_DONE;
+			}
 		}
 	}
 	free(c->h_buf); c->h_buf=NULL;
@@ -488,19 +650,24 @@ static void mfs_poll_one(struct macos9_fetch_ctx *c) {
 		memcpy(c->h_buf+c->h_len,b,(size_t)n); c->h_len=nl;
 		if(strstr(c->h_buf,"\r\n\r\n")) mfs_parse_headers(c);
 	} else {
-		long deliver = n;
-		/* fixes91 — cap delivery at Content-Length so we don't bleed
-		 * into the next pipelined response. */
-		if (c->content_length >= 0 && c->body_bytes + deliver > c->content_length)
-			deliver = c->content_length - c->body_bytes;
-		if (deliver > 0) {
-			m.type=FETCH_DATA; m.data.header_or_data.buf=(const uint8_t*)b;
-			m.data.header_or_data.len=(size_t)deliver;
-			fetch_send_callback(&m,c->parent);
-			c->body_bytes += deliver;
-		}
-		if (c->content_length >= 0 && c->body_bytes >= c->content_length) {
-			c->state = MFS_DONE;
+		if (c->chunked) {
+			process_chunked_bytes(c, b, (long)n);
+			if (c->chunk_state == CS_DONE) c->state = MFS_DONE;
+		} else {
+			long deliver = n;
+			/* fixes91 — cap delivery at Content-Length so we don't bleed
+			 * into the next pipelined response. */
+			if (c->content_length >= 0 && c->body_bytes + deliver > c->content_length)
+				deliver = c->content_length - c->body_bytes;
+			if (deliver > 0) {
+				m.type=FETCH_DATA; m.data.header_or_data.buf=(const uint8_t*)b;
+				m.data.header_or_data.len=(size_t)deliver;
+				fetch_send_callback(&m,c->parent);
+				c->body_bytes += deliver;
+			}
+			if (c->content_length >= 0 && c->body_bytes >= c->content_length) {
+				c->state = MFS_DONE;
+			}
 		}
 	}
 #endif
