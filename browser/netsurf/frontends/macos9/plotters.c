@@ -989,8 +989,17 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 	SetRect(&dst_rect, (short)x, (short)y,
 		(short)(x + width), (short)(y + height));
 
-	err = NewGWorld(&gw, 32, &src_rect, NULL, NULL, 0);
-	if (err != noErr || gw == NULL) return NSERROR_OK;
+	/* useTempMem (=4) so a large source bitmap (e.g. 1600x1200 JPEG
+	 * = 7.7 MB) doesn't exhaust the app heap on every redraw. */
+	err = NewGWorld(&gw, 32, &src_rect, NULL, NULL, (GWorldFlags)4);
+	if (err != noErr || gw == NULL) {
+		MS_LOG("plot_bitmap: NewGWorld tempmem FAIL, retry");
+		err = NewGWorld(&gw, 32, &src_rect, NULL, NULL, 0);
+		if (err != noErr || gw == NULL) {
+			MS_LOG("plot_bitmap: NewGWorld FAIL");
+			return NSERROR_OK;
+		}
+	}
 
 	pm = GetGWorldPixMap(gw);
 	if (pm == NULL || !LockPixels(pm)) {
@@ -1021,30 +1030,42 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 		RgnHandle saved_clip;
 		bool is_opaque;
 		short xfer_mode;
-		RGBColor save_bg;
+		RGBColor save_dst_bg;
+		CGrafPtr save_gworld;
+		GDHandle save_gdh;
 		GetPort(&save_port);
 		saved_clip = macos9_push_clip();
 		is_opaque = macos9_bitmap_get_opaque((void *)bitmap);
 		if (is_opaque) {
 			xfer_mode = srcCopy;
+			MS_LOG("plot_bitmap: opaque srcCopy");
 		} else {
-			/* Non-opaque bitmap uses transparent transfer mode
-			 * keyed on the magenta sentinel (0xFF, 0x00, 0xFF)
-			 * written by macos9_image.c at decode time for any
-			 * pixel whose source alpha < 128. */
+			/* Non-opaque bitmap: pixels whose source alpha was
+			 * < 128 at decode time were rewritten to magenta
+			 * (0xFF, 0x00, 0xFF). CopyBits with the transparent
+			 * transfer mode compares each source pixel against
+			 * the source port's bgColor and skips matches. Set
+			 * magenta on BOTH the source GWorld and the dest
+			 * port -- different QuickDraw paths differ on which
+			 * is read, and writing both is cheap. */
 			RGBColor magenta;
-			GetBackColor(&save_bg);
 			magenta.red = 0xFFFF;
 			magenta.green = 0;
 			magenta.blue = 0xFFFF;
+			GetGWorld(&save_gworld, &save_gdh);
+			SetGWorld(gw, NULL);
+			RGBBackColor(&magenta);
+			SetGWorld(save_gworld, save_gdh);
+			GetBackColor(&save_dst_bg);
 			RGBBackColor(&magenta);
 			xfer_mode = transparent;
+			MS_LOG("plot_bitmap: alpha transparent");
 		}
 		CopyBits((BitMap *)*pm,
 			&((GrafPtr)save_port)->portBits,
 			&src_rect, &dst_rect, xfer_mode, NULL);
 		if (!is_opaque) {
-			RGBBackColor(&save_bg);
+			RGBBackColor(&save_dst_bg);
 		}
 		macos9_pop_clip(saved_clip);
 	}

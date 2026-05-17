@@ -266,13 +266,18 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 			if (wants_alpha) {
 				a = src_row[col * 4 + 0];
 				if (a < 128) {
+					/* alpha byte = 0xFF so the 32-bit
+					 * source word matches QuickDraw's
+					 * 32-bit bgColor representation
+					 * regardless of how it stores the
+					 * alpha component for RGBBackColor. */
 					dst_row[col * 4 + 0] =
 						MACOS9_IMG_TRANSPARENT_R;
 					dst_row[col * 4 + 1] =
 						MACOS9_IMG_TRANSPARENT_G;
 					dst_row[col * 4 + 2] =
 						MACOS9_IMG_TRANSPARENT_B;
-					dst_row[col * 4 + 3] = 0;
+					dst_row[col * 4 + 3] = 0xFF;
 					continue;
 				}
 			}
