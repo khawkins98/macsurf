@@ -281,6 +281,23 @@ static void fetcher_poll(void *unused)
  * Public API								      *
  ******************************************************************************/
 
+/* fixes90: unconditional pump driven from the macos9 event loop.
+ * fetcher_poll() above only re-arms itself via guit->misc->schedule
+ * while fetch_ring is non-empty, so the moment all fetches finish the
+ * chain goes dormant and any subsequent queued fetch (or synchronous
+ * cache-hit broadcast) is stranded. Calling this every event-loop
+ * iteration guarantees queued jobs start and per-scheme polls run. */
+void fetch_pump(void)
+{
+	int fetcherd;
+	fetch_dispatch_jobs();
+	for (fetcherd = 0; fetcherd < MAX_FETCHERS; fetcherd++) {
+		if (fetchers[fetcherd].refcount > 0) {
+			fetchers[fetcherd].ops.poll(fetchers[fetcherd].scheme);
+		}
+	}
+}
+
 /* exported interface documented in content/fetch.h */
 #ifndef __MACOS9__
 nserror fetcher_init(void)
