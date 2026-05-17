@@ -273,6 +273,9 @@ macsurf_debug_log_init(void)
 	macsurf_debug_log_write("========================================");
 	macsurf_debug_log_writef("log init OK vref=%d dirID=%ld fsref=%d",
 		(int)vRefNum, (long)dirID, (int)g_log_ref);
+	/* fixes96 — explicit checkpoint: the startup banner needs to be
+	 * on disk if a later crash happens during the first event loop. */
+	if (g_log_vref != 0) (void)FlushVol(NULL, g_log_vref);
 	macsurf_debug_set_title("log OK");
 #endif
 }
@@ -308,22 +311,36 @@ macsurf_debug_log_write(const char *msg)
 	(void)FSWrite(g_log_ref, &count, "\r");
 
 	/*
-	 * Force a flush so the entry survives a crash. The SetFPos
-	 * LEOF re-assertion pushes File Manager's cached position
-	 * state; FlushVol asks HFS to commit the volume's metadata
-	 * and data buffers. Both are needed -- on classic Mac OS
-	 * the File Manager caches aggressively, and a crash can
-	 * eat up to the last 32 KB of unwritten data without
-	 * FlushVol.
+	 * fixes96 — per-write FlushVol REMOVED. It was synchronously
+	 * waiting for HFS to commit each line, which on real hardware
+	 * costs ~10–50 ms per call. With ~80 MS_LOG calls per page
+	 * load (most from NetSurf core's llcache / hlcache trace), that
+	 * was 1–4 seconds of disk-sync wait per nav — the chief cause
+	 * of "second nav held back" and the residual dial-up feel.
+	 *
+	 * The log is now written through HFS's normal cache; clean
+	 * shutdown flushes via FSClose, and macsurf_debug_log_flush()
+	 * exposes an explicit checkpoint for callers who really need
+	 * durability after a critical message. On a hard crash, we may
+	 * lose up to a few KB of trailing lines — acceptable given the
+	 * stability we've reached and the massive throughput win.
 	 */
-	(void)SetFPos(g_log_ref, fsFromStart, 0);
-	(void)SetFPos(g_log_ref, fsFromLEOF, 0);
-	if (g_log_vref != 0) {
-		(void)FlushVol(NULL, g_log_vref);
-	}
 #else
 	if (msg == NULL) return;
 	fprintf(stderr, "MS_FLOG: %s\n", msg);
+#endif
+}
+
+/*
+ * fixes96 — explicit flush. Use sparingly. Called once after init
+ * so the startup banner is on disk before any work begins.
+ */
+void
+macsurf_debug_log_flush(void)
+{
+#ifdef __MACOS9__
+	if (!g_log_open) return;
+	if (g_log_vref != 0) (void)FlushVol(NULL, g_log_vref);
 #endif
 }
 
