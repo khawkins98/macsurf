@@ -42,6 +42,12 @@
 #define graphicsModeStraightAlpha 256
 #endif
 
+/* k32ARGBPixelFormat = 'ARGB'. Defined in <ImageCompression.h> but
+ * some CW8 SDKs are missing it -- provide the literal as a fallback. */
+#ifndef k32ARGBPixelFormat
+#define k32ARGBPixelFormat 0x41524742
+#endif
+
 typedef ComponentInstance GraphicsImportComponent;
 
 typedef struct macos9_qt_image_content {
@@ -143,48 +149,33 @@ macos9_qt_format_has_alpha(const unsigned char *p, long n)
 #define MACOS9_IMG_TRANSPARENT_G 0x00
 #define MACOS9_IMG_TRANSPARENT_B 0xFF
 
-/* Helper: erase the given GWorld to the given RGB and decode the
- * importer into it. The current port is left set to gw on return. */
-static void
-macos9_qt_draw_into(GraphicsImportComponent gi, GWorldPtr gw,
-		const Rect *r, unsigned short rr, unsigned short gg,
-		unsigned short bb)
-{
-	RGBColor c;
-	SetGWorld(gw, NULL);
-	c.red = rr;
-	c.green = gg;
-	c.blue = bb;
-	RGBBackColor(&c);
-	EraseRect(r);
-	GraphicsImportSetGWorld(gi, gw, NULL);
-	GraphicsImportSetBoundsRect(gi, r);
-	GraphicsImportDraw(gi);
-}
-
 /* Decode the importer into a freshly-allocated NetSurf bitmap.
  * Returns NSERROR_OK on success. On failure the bitmap is freed and
- * *out_bitmap is left NULL. */
+ * *out_bitmap is left NULL.
+ *
+ * For alpha-capable formats (PNG/TIFF) the temp GWorld is allocated
+ * via QTNewGWorld with k32ARGBPixelFormat -- this tells the QT
+ * graphics importer that the destination pixmap has a real alpha
+ * channel, so PNG/TIFF importers map the file's per-pixel alpha into
+ * the high byte rather than treating it as filler.
+ *
+ * Opaque formats (JPEG / 24-bit BMP / GIF) still allocate via the
+ * vanilla NewGWorld(32) path -- no alpha to preserve. */
 static nserror
 macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 		int bw, int bh, bool wants_alpha, void **out_bitmap)
 {
 	void *bm;
 	unsigned char *dst_buf;
-	GWorldPtr gw_a;
-	GWorldPtr gw_b;
+	GWorldPtr temp_gw;
 	Rect tmp_bounds;
-	PixMapHandle pm_a;
-	PixMapHandle pm_b;
+	PixMapHandle tmp_pm;
 	OSErr err;
 	long row_bytes;
-	long pa_rowbytes;
-	long pb_rowbytes;
+	long src_rowbytes;
 	int row, col;
-	unsigned char *pa_base;
-	unsigned char *pb_base;
-	unsigned char *pa_row;
-	unsigned char *pb_row;
+	unsigned char *src_base;
+	unsigned char *src_row;
 	unsigned char *dst_row;
 	CGrafPtr save_port;
 	GDHandle save_gdh;
@@ -216,104 +207,107 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 	tmp_bounds.right = (short)bw;
 	tmp_bounds.bottom = (short)bh;
 
-	gw_a = NULL;
-	gw_b = NULL;
-	pm_a = NULL;
-	pm_b = NULL;
-
-	/* useTempMem (= 4) so the temp GWorld doesn't exhaust the app
-	 * heap for larger images. Fall back to app heap if temp fails. */
-	err = NewGWorld(&gw_a, 32, &tmp_bounds, NULL, NULL,
-			(GWorldFlags)4);
-	if (err != noErr || gw_a == NULL) {
-		err = NewGWorld(&gw_a, 32, &tmp_bounds, NULL, NULL, 0);
-		if (err != noErr || gw_a == NULL) {
-			MS_LOG("img decode: NewGWorld(A) FAIL");
+	temp_gw = NULL;
+	if (wants_alpha) {
+		/* QTNewGWorld with k32ARGBPixelFormat asks for a pixmap
+		 * with a real alpha component. QT importers honor it. */
+		err = QTNewGWorld(&temp_gw, k32ARGBPixelFormat,
+				&tmp_bounds, NULL, NULL, (GWorldFlags)4);
+		if (err != noErr || temp_gw == NULL) {
+			err = QTNewGWorld(&temp_gw, k32ARGBPixelFormat,
+					&tmp_bounds, NULL, NULL, 0);
+		}
+		if (err != noErr || temp_gw == NULL) {
+			MS_LOG("img decode: QTNewGWorld ARGB FAIL");
+			guit->bitmap->destroy(bm);
+			return NSERROR_NOMEM;
+		}
+	} else {
+		err = NewGWorld(&temp_gw, 32, &tmp_bounds, NULL, NULL,
+				(GWorldFlags)4);
+		if (err != noErr || temp_gw == NULL) {
+			err = NewGWorld(&temp_gw, 32, &tmp_bounds, NULL,
+					NULL, 0);
+		}
+		if (err != noErr || temp_gw == NULL) {
+			MS_LOG("img decode: NewGWorld FAIL");
 			guit->bitmap->destroy(bm);
 			return NSERROR_NOMEM;
 		}
 	}
-	pm_a = GetGWorldPixMap(gw_a);
-	if (pm_a == NULL || !LockPixels(pm_a)) {
-		MS_LOG("img decode: LockPixels(A) FAIL");
-		DisposeGWorld(gw_a);
+
+	tmp_pm = GetGWorldPixMap(temp_gw);
+	if (tmp_pm == NULL || !LockPixels(tmp_pm)) {
+		MS_LOG("img decode: LockPixels FAIL");
+		DisposeGWorld(temp_gw);
 		guit->bitmap->destroy(bm);
 		return NSERROR_NOMEM;
 	}
-	pa_rowbytes = (*pm_a)->rowBytes & 0x3FFF;
-	pa_base = (unsigned char *)GetPixBaseAddr(pm_a);
+
+	src_rowbytes = (*tmp_pm)->rowBytes & 0x3FFF;
+	src_base = (unsigned char *)GetPixBaseAddr(tmp_pm);
 
 	GetGWorld(&save_port, &save_gdh);
+	SetGWorld(temp_gw, NULL);
+	{
+		RGBColor c;
+		if (wants_alpha) {
+			/* Erase to fully transparent (alpha = 0 across the
+			 * whole pixmap). If QT honors the ARGB format,
+			 * opaque source pixels will overwrite alpha with
+			 * 0xFF and source-transparent pixels will leave
+			 * alpha as 0 -- giving the byte-swap real per-
+			 * pixel alpha to read. */
+			c.red = 0;
+			c.green = 0;
+			c.blue = 0;
+		} else {
+			c.red = 0xFFFF;
+			c.green = 0xFFFF;
+			c.blue = 0xFFFF;
+		}
+		RGBBackColor(&c);
+		EraseRect(&tmp_bounds);
+	}
+
+	GraphicsImportSetGWorld(gi, temp_gw, NULL);
+	GraphicsImportSetBoundsRect(gi, &tmp_bounds);
+	GraphicsImportDraw(gi);
+
+	SetGWorld(save_port, save_gdh);
 
 	if (wants_alpha) {
-		/* Two-pass alpha detection. Classic QuickDraw 32-bit
-		 * GWorlds have no real alpha channel (the high byte is
-		 * filler), so we can't read alpha from a single decoded
-		 * pixmap. Instead, decode the image into TWO independent
-		 * GWorlds primed with different background colors (white
-		 * and black). Where the resulting RGB matches between the
-		 * two, the pixel is fully opaque (background didn't bleed
-		 * through). Where RGB differs, the source had alpha < 255
-		 * -- those pixels become the magenta sentinel for
-		 * color-key transparency at blit time.
-		 *
-		 * Two separate GWorlds (rather than reusing one) because
-		 * GraphicsImportDraw's state-after-call on a single
-		 * GWorld doesn't reliably re-decode on the next pass --
-		 * earlier rounds with one GWorld produced all-magenta
-		 * output even on opaque pixels. */
-		err = NewGWorld(&gw_b, 32, &tmp_bounds, NULL, NULL,
-				(GWorldFlags)4);
-		if (err != noErr || gw_b == NULL) {
-			err = NewGWorld(&gw_b, 32, &tmp_bounds, NULL, NULL, 0);
-			if (err != noErr || gw_b == NULL) {
-				MS_LOG("img decode: NewGWorld(B) FAIL");
-				SetGWorld(save_port, save_gdh);
-				UnlockPixels(pm_a);
-				DisposeGWorld(gw_a);
-				guit->bitmap->destroy(bm);
-				return NSERROR_NOMEM;
-			}
-		}
-		pm_b = GetGWorldPixMap(gw_b);
-		if (pm_b == NULL || !LockPixels(pm_b)) {
-			MS_LOG("img decode: LockPixels(B) FAIL");
-			SetGWorld(save_port, save_gdh);
-			UnlockPixels(pm_a);
-			DisposeGWorld(gw_a);
-			DisposeGWorld(gw_b);
-			guit->bitmap->destroy(bm);
-			return NSERROR_NOMEM;
-		}
-		pb_rowbytes = (*pm_b)->rowBytes & 0x3FFF;
-		pb_base = (unsigned char *)GetPixBaseAddr(pm_b);
+		/* Probe: log the alpha byte at 8 evenly-spaced columns
+		 * across the middle row. If QT honored k32ARGBPixelFormat
+		 * we expect VARYING values (00 for transparent pixels,
+		 * FF for opaque). A row of uniform 00 or FF means QT
+		 * ignored the pixel format and the high byte is filler. */
+		int probe_row = bh / 2;
+		unsigned char *p = src_base + (long)probe_row * src_rowbytes;
+		macsurf_debug_log_writef(
+			"alpha probe row=%d: %d %d %d %d %d %d %d %d",
+			probe_row,
+			(int)p[(bw * 0 / 8) * 4 + 0],
+			(int)p[(bw * 1 / 8) * 4 + 0],
+			(int)p[(bw * 2 / 8) * 4 + 0],
+			(int)p[(bw * 3 / 8) * 4 + 0],
+			(int)p[(bw * 4 / 8) * 4 + 0],
+			(int)p[(bw * 5 / 8) * 4 + 0],
+			(int)p[(bw * 6 / 8) * 4 + 0],
+			(int)p[(bw * 7 / 8) * 4 + 0]);
+	}
 
-		/* Decode into gw_a primed white, gw_b primed black. */
-		macos9_qt_draw_into(gi, gw_a, &tmp_bounds,
-				0xFFFF, 0xFFFF, 0xFFFF);
-		macos9_qt_draw_into(gi, gw_b, &tmp_bounds,
-				0, 0, 0);
-
-		for (row = 0; row < bh; row++) {
-			pa_row = pa_base + row * pa_rowbytes;
-			pb_row = pb_base + row * pb_rowbytes;
-			dst_row = dst_buf + row * row_bytes;
-			for (col = 0; col < bw; col++) {
-				int dr, dg, db;
-				dr = (int)pa_row[col * 4 + 1]
-						- (int)pb_row[col * 4 + 1];
-				dg = (int)pa_row[col * 4 + 2]
-						- (int)pb_row[col * 4 + 2];
-				db = (int)pa_row[col * 4 + 3]
-						- (int)pb_row[col * 4 + 3];
-				if (dr < 0) dr = -dr;
-				if (dg < 0) dg = -dg;
-				if (db < 0) db = -db;
-				/* Threshold > 8 absorbs decoder jitter
-				 * and slight bg-bleed at half-transparent
-				 * edges while still catching real
-				 * alpha-driven differences. */
-				if (dr > 8 || dg > 8 || db > 8) {
+	/* Byte-swap. GWorld is ARGB (byte 0=A, 1=R, 2=G, 3=B), bitmap
+	 * is RGBA. For alpha format, alpha < 128 becomes the magenta
+	 * sentinel for color-key transparency at blit time. Opaque
+	 * formats force alpha = 0xFF. */
+	for (row = 0; row < bh; row++) {
+		src_row = src_base + row * src_rowbytes;
+		dst_row = dst_buf + row * row_bytes;
+		for (col = 0; col < bw; col++) {
+			if (wants_alpha) {
+				unsigned char a = src_row[col * 4 + 0];
+				if (a < 128) {
 					dst_row[col * 4 + 0] =
 						MACOS9_IMG_TRANSPARENT_R;
 					dst_row[col * 4 + 1] =
@@ -321,41 +315,18 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 					dst_row[col * 4 + 2] =
 						MACOS9_IMG_TRANSPARENT_B;
 					dst_row[col * 4 + 3] = 0xFF;
-				} else {
-					/* Opaque -- use the white-bg pass's
-					 * RGB (matches black-bg's anyway). */
-					dst_row[col * 4 + 0] =
-							pa_row[col * 4 + 1];
-					dst_row[col * 4 + 1] =
-							pa_row[col * 4 + 2];
-					dst_row[col * 4 + 2] =
-							pa_row[col * 4 + 3];
-					dst_row[col * 4 + 3] = 0xFF;
+					continue;
 				}
 			}
-		}
-	} else {
-		/* Opaque-only formats: single decode on a white bg. */
-		macos9_qt_draw_into(gi, gw_a, &tmp_bounds,
-				0xFFFF, 0xFFFF, 0xFFFF);
-		for (row = 0; row < bh; row++) {
-			pa_row = pa_base + row * pa_rowbytes;
-			dst_row = dst_buf + row * row_bytes;
-			for (col = 0; col < bw; col++) {
-				dst_row[col * 4 + 0] = pa_row[col * 4 + 1];
-				dst_row[col * 4 + 1] = pa_row[col * 4 + 2];
-				dst_row[col * 4 + 2] = pa_row[col * 4 + 3];
-				dst_row[col * 4 + 3] = 0xFF;
-			}
+			dst_row[col * 4 + 0] = src_row[col * 4 + 1];
+			dst_row[col * 4 + 1] = src_row[col * 4 + 2];
+			dst_row[col * 4 + 2] = src_row[col * 4 + 3];
+			dst_row[col * 4 + 3] = 0xFF;
 		}
 	}
 
-	SetGWorld(save_port, save_gdh);
-
-	if (pm_b != NULL) UnlockPixels(pm_b);
-	if (gw_b != NULL) DisposeGWorld(gw_b);
-	UnlockPixels(pm_a);
-	DisposeGWorld(gw_a);
+	UnlockPixels(tmp_pm);
+	DisposeGWorld(temp_gw);
 
 	if (guit->bitmap->set_opaque != NULL) {
 		guit->bitmap->set_opaque(bm, !wants_alpha);
