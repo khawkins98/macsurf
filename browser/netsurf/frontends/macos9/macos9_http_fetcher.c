@@ -290,7 +290,18 @@ static int mfs_open(struct macos9_fetch_ctx *c) {
 	/* Build the request line.
 	 *   proxy: absolute-form  (GET http://example.com/foo HTTP/1.1)
 	 *   direct: origin-form   (GET /foo HTTP/1.1)
-	 * In both cases Host: holds the origin hostname. */
+	 * In both cases Host: holds the origin hostname.
+	 *
+	 * fixes95: direct fetches send `Connection: close` and skip the
+	 * pool. The proxy buffers responses and emits Content-Length so
+	 * we can frame them and keep-alive cleanly. Origin servers
+	 * (e.g. nginx) reply with Transfer-Encoding: chunked + keep-alive
+	 * for HTML; we don't have a chunked decoder yet, so without a
+	 * Content-Length we can't tell where one response ends on a
+	 * reused socket — the fetch just hangs. Connection: close makes
+	 * the origin close after the response, which OTRcv reports as
+	 * n==0 and we transition to MFS_DONE. Cost: one TCP setup per
+	 * direct fetch. Still saves the Hetzner round-trip vs proxy. */
 	if (use_proxy) {
 		u_full = nsurl_access(c->url);
 		macsurf_debug_log_writef("mfs_open: GET (proxy) %s",
@@ -336,12 +347,16 @@ static int mfs_open(struct macos9_fetch_ctx *c) {
 		}
 		macsurf_debug_log_writef("mfs_open: GET (direct) %s %s",
 				target, path_buf);
+		/* fixes95: force connection-close on direct so origin
+		 * servers signal end-of-response by closing the socket
+		 * (we have no chunked decoder). Also disables pooling. */
+		c->keep_alive_ok = 0;
 		sprintf(req,
 			"GET %s HTTP/1.1\r\n"
 			"Host: %.*s\r\n"
 			"User-Agent: MacSurf/0.2\r\n"
 			"Accept: */*\r\n"
-			"Connection: keep-alive\r\n\r\n",
+			"Connection: close\r\n\r\n",
 			path_buf, (int)host_len, host_str);
 	}
 
