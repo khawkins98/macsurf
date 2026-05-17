@@ -18,7 +18,7 @@ extern OTClientContextPtr macos9_ot_context;
 
 #define PROXY_H "116.202.231.103"
 #define PROXY_P 8765
-#define MAX_F 8
+#define MAX_F 64
 #define RECV_B 8192
 
 enum mfs_state { MFS_IDLE, MFS_INIT, MFS_HEADERS, MFS_BODY, MFS_DONE, MFS_FAIL, MFS_NOTIFIED };
@@ -191,8 +191,8 @@ static void macos9_http_finalise(lwc_string *s) { (void)s; }
 static bool macos9_http_acceptable(const struct nsurl *u) { (void)u; return true; }
 static void *macos9_http_setup(struct fetch *p, struct nsurl *u, bool o, bool d, const char *pu, const struct fetch_multipart_data *pm, const char **h) {
 	int i; (void)o;(void)d;(void)pu;(void)pm;(void)h;
-	MS_LOG("http_setup called");
-	for(i=0;i<MAX_F;i++) if(f_slots[i].state==MFS_IDLE) { memset(&f_slots[i],0,sizeof(f_slots[0])); f_slots[i].parent=p; f_slots[i].url=nsurl_ref(u); f_slots[i].state=MFS_INIT; return &f_slots[i]; }
+	for(i=0;i<MAX_F;i++) if(f_slots[i].state==MFS_IDLE) { memset(&f_slots[i],0,sizeof(f_slots[0])); f_slots[i].parent=p; f_slots[i].url=nsurl_ref(u); f_slots[i].state=MFS_INIT; macsurf_debug_log_writef("http_setup: slot=%d/%d", i, MAX_F); return &f_slots[i]; }
+	macsurf_debug_log_writef("http_setup: NO FREE SLOTS (MAX_F=%d) - fetch will FAIL", MAX_F);
 	return NULL;
 }
 static bool macos9_http_start(void *ctx) { return true; }
