@@ -268,11 +268,48 @@ void macos9_window_destroy(struct gui_window *g) { struct gui_window **p; for(p=
 	if(g->content_gworld) { DisposeGWorld(g->content_gworld); g->content_gworld = NULL; }
 #endif
 	if(g->window) DisposeWindow(g->window); free(g); }
+/* fixes100 — honour NetSurf's per-update dirty rect.
+ *
+ * Pre-fixes100 this function logged the supplied rect and then
+ * unconditionally InvalWindowRect'd the entire content area. That
+ * meant every keystroke (caret blink, textarea text change), every
+ * scroll-bar value update, every late image arrival, every layout
+ * tweak triggered a full content viewport repaint — on the duck-duck
+ * search results page that's ~170 DrawText calls and ~600 box-tree
+ * visits per character typed, ~200-300ms per keystroke on G3/G4.
+ *
+ * NetSurf passes r in document/layout coords (pre-scroll). Convert
+ * to window coords: window = layout + content_rect.{top,left} -
+ * scroll_{y,x}. Then clip to content_rect so we never invalidate
+ * outside the viewport (a stray invalidate over the URL bar would
+ * trigger TextEdit overdraw bugs). Null r still means full content,
+ * matching the prior contract for callers that ask for a full
+ * repaint (NEW_CONTENT, reformat, etc). */
 static nserror macos9_gw_invalidate(struct gui_window *g, const struct rect *r) {
-	if(!g||!g->window)return 0;
-	if(r) macsurf_debug_log_writef("gw_invalidate: r=(%d,%d,%d,%d)", r->x0, r->y0, r->x1, r->y1);
-	else MS_LOG("gw_invalidate: r=NULL (full)");
-	InvalWindowRect(g->window, &g->content_rect);
+	if(!g||!g->window) return 0;
+	if (r != NULL) {
+		Rect ir;
+		int wx0, wy0, wx1, wy1;
+		macsurf_debug_log_writef("gw_invalidate: r=(%d,%d,%d,%d)",
+			r->x0, r->y0, r->x1, r->y1);
+		wx0 = r->x0 + g->content_rect.left - g->scroll_x;
+		wy0 = r->y0 + g->content_rect.top  - g->scroll_y;
+		wx1 = r->x1 + g->content_rect.left - g->scroll_x;
+		wy1 = r->y1 + g->content_rect.top  - g->scroll_y;
+		if (wx0 < g->content_rect.left)   wx0 = g->content_rect.left;
+		if (wy0 < g->content_rect.top)    wy0 = g->content_rect.top;
+		if (wx1 > g->content_rect.right)  wx1 = g->content_rect.right;
+		if (wy1 > g->content_rect.bottom) wy1 = g->content_rect.bottom;
+		if (wx1 <= wx0 || wy1 <= wy0) return 0;
+		ir.left   = (short)wx0;
+		ir.top    = (short)wy0;
+		ir.right  = (short)wx1;
+		ir.bottom = (short)wy1;
+		InvalWindowRect(g->window, &ir);
+	} else {
+		MS_LOG("gw_invalidate: r=NULL (full)");
+		InvalWindowRect(g->window, &g->content_rect);
+	}
 	return 0;
 }
 static bool macos9_gw_get_scroll(struct gui_window *g, int *x, int *y) { if(x) *x=g->scroll_x; if(y) *y=g->scroll_y; return 1; }
