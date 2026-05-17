@@ -48,6 +48,11 @@ enum mfs_state {
 	MFS_NOTIFIED
 };
 
+/* fixes94 — pool_key remembers which (host, port) this slot's endpoint
+ * was opened to. Returned to the matching bucket on close. Direct
+ * origins ("frogfind.com:80") and the proxy ("PROXY") each get their
+ * own pool entries so reuse only happens on identical targets. */
+#define POOL_KEY_LEN 96
 struct macos9_fetch_ctx {
 	struct fetch *parent; struct nsurl *url; enum mfs_state state;
 	int redirects; int aborted;
@@ -60,38 +65,48 @@ struct macos9_fetch_ctx {
 	long content_length; /* fixes91: -1 = unknown */
 	int keep_alive_ok;   /* fixes91: 1 if endpoint can be reused after response */
 	int chunked;         /* fixes91: 1 if Transfer-Encoding: chunked */
+	char pool_key[POOL_KEY_LEN]; /* fixes94: host:port of this fetch's endpoint */
 };
 static struct macos9_fetch_ctx f_slots[MAX_F];
 
 #ifdef __MACOS9__
-/* fixes91 — endpoint pool for HTTP/1.1 keep-alive to the proxy.
- * Every HTTP fetch through MacSurf currently dials the same proxy
- * (PROXY_H:PROXY_P), so we don't key by host — the whole pool serves
- * one (host, port) pair. */
-static EndpointRef ep_pool[POOL_SIZE];
+/* fixes94 — keyed endpoint pool. Previously all entries were assumed
+ * to be proxy connections; now we route http:// directly to the
+ * origin, so each pool entry needs to remember its (host, port). */
+struct ep_pool_entry {
+	EndpointRef ep;
+	char key[POOL_KEY_LEN];
+};
+static struct ep_pool_entry ep_pool[POOL_SIZE];
 static int ep_pool_count = 0;
 
 static EndpointRef
-ep_pool_take(void)
+ep_pool_take(const char *key)
 {
-	while (ep_pool_count > 0) {
-		EndpointRef ep = ep_pool[--ep_pool_count];
+	int i;
+	for (i = ep_pool_count - 1; i >= 0; i--) {
 		OTResult look;
+		EndpointRef ep;
 
-		/* OTLook reports any pending events without consuming
+		if (strcmp(ep_pool[i].key, key) != 0) continue;
+		ep = ep_pool[i].ep;
+		/* Compact: move tail entry into this slot. */
+		ep_pool[i] = ep_pool[ep_pool_count - 1];
+		ep_pool_count--;
+
+		/* OTLook reports any pending event without consuming
 		 * data. 0 means the endpoint is in T_DATAXFER with no
 		 * pending events — healthy idle, safe to reuse. */
 		look = OTLook(ep);
 		if (look == 0) {
 			macsurf_debug_log_writef(
-				"ep_pool: REUSE remaining=%d", ep_pool_count);
+				"ep_pool: REUSE key=%s remaining=%d",
+				key, ep_pool_count);
 			return ep;
 		}
-		/* Peer signalled shutdown / leftover bytes / etc.
-		 * Close cleanly and try the next pooled endpoint. */
 		macsurf_debug_log_writef(
-			"ep_pool: discard look=%ld remaining=%d",
-			(long)look, ep_pool_count);
+			"ep_pool: discard key=%s look=%ld remaining=%d",
+			key, (long)look, ep_pool_count);
 		if (look == T_ORDREL) {
 			OTRcvOrderlyDisconnect(ep);
 		} else if (look == T_DISCONNECT) {
@@ -99,12 +114,15 @@ ep_pool_take(void)
 		}
 		OTSndOrderlyDisconnect(ep);
 		OTCloseProvider(ep);
+		/* Restart scan from new top — index i may now refer to a
+		 * different entry after compaction. */
+		i = ep_pool_count;
 	}
 	return NULL;
 }
 
 static void
-ep_pool_return(EndpointRef ep)
+ep_pool_return(const char *key, EndpointRef ep)
 {
 	char drain[256];
 	OTResult n;
@@ -113,7 +131,8 @@ ep_pool_return(EndpointRef ep)
 	if (ep == NULL) return;
 	if (ep_pool_count >= POOL_SIZE) {
 		macsurf_debug_log_writef(
-			"ep_pool: full, closing (count=%d)", ep_pool_count);
+			"ep_pool: full, closing (count=%d key=%s)",
+			ep_pool_count, key);
 		OTSndOrderlyDisconnect(ep);
 		OTCloseProvider(ep);
 		return;
@@ -127,10 +146,13 @@ ep_pool_return(EndpointRef ep)
 		if (n > 0) drained += n;
 	} while (n > 0);
 
-	ep_pool[ep_pool_count++] = ep;
+	ep_pool[ep_pool_count].ep = ep;
+	strncpy(ep_pool[ep_pool_count].key, key, POOL_KEY_LEN - 1);
+	ep_pool[ep_pool_count].key[POOL_KEY_LEN - 1] = '\0';
+	ep_pool_count++;
 	macsurf_debug_log_writef(
-		"ep_pool: STORED count=%d drained=%ld",
-		ep_pool_count, drained);
+		"ep_pool: STORED key=%s count=%d drained=%ld",
+		key, ep_pool_count, drained);
 }
 #endif /* __MACOS9__ */
 
@@ -153,8 +175,8 @@ static void mfs_close(struct macos9_fetch_ctx *c) {
 		 * closed regardless of keep_alive_ok. That means fixes91 paid
 		 * 44 fresh OTConnects per MacTrove page (~the dial-up feel).
 		 * The real eligibility test is just keep_alive_ok && !aborted. */
-		if (c->keep_alive_ok && !c->aborted) {
-			ep_pool_return(c->ep);
+		if (c->keep_alive_ok && !c->aborted && c->pool_key[0] != '\0') {
+			ep_pool_return(c->pool_key, c->ep);
 		} else {
 			OTSndOrderlyDisconnect(c->ep);
 			OTCloseProvider(c->ep);
@@ -167,83 +189,192 @@ static void mfs_close(struct macos9_fetch_ctx *c) {
 static int mfs_open(struct macos9_fetch_ctx *c) {
 #ifdef __MACOS9__
 	OSStatus e; OTConfigurationRef cfg; DNSAddress dns; TCall call;
-	char pstr[64], req[2048]; const char *u; OTResult r;
+	char target[96];        /* host:port for OTInitDNSAddress + pool key */
+	char path_buf[1024];    /* path?query for direct-mode request line */
+	char req[2048];
+	OTResult r;
+	lwc_string *scheme_lwc;
 	lwc_string *host_lwc;
+	lwc_string *port_lwc;
+	lwc_string *path_lwc;
+	lwc_string *query_lwc;
+	const char *scheme_str;
 	const char *host_str;
 	size_t host_len;
+	size_t scheme_len;
+	int port_num;
+	int use_proxy;
 	EndpointRef pooled;
+	const char *u_full;
+
+	scheme_lwc = NULL;
+	host_lwc = NULL;
+	port_lwc = NULL;
+	path_lwc = NULL;
+	query_lwc = NULL;
+
+	scheme_lwc = nsurl_get_component(c->url, NSURL_SCHEME);
+	host_lwc = nsurl_get_component(c->url, NSURL_HOST);
+	if (scheme_lwc == NULL || host_lwc == NULL) {
+		MS_LOG("mfs_open: missing scheme/host");
+		goto fail_unref;
+	}
+
+	scheme_str = lwc_string_data(scheme_lwc);
+	scheme_len = lwc_string_length(scheme_lwc);
+	host_str = lwc_string_data(host_lwc);
+	host_len = lwc_string_length(host_lwc);
+
+	/* fixes94 — only HTTPS routes through the proxy (we have no TLS).
+	 * Plain HTTP goes direct to the origin, saving the round-trip to
+	 * the Hetzner box for ~every fetch on http-only sites. */
+	use_proxy = (scheme_len == 5 && strncmp(scheme_str, "https", 5) == 0);
+
+	if (use_proxy) {
+		sprintf(target, "%s:%d", PROXY_H, PROXY_P);
+		strcpy(c->pool_key, "PROXY");
+	} else {
+		port_lwc = nsurl_get_component(c->url, NSURL_PORT);
+		if (port_lwc != NULL && lwc_string_length(port_lwc) > 0) {
+			port_num = atoi(lwc_string_data(port_lwc));
+			if (port_num <= 0 || port_num > 65535) port_num = 80;
+		} else {
+			port_num = 80;
+		}
+		if (host_len + 8 >= sizeof(target)) {
+			MS_LOG("mfs_open: host too long");
+			goto fail_unref;
+		}
+		sprintf(target, "%.*s:%d", (int)host_len, host_str, port_num);
+		strncpy(c->pool_key, target, POOL_KEY_LEN - 1);
+		c->pool_key[POOL_KEY_LEN - 1] = '\0';
+	}
 
 	MS_LOG("mfs_open: enter");
-	pooled = ep_pool_take();
+	pooled = ep_pool_take(c->pool_key);
 	if (pooled != NULL) {
 		c->ep = pooled;
 		OTSetSynchronous(c->ep);
 		OTSetBlocking(c->ep);
-		MS_LOG("mfs_open: reused pooled endpoint");
 	} else {
 		cfg = OTCreateConfiguration("tcp");
-		if(!cfg) { MS_LOG("mfs_open: OTCreateConfig FAIL"); return 0; }
+		if (!cfg) {
+			macsurf_debug_log_writef(
+				"mfs_open: OTCreateConfig FAIL target=%s", target);
+			goto fail_unref;
+		}
 		c->ep = OTOpenEndpointInContext(cfg, 0, NULL, &e, macos9_ot_context);
-		if(e!=noErr||!c->ep) {
-			macsurf_debug_log_writef("mfs_open: OTOpenEndpoint err=%d",
-					(int)e);
-			return 0;
+		if (e != noErr || !c->ep) {
+			macsurf_debug_log_writef(
+				"mfs_open: OTOpenEndpoint err=%d target=%s",
+				(int)e, target);
+			goto fail_unref;
 		}
-		OTSetSynchronous(c->ep); OTSetBlocking(c->ep);
-		if(OTBind(c->ep,NULL,NULL)!=noErr) {
+		OTSetSynchronous(c->ep);
+		OTSetBlocking(c->ep);
+		if (OTBind(c->ep, NULL, NULL) != noErr) {
 			MS_LOG("mfs_open: OTBind FAIL");
-			return 0;
+			goto fail_unref;
 		}
-		sprintf(pstr,"%s:%d",PROXY_H,PROXY_P); OTMemzero(&call,sizeof(TCall));
-		call.addr.buf=(UInt8*)&dns; call.addr.len = (short)OTInitDNSAddress(&dns,pstr);
-		MS_LOG("mfs_open: OTConnect start");
-		if(OTConnect(c->ep,&call,NULL)!=noErr) {
-			MS_LOG("mfs_open: OTConnect FAIL");
-			return 0;
+		OTMemzero(&call, sizeof(TCall));
+		call.addr.buf = (UInt8 *)&dns;
+		call.addr.len = (short)OTInitDNSAddress(&dns, target);
+		macsurf_debug_log_writef("mfs_open: OTConnect %s", target);
+		if (OTConnect(c->ep, &call, NULL) != noErr) {
+			macsurf_debug_log_writef(
+				"mfs_open: OTConnect FAIL target=%s", target);
+			goto fail_unref;
 		}
-		MS_LOG("mfs_open: OTConnect OK");
 	}
 
-	u=nsurl_access(c->url);
-	macsurf_debug_log_writef("mfs_open: GET %s", u ? u : "(null)");
-
-	/* Extract Host: header value from the URL. Required by HTTP/1.1
-	 * origin servers and increasingly by HTTP/1.0 ones too -- many
-	 * proxies forward without injecting it, so the absence used to
-	 * silently kill requests to virtual-hosted sites. */
-	host_str = "";
-	host_len = 0;
-	host_lwc = nsurl_get_component(c->url, NSURL_HOST);
-	if (host_lwc != NULL) {
-		host_str = lwc_string_data(host_lwc);
-		host_len = lwc_string_length(host_lwc);
+	/* Build the request line.
+	 *   proxy: absolute-form  (GET http://example.com/foo HTTP/1.1)
+	 *   direct: origin-form   (GET /foo HTTP/1.1)
+	 * In both cases Host: holds the origin hostname. */
+	if (use_proxy) {
+		u_full = nsurl_access(c->url);
+		macsurf_debug_log_writef("mfs_open: GET (proxy) %s",
+				u_full ? u_full : "(null)");
+		sprintf(req,
+			"GET %s HTTP/1.1\r\n"
+			"Host: %.*s\r\n"
+			"User-Agent: MacSurf/0.2\r\n"
+			"Accept: */*\r\n"
+			"Connection: keep-alive\r\n\r\n",
+			u_full, (int)host_len, host_str);
+	} else {
+		path_lwc = nsurl_get_component(c->url, NSURL_PATH);
+		query_lwc = nsurl_get_component(c->url, NSURL_QUERY);
+		{
+			const char *p_str = NULL;
+			size_t p_len = 0;
+			const char *q_str = NULL;
+			size_t q_len = 0;
+			if (path_lwc != NULL && lwc_string_length(path_lwc) > 0) {
+				p_str = lwc_string_data(path_lwc);
+				p_len = lwc_string_length(path_lwc);
+			}
+			if (query_lwc != NULL && lwc_string_length(query_lwc) > 0) {
+				q_str = lwc_string_data(query_lwc);
+				q_len = lwc_string_length(query_lwc);
+			}
+			if (p_str == NULL) {
+				strcpy(path_buf, "/");
+			} else if (q_str == NULL) {
+				if (p_len >= sizeof(path_buf)) p_len = sizeof(path_buf) - 1;
+				memcpy(path_buf, p_str, p_len);
+				path_buf[p_len] = '\0';
+			} else {
+				size_t total = p_len + 1 + q_len;
+				if (total >= sizeof(path_buf)) total = sizeof(path_buf) - 1;
+				sprintf(path_buf, "%.*s?%.*s",
+					(int)p_len, p_str,
+					(int)q_len, q_str);
+				path_buf[sizeof(path_buf) - 1] = '\0';
+				(void)total;
+			}
+		}
+		macsurf_debug_log_writef("mfs_open: GET (direct) %s %s",
+				target, path_buf);
+		sprintf(req,
+			"GET %s HTTP/1.1\r\n"
+			"Host: %.*s\r\n"
+			"User-Agent: MacSurf/0.2\r\n"
+			"Accept: */*\r\n"
+			"Connection: keep-alive\r\n\r\n",
+			path_buf, (int)host_len, host_str);
 	}
 
-	/* fixes91 — HTTP/1.1 with explicit keep-alive. The Go proxy
-	 * (proxy/proxy.go) is net/http-based, which honours keep-alive
-	 * by default. Reusing the front-side TCP connection collapses
-	 * ~44 OTConnect handshakes per page load to ~5–8. */
-	sprintf(req,
-		"GET %s HTTP/1.1\r\n"
-		"Host: %.*s\r\n"
-		"User-Agent: MacSurf/0.2\r\n"
-		"Accept: */*\r\n"
-		"Connection: keep-alive\r\n\r\n",
-		u,
-		(int)host_len, host_str);
+	r = OTSnd(c->ep, req, (long)strlen(req), 0);
+	if (r < 0) {
+		macsurf_debug_log_writef("mfs_open: OTSnd err=%ld", (long)r);
+		goto fail_unref;
+	}
+	OTSetNonBlocking(c->ep);
 
+	if (scheme_lwc != NULL) lwc_string_unref(scheme_lwc);
 	if (host_lwc != NULL) lwc_string_unref(host_lwc);
+	if (port_lwc != NULL) lwc_string_unref(port_lwc);
+	if (path_lwc != NULL) lwc_string_unref(path_lwc);
+	if (query_lwc != NULL) lwc_string_unref(query_lwc);
+	return 1;
 
-	MS_LOG("mfs_open: OTSnd start");
-	r=OTSnd(c->ep,req,(long)strlen(req),0);
-	if(r<0) {
-		macsurf_debug_log_writef("mfs_open: OTSnd err=%ld",
-				(long)r);
-		return 0;
+fail_unref:
+	/* fixes94 — if we opened an endpoint but failed before OTSnd,
+	 * close it immediately so mfs_close doesn't try to pool a
+	 * half-built connection (pool_key may already be set). */
+	if (c->ep != NULL) {
+		OTSndOrderlyDisconnect(c->ep);
+		OTCloseProvider(c->ep);
+		c->ep = NULL;
 	}
-	macsurf_debug_log_writef("mfs_open: OTSnd OK (%ld bytes)",
-			(long)r);
-	OTSetNonBlocking(c->ep); return 1;
+	c->keep_alive_ok = 0;
+	if (scheme_lwc != NULL) lwc_string_unref(scheme_lwc);
+	if (host_lwc != NULL) lwc_string_unref(host_lwc);
+	if (port_lwc != NULL) lwc_string_unref(port_lwc);
+	if (path_lwc != NULL) lwc_string_unref(path_lwc);
+	if (query_lwc != NULL) lwc_string_unref(query_lwc);
+	return 0;
 #else
 	return 0;
 #endif
