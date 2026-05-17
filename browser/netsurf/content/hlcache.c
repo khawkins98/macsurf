@@ -197,7 +197,7 @@ static void hlcache_content_callback(struct content *c, content_msg msg,
 	nserror error = NSERROR_OK;
 	hlcache_event event;
 
-	MS_LOG("hlcache notifying html handler");
+	/* fixes97: dropped — fires for every broadcast forward, dominant. */
 
 	memset(&event, 0, sizeof(event));
 	event.type = msg;
@@ -270,8 +270,8 @@ static nserror hlcache_find_content(hlcache_retrieval_ctx *ctx,
 		if (entry == NULL)
 			return NSERROR_NOMEM;
 
-		/* Create content using llhandle */
-		MS_LOG("hlcache creating content");
+		/* Create content using llhandle. fixes97: success-path
+		 * MS_LOGs dropped; the failure log stays for diagnostics. */
 		entry->content = content_factory_create_content(ctx->llcache,
 				ctx->child.charset, ctx->child.quirks,
 				effective_type);
@@ -279,8 +279,6 @@ static nserror hlcache_find_content(hlcache_retrieval_ctx *ctx,
 			MS_LOG("hlcache content create FAILED");
 			free(entry);
 			return NSERROR_NOMEM;
-		} else {
-			MS_LOG("hlcache content created OK");
 		}
 
 		/* Insert into cache */
@@ -295,8 +293,8 @@ static nserror hlcache_find_content(hlcache_retrieval_ctx *ctx,
 
 		hlcache->miss_count++;
 	} else {
-		MS_LOG("hlcache found existing");
-		/* Found a suitable content: no longer need low-level handle */
+		/* Found a suitable content: no longer need low-level handle.
+		 * fixes97: cache-hit MS_LOG dropped (very frequent). */
 		llcache_handle_release(ctx->llcache);
 		hlcache->hit_count++;
 	}
@@ -314,7 +312,7 @@ static nserror hlcache_find_content(hlcache_retrieval_ctx *ctx,
 		content_status status = content_get_status(ctx->handle);
 
 		if (status == CONTENT_STATUS_LOADING) {
-			MS_LOG("hl cu LOADING");
+			/* fixes97: per-content MS_LOG dropped. */
 			event.type = CONTENT_MSG_LOADING;
 			ctx->handle->cb(ctx->handle, &event, ctx->handle->pw);
 		} else if (status == CONTENT_STATUS_READY) {
@@ -368,9 +366,8 @@ static nserror hlcache_migrate_ctx(hlcache_retrieval_ctx *ctx,
 	    hlcache_type_is_acceptable(effective_type,
 				       ctx->accepted_types,
 				       &type)) {
-		MS_LOG("migrate type OK");
+		/* fixes97: migrate trace dropped. */
 		error = hlcache_find_content(ctx, effective_type);
-		MS_LOG("migrate find_content done");
 		if (error != NSERROR_OK && error != NSERROR_NEED_DATA) {
 			if (ctx->handle->cb != NULL) {
 				hlcache_event hlevent;
@@ -450,13 +447,14 @@ hlcache_llcache_callback(llcache_handle *handle,
 	lwc_string *effective_type = NULL;
 	nserror error;
 
-	MS_LOG("hlcache llcache cb");
+	/* fixes97: per-callback MS_LOGs dropped. They fired on every
+	 * llcache event for every consumer — heaviest medium-noise
+	 * contributor after llcache "fetch HEADER" / "fetch DATA". */
 
 	assert(ctx->llcache == handle);
 
 	switch (event->type) {
 	case LLCACHE_EVENT_GOT_CERTS:
-		MS_LOG("cb GOT_CERTS");
 		/* Pass them on upward */
 		if (ctx->handle->cb != NULL) {
 			hlcache_event hlevent;
@@ -468,7 +466,6 @@ hlcache_llcache_callback(llcache_handle *handle,
 		}
 		break;
 	case LLCACHE_EVENT_HAD_HEADERS:
-		MS_LOG("cb HAD_HEADERS");
 		error = mimesniff_compute_effective_type(llcache_handle_get_header(handle, "Content-Type"), NULL, 0,
 				ctx->flags & HLCACHE_RETRIEVE_SNIFF_TYPE,
 				ctx->accepted_types == CONTENT_IMAGE,
@@ -477,7 +474,6 @@ hlcache_llcache_callback(llcache_handle *handle,
 			/* If the sniffer was successful or failed to find
 			 * a Content-Type header when sniffing was
 			 * prohibited, we must migrate the retrieval context. */
-			MS_LOG("cb hdr migrate");
 			error = hlcache_migrate_ctx(ctx, effective_type);
 
 			lwc_string_unref(effective_type);
@@ -494,7 +490,6 @@ hlcache_llcache_callback(llcache_handle *handle,
 
 		break;
 	case LLCACHE_EVENT_HAD_DATA:
-		MS_LOG("cb HAD_DATA");
 		error = mimesniff_compute_effective_type(llcache_handle_get_header(handle, "Content-Type"),
 				event->data.data.buf, event->data.data.len,
 				ctx->flags & HLCACHE_RETRIEVE_SNIFF_TYPE,
@@ -504,7 +499,6 @@ hlcache_llcache_callback(llcache_handle *handle,
 			assert(0 && "MIME sniff failed with data");
 		}
 
-		MS_LOG("cb data migrate");
 		error = hlcache_migrate_ctx(ctx, effective_type);
 
 		lwc_string_unref(effective_type);
@@ -513,7 +507,6 @@ hlcache_llcache_callback(llcache_handle *handle,
 
 		break;
 	case LLCACHE_EVENT_DONE:
-		MS_LOG("cb DONE");
 		/* DONE event before we could determine the effective MIME type.
 		 */
 		error = mimesniff_compute_effective_type(llcache_handle_get_header(handle, "Content-Type"),

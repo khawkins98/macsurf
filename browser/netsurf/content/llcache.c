@@ -3128,8 +3128,9 @@ static void llcache_fetch_callback(const fetch_msg *msg, void *p)
 
 	switch (msg->type) {
 	case FETCH_HEADER:
-		/* Received a fetch header */
-		MS_LOG("fetch HEADER");
+		/* Received a fetch header. fixes97: per-header-line MS_LOG
+		 * dropped — fired 10+ times per response, dominant log
+		 * volume contributor. */
 		object->fetch.state = LLCACHE_FETCH_HEADERS;
 
 		error = llcache_fetch_process_header(object,
@@ -3164,8 +3165,7 @@ static void llcache_fetch_callback(const fetch_msg *msg, void *p)
 
 	/* Normal 2xx state machine */
 	case FETCH_DATA:
-		/* Received some data */
-		MS_LOG("fetch DATA");
+		/* Received some data. fixes97: per-chunk MS_LOG dropped. */
 		error = llcache_fetch_process_data(object,
 				msg->data.header_or_data.buf,
 				msg->data.header_or_data.len);
@@ -3587,10 +3587,8 @@ static nserror llcache_object_notify_users(llcache_object *object)
 				objstate > LLCACHE_FETCH_DATA) {
 			handle->state = LLCACHE_FETCH_COMPLETE;
 
-			/* Emit DONE event */
+			/* Emit DONE event. fixes97: per-user MS_LOG dropped. */
 			event.type = LLCACHE_EVENT_DONE;
-
-			MS_LOG("llcache event done sent");
 			error = handle->cb(handle, &event, handle->pw);
 			if (user->queued_for_delete) {
 				next_user = user->next;

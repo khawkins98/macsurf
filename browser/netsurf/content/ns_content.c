@@ -769,7 +769,9 @@ void content_broadcast(struct content *c, content_msg msg,
 	struct content_user *user, *next;
 	assert(c);
 
-	MS_LOG("content broadcast");
+	/* fixes97: per-broadcast MS_LOG dropped. The READY transition is
+	 * useful but fires once per content load — we log content_broadcast
+	 * READY only and let the rest be silent. */
 	if (msg == CONTENT_MSG_READY) {
 		MS_LOG("content broadcast READY");
 	}
