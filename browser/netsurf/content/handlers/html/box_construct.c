@@ -291,6 +291,12 @@ box_get_style(html_content *c,
 	ctx.universal = c->universal;
 	ctx.root_style = root_style;
 	ctx.parent_style = parent_style;
+	/* fixes130 — propagate dynamic pseudo-class state into the
+	 * select context so :hover / :active / :focus match correctly
+	 * during this cascade pass. */
+	ctx.dyn_hover_node = c->dyn_hover_node;
+	ctx.dyn_active_node = c->dyn_active_node;
+	ctx.dyn_focus_node = c->dyn_focus_node;
 
 	/* Select style for element */
 	styles = nscss_get_style(&ctx, n, &c->media, &c->unit_len_ctx,

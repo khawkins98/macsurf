@@ -1537,12 +1537,43 @@ css_error node_is_visited(void *pw, void *node, bool *match)
  *
  * \post \a match will contain true if the node matches and false otherwise.
  */
+/* fixes130: shared helper for :hover/:active/:focus.
+ * Returns true if `node` is `target` or any of its ancestors,
+ * so that `.parent:hover .child` matches when child is the deepest
+ * hit (CSS spec: :hover applies to the element and all ancestors).
+ *
+ * The starting `node` is a borrowed reference. Each parent fetched
+ * via dom_node_get_parent_node is refed by libdom; we unref it
+ * after we either match or step to its parent. */
+static bool dyn_node_matches(dom_node *node, dom_node *target)
+{
+	dom_node *cursor = node;
+	bool own_cursor = false;
+	while (cursor != NULL) {
+		dom_node *parent = NULL;
+		if (cursor == target) {
+			if (own_cursor) dom_node_unref(cursor);
+			return true;
+		}
+		if (dom_node_get_parent_node(cursor, &parent) != DOM_NO_ERR) {
+			if (own_cursor) dom_node_unref(cursor);
+			return false;
+		}
+		if (own_cursor) dom_node_unref(cursor);
+		cursor = parent;
+		own_cursor = (parent != NULL);
+	}
+	return false;
+}
+
 css_error node_is_hover(void *pw, void *node, bool *match)
 {
-	/** \todo Support hovering */
-
+	nscss_select_ctx *ctx = (nscss_select_ctx *)pw;
 	*match = false;
-
+	if (ctx == NULL || ctx->dyn_hover_node == NULL || node == NULL)
+		return CSS_OK;
+	*match = dyn_node_matches((dom_node *)node,
+			(dom_node *)ctx->dyn_hover_node);
 	return CSS_OK;
 }
 
@@ -1558,10 +1589,13 @@ css_error node_is_hover(void *pw, void *node, bool *match)
  */
 css_error node_is_active(void *pw, void *node, bool *match)
 {
-	/** \todo Support active nodes */
-
+	/* fixes130: mirror of node_is_hover for :active. */
+	nscss_select_ctx *ctx = (nscss_select_ctx *)pw;
 	*match = false;
-
+	if (ctx == NULL || ctx->dyn_active_node == NULL || node == NULL)
+		return CSS_OK;
+	*match = dyn_node_matches((dom_node *)node,
+			(dom_node *)ctx->dyn_active_node);
 	return CSS_OK;
 }
 
@@ -1577,10 +1611,13 @@ css_error node_is_active(void *pw, void *node, bool *match)
  */
 css_error node_is_focus(void *pw, void *node, bool *match)
 {
-	/** \todo Support focussed nodes */
-
+	/* fixes130: mirror of node_is_hover for :focus. */
+	nscss_select_ctx *ctx = (nscss_select_ctx *)pw;
 	*match = false;
-
+	if (ctx == NULL || ctx->dyn_focus_node == NULL || node == NULL)
+		return CSS_OK;
+	*match = dyn_node_matches((dom_node *)node,
+			(dom_node *)ctx->dyn_focus_node);
 	return CSS_OK;
 }
 
