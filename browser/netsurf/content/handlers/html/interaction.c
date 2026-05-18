@@ -1343,6 +1343,33 @@ mouse_action_drag_none(html_content *html,
 		return res;
 	}
 
+	/* fixes130: dynamic pseudo-class state tracking. Compare the
+	 * node at point to our cached hover/active state; if either
+	 * changed, update and trigger a reformat so the cascade picks
+	 * up the new state via node_is_hover / node_is_active. First
+	 * cut uses brute-force whole-page reformat; future round can
+	 * scope the restyle to the affected subtree. */
+	{
+		bool active_state = (mouse & (BROWSER_MOUSE_PRESS_1 |
+				BROWSER_MOUSE_PRESS_2 |
+				BROWSER_MOUSE_HOLDING_1 |
+				BROWSER_MOUSE_HOLDING_2)) != 0;
+		dom_node *want_hover = mas.node;
+		dom_node *want_active = active_state ? mas.node : NULL;
+		bool changed = false;
+		if (want_hover != html->dyn_hover_node) {
+			html->dyn_hover_node = want_hover;
+			changed = true;
+		}
+		if (want_active != html->dyn_active_node) {
+			html->dyn_active_node = want_active;
+			changed = true;
+		}
+		if (changed && bw != NULL) {
+			browser_window_schedule_reformat(bw);
+		}
+	}
+
 	if (mouse & BROWSER_MOUSE_CLICK_4) {
 		mas.result.action = ACTION_BACK;
 	} else if (mouse & BROWSER_MOUSE_CLICK_5) {

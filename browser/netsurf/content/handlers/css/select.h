@@ -39,6 +39,14 @@ typedef struct nscss_select_ctx
 	lwc_string *universal;
 	const css_computed_style *root_style;
 	const css_computed_style *parent_style;
+	/* fixes130: dynamic pseudo-class state. The select-handler
+	 * callbacks node_is_hover/active/focus compare candidate DOM
+	 * nodes to these pointers. Set per-cascade in box_construct
+	 * from html_content's tracked state. NULL means no element
+	 * is currently in that state. */
+	void *dyn_hover_node;
+	void *dyn_active_node;
+	void *dyn_focus_node;
 } nscss_select_ctx;
 
 css_stylesheet *nscss_create_inline_style(const uint8_t *data, size_t len,

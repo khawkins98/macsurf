@@ -203,6 +203,15 @@ typedef struct html_content {
 	/** Current input focus target */
 	union html_focus_owner focus_owner;
 
+	/* fixes130: dynamic pseudo-class state. The select.c callbacks
+	 * (node_is_hover/active/focus) compare a candidate DOM node to
+	 * these pointers when matching :hover / :active / :focus
+	 * selectors. Updated by html_mouse_action and focus-tracking
+	 * paths; nullable. */
+	dom_node *dyn_hover_node;
+	dom_node *dyn_active_node;
+	dom_node *dyn_focus_node;
+
 	/** HTML content's own text selection object */
 	struct selection *sel;
 
