@@ -579,10 +579,12 @@ static void mfs_parse_headers(struct macos9_fetch_ctx *c) {
 			c->status, c->redirect_url);
 		c->state = MFS_NOTIFIED;
 		c->keep_alive_ok = 0;
-		/* fixes102 — release the slot (matches curl.c). h_buf will
-		 * be freed by macos9_http_free, so don't double-free here.
-		 * Save parent before fetch_free clears c via ops.free. */
+		/* fixes103 — remove from fetch_ring AND free. Both calls
+		 * are required (see comment in macos9_http_poll). h_buf
+		 * is freed via ops.free; no double-free. Save parent
+		 * before fetch_free destroys c. */
 		parent_save = c->parent;
+		fetch_remove_from_queues(parent_save);
 		fetch_free(parent_save);
 		return;
 	}
@@ -688,7 +690,15 @@ static void macos9_http_poll(lwc_string *s) {
 			fetch_msg m; m.type=FETCH_ERROR; m.data.error=c->err;
 			c->state=MFS_NOTIFIED; fetch_send_callback(&m,c->parent);
 			macsurf_debug_log_writef("http: fail body_bytes=%ld status=%d", c->body_bytes, c->status);
-			/* fixes102 — fetcher self-frees, matching curl.c. */
+			/* fixes103 — both calls, matching every reference
+			 * fetcher (file.c:828-829, resource.c:469-470,
+			 * about.c:731-732, data.c:314-315, css_fetcher.c,
+			 * javascript/fetcher.c, curl.c). fetch_free does NOT
+			 * call RING_REMOVE on its own; without
+			 * fetch_remove_from_queues the freed struct stays in
+			 * fetch_ring as a dangling pointer and the next
+			 * RING_GETSIZE walks freed memory. */
+			fetch_remove_from_queues(c->parent);
 			fetch_free(c->parent);
 		}
 		else if(c->state==MFS_DONE) {
@@ -704,18 +714,17 @@ static void macos9_http_poll(lwc_string *s) {
 				c->ep = NULL;
 			}
 #endif
-			/* fixes102 — release the fetcher slot. NetSurf core
-			 * does NOT call ops.free on its own — every reference
-			 * fetcher (curl.c, file.c, data.c, resource.c,
-			 * css_fetcher.c, javascript/fetcher.c, about.c) self-
-			 * invokes fetch_free after the terminal callback.
-			 * Without this, our slot stays in MFS_NOTIFIED forever,
-			 * the slot table walks linearly through 0..MAX_F, and
-			 * NetSurf's internal per-content / per-bw active-fetch
-			 * caps trip after a handful of pages — observed as
-			 * "stuck after about three pages." fetch_free calls
-			 * macos9_http_free which sets state=MFS_IDLE; don't
-			 * touch c after this point. */
+			/* fixes103 — release the fetcher slot completely.
+			 * fetch_free alone is NOT enough: it does not remove
+			 * the entry from fetch_ring, leaving a dangling
+			 * pointer that the next RING_GETSIZE walks as freed
+			 * memory. Every reference fetcher (file.c:828-829,
+			 * resource.c:469-470, about.c:731-732, data.c:314-315,
+			 * css_fetcher.c, javascript/fetcher.c, curl.c) calls
+			 * fetch_remove_from_queues FIRST, then fetch_free. Do
+			 * the same. After this point c (and c->parent) are
+			 * freed memory — don't touch them. */
+			fetch_remove_from_queues(c->parent);
 			fetch_free(c->parent);
 		}
 	}
