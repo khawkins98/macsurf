@@ -3604,9 +3604,23 @@ bool layout_block_context(
 		if (css_w_type != CSS_WIDTH_SET) {
 			temp_width = AUTO;
 			restore_width = true;
+		} else if (css_u_w == CSS_UNIT_PX) {
+			/* fixes128: CSS gave an absolute pixel width; trust
+			 * it instead of whatever flex/block layout decided.
+			 * Confirmed via fixes127 diag that the cascade
+			 * correctly delivers HTML width attr as CSS_WIDTH_SET
+			 * (e.g. mactrove logo: 409600 css_fixed = 400px),
+			 * but layout was substituting natural width (1058)
+			 * before reaching this object branch. Convert
+			 * css_fixed to int px via FIXTOINT (>> 10). */
+			temp_width = FIXTOINT(css_v_w);
+			restore_width = true;
 		}
 		if (css_h_type != CSS_HEIGHT_SET) {
 			block->height = AUTO;
+		} else if (css_u_h == CSS_UNIT_PX) {
+			/* fixes128: symmetric for height. */
+			block->height = FIXTOINT(css_v_h);
 		}
 		if (!layout_block_object(block))
 			return false;
