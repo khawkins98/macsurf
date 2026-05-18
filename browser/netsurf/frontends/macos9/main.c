@@ -129,6 +129,23 @@ static void macos9_handle_menu(short menu_id, short item) {
 				nsurl_unref(home);
 			}
 		} break;
+		case ITEM_FILE_LOCATION: {
+			/* fixes109 — Cmd+L focuses the URL bar and selects all so
+			 * the next keystroke replaces the existing URL. Was a
+			 * dead menu entry before this fix (menu accepted Cmd+L
+			 * via the "/L" suffix but no handler ran, so the user
+			 * got no visible response). */
+			WindowRef wfront = FrontWindow();
+			struct gui_window *gwl = wfront ? macos9_find_window(wfront) : NULL;
+			if (gwl != NULL) {
+				extern void macos9_window_te_activate_url(struct gui_window *);
+				macos9_window_te_activate_url(gwl);
+				if (gwl->url_te != NULL) {
+					SetPortWindowPort(gwl->window);
+					TESetSelect(0, 32767, gwl->url_te);
+				}
+			}
+		} break;
 		case ITEM_FILE_QUIT:
 			macos9_done = (bool)1;
 			break;
