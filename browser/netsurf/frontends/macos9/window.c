@@ -255,7 +255,45 @@ struct gui_window *macos9_create_initial_window(void) {
 
 static struct gui_window *macos9_window_create(struct browser_window *bw, struct gui_window *ex, gui_window_create_flags f) {
 	struct gui_window *g=(struct gui_window *)calloc(1,sizeof(*g)); Rect b; short x; if(!g) return NULL;
-	g->bw=bw; SetRect(&b, 40, 50, 640, 470); if(CreateNewWindow(6, 0x1F, &b, &g->window)!=0) { free(g); return NULL; }
+	/* fixes124: open at desktop-class default size (1024x768)
+	 * so real-window-width media queries naturally match the
+	 * desktop branch on modern responsive sites. Clamped to
+	 * the actual screen bounds with margin so a G3 iBook at
+	 * 800x600 still gets a usable window without overflow.
+	 * Uses Carbon-safe GetQDGlobalsScreenBits (qd globals
+	 * struct is unavailable to Carbon apps). */
+	{
+		BitMap bm;
+		Rect sb;
+		short sw;
+		short sh;
+		short want_w;
+		short want_h;
+		short left;
+		short top;
+		short right;
+		short bot;
+		GetQDGlobalsScreenBits(&bm);
+		sb = bm.bounds;
+		sw = (short)(sb.right - sb.left);
+		sh = (short)(sb.bottom - sb.top);
+		want_w = 1024;
+		want_h = 768;
+		left = 40;
+		top = 50;
+		if ((short)(sw - left - 20) < want_w) {
+			want_w = (short)(sw - left - 20);
+		}
+		if ((short)(sh - top - 30) < want_h) {
+			want_h = (short)(sh - top - 30);
+		}
+		if (want_w < 480) want_w = 480;
+		if (want_h < 360) want_h = 360;
+		right = (short)(left + want_w);
+		bot = (short)(top + want_h);
+		SetRect(&b, left, top, right, bot);
+	}
+	g->bw=bw; if(CreateNewWindow(6, 0x1F, &b, &g->window)!=0) { free(g); return NULL; }
 	SetWRefCon(g->window,(long)g); SetPortWindowPort(g->window); SetWTitle(g->window,(const unsigned char*)"\pMacSurf");
 	g->next=window_list; window_list=g; 
 	x=4; SetRect(&b,x,8,(short)(x+60),30); g->back_btn=NewControl(g->window,&b,(const unsigned char*)"\pBack",1,0,0,1,368,(long)g); x=(short)(x+64);

@@ -359,21 +359,17 @@ static void html_get_dimensions(html_content *htmlc)
 	w = css_unit_device2css_px(INTTOFIX(w), device_dpi);
 	h = css_unit_device2css_px(INTTOFIX(h), device_dpi);
 
-	/* fixes122: MacSurf lies to CSS media queries with a fixed
-	 * desktop-class viewport width. Sites use
-	 * `@media (max-width: 720px)` to swap in mobile layouts that
-	 * crush logos and hide desktop chrome; on a real desktop
-	 * browser with a small window, we want the DESKTOP rules to
-	 * apply — the user can scroll horizontally rather than get a
-	 * crushed mobile design. Layout (unit_len_ctx.viewport_width)
-	 * still sees the real window width so percentage widths and
-	 * vw units render correctly. */
-	{
-		css_fixed desktop_w = INTTOFIX(1024);
-		css_fixed desktop_h = INTTOFIX(768);
-		htmlc->media.width  = (w < desktop_w) ? desktop_w : w;
-		htmlc->media.height = (h < desktop_h) ? desktop_h : h;
-	}
+	/* fixes124: reverted fixes122's media-query viewport lie.
+	 * Atari and RISC OS NetSurf frontends report real window
+	 * dimensions to libcss for `@media` matching. Lying about
+	 * the viewport caused author CSS to apply desktop container
+	 * widths (max-width:1100px) to physical space that didn't
+	 * exist, collapsing image heights into "smear" rendering.
+	 * The real fix is for MacSurf to open windows at a desktop-
+	 * class default size (done in window.c) so real-window-width
+	 * media queries naturally match the desktop branch. */
+	htmlc->media.width  = w;
+	htmlc->media.height = h;
 	htmlc->unit_len_ctx.viewport_width  = w;
 	htmlc->unit_len_ctx.viewport_height = h;
 	htmlc->unit_len_ctx.device_dpi = device_dpi;
