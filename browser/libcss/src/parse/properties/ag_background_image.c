@@ -41,6 +41,38 @@ css_error css__parse_background_image(css_language *c,
 	const css_token *token;
 	bool match;
 
+	/* fixes129: bridge standard CSS `background-image: linear-gradient(...)`
+	 * (and `radial-gradient(...)`) to the existing -macsurf-gradient
+	 * parser. Mactrove and most modern themes use the standard syntax
+	 * heavily for button chrome and header bevels. The redraw path
+	 * already paints whatever lands in the MACSURF_GRADIENT slot
+	 * (fixes47-49); we just need the parser to recognise the standard
+	 * form and route it there. Peek the first token: if it's a FUNCTION
+	 * matching linear-gradient or radial-gradient, defer to the existing
+	 * gradient parser, then emit a placeholder BACKGROUND_IMAGE_NONE so
+	 * the property has a valid value. Anything else falls through to the
+	 * stock IDENT/URI path below. */
+	token = parserutils_vector_peek(vector, *ctx);
+	if (token != NULL && token->type == CSS_TOKEN_FUNCTION) {
+		bool is_linear = false;
+		bool is_radial = false;
+		(void)lwc_string_caseless_isequal(token->idata,
+				c->strings[LINEAR_GRADIENT], &is_linear);
+		(void)lwc_string_caseless_isequal(token->idata,
+				c->strings[RADIAL_GRADIENT], &is_radial);
+		if (is_linear || is_radial) {
+			error = css__parse_macsurf_gradient(c, vector, ctx,
+					result);
+			if (error != CSS_OK) {
+				*ctx = orig_ctx;
+				return error;
+			}
+			return css__stylesheet_style_appendOPV(result,
+					CSS_PROP_BACKGROUND_IMAGE,
+					0, BACKGROUND_IMAGE_NONE);
+		}
+	}
+
 	token = parserutils_vector_iterate(vector, ctx);
 	if ((token == NULL) || ((token->type != CSS_TOKEN_IDENT) && (token->type != CSS_TOKEN_URI))) {
 		*ctx = orig_ctx;
