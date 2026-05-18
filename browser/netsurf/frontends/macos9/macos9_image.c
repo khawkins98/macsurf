@@ -646,6 +646,29 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 				"img aspect-fix: nat=%dx%d req=%dx%d -> %dx%d",
 				nat_w, nat_h, dst_w, dst_h, dst_w, new_h);
 			dst_h = new_h;
+		} else if (nat_w > 0 && nat_h > 0 &&
+				dst_w == nat_w && dst_h != nat_h &&
+				dst_h > 0) {
+			/* fixes126: symmetric mirror of fixes111 above.
+			 * NetSurf core's layout produces requests where
+			 * the OPPOSITE dim is stuck at intrinsic — width
+			 * is unchanged from natural while height was
+			 * scaled by CSS (e.g. mactrove logo: nat 1058x245,
+			 * CSS height resolves to 92, layout passes
+			 * 1058x92 to the plotter). Without correction the
+			 * QuickDraw CopyBits scales source 1058x245 into
+			 * dst 1058x92 = vertical squash / smear. Detect
+			 * the pattern and rescale width to preserve
+			 * aspect ratio. */
+			int new_w = (int)(((long)dst_h * (long)nat_w) /
+					(long)nat_h);
+			if (new_w > 0) {
+				macsurf_debug_log_writef(
+					"img aspect fix126: nat=%dx%d req=%dx%d -> %dx%d",
+					nat_w, nat_h, dst_w, dst_h,
+					new_w, dst_h);
+				dst_w = new_w;
+			}
 		} else if (dst_w != nat_w || dst_h != nat_h) {
 			macsurf_debug_log_writef(
 				"img plot: nat=%dx%d req=%dx%d (scaled)",
