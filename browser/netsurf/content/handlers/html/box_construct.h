@@ -91,6 +91,23 @@ nserror cancel_dom_to_box(void *box_conversion_context);
 
 
 /**
+ * fixes130b: re-cascade an existing box tree in place.
+ *
+ * Walks the existing box tree top-down. For every box that has a
+ * DOM node and cached select results, calls box_get_style with the
+ * current html_content state (which includes dynamic pseudo-class
+ * pointers dyn_hover_node / dyn_active_node / dyn_focus_node) and
+ * swaps in the freshly computed css_select_results. Used after a
+ * hover/active/focus state change to make :hover etc. take effect
+ * without doing a full DOM-to-box reconstruction.
+ *
+ * \param c html_content whose box tree to re-cascade
+ * \return NSERROR_OK on success
+ */
+nserror html_recascade_tree(struct html_content *c);
+
+
+/**
  * Retrieve the box for a dom node, if there is one
  *
  * \param node The DOM node

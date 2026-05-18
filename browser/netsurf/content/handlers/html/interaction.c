@@ -52,6 +52,7 @@
 #include "desktop/gui_internal.h"
 
 #include "html/box.h"
+#include "html/box_construct.h"
 #include "html/box_textarea.h"
 #include "html/box_inspect.h"
 #include "html/font.h"
@@ -1348,7 +1349,11 @@ mouse_action_drag_none(html_content *html,
 	 * changed, update and trigger a reformat so the cascade picks
 	 * up the new state via node_is_hover / node_is_active. First
 	 * cut uses brute-force whole-page reformat; future round can
-	 * scope the restyle to the affected subtree. */
+	 * scope the restyle to the affected subtree.
+	 *
+	 * fixes130b: instrumented. Logs every poll's mas.node and
+	 * the prior state; flags `dyn` when either changed so we can
+	 * tell from the log whether hover detection is firing. */
 	{
 		bool active_state = (mouse & (BROWSER_MOUSE_PRESS_1 |
 				BROWSER_MOUSE_PRESS_2 |
@@ -1357,15 +1362,28 @@ mouse_action_drag_none(html_content *html,
 		dom_node *want_hover = mas.node;
 		dom_node *want_active = active_state ? mas.node : NULL;
 		bool changed = false;
+		extern void macsurf_debug_log_write(const char *s);
+		extern void macsurf_debug_log_writef(const char *fmt, ...);
 		if (want_hover != html->dyn_hover_node) {
+			macsurf_debug_log_writef(
+				"dyn hover: old=%p new=%p",
+				(void *)html->dyn_hover_node,
+				(void *)want_hover);
 			html->dyn_hover_node = want_hover;
 			changed = true;
 		}
 		if (want_active != html->dyn_active_node) {
+			macsurf_debug_log_writef(
+				"dyn active: old=%p new=%p",
+				(void *)html->dyn_active_node,
+				(void *)want_active);
 			html->dyn_active_node = want_active;
 			changed = true;
 		}
 		if (changed && bw != NULL) {
+			macsurf_debug_log_write(
+				"dyn change: recascade + reformat");
+			html_recascade_tree(html);
 			browser_window_schedule_reformat(bw);
 		}
 	}
