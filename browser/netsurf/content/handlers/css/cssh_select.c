@@ -1555,13 +1555,17 @@ css_error node_is_visited(void *pw, void *node, bool *match)
  * \post \a match will contain true if the node matches and false otherwise.
  */
 /* fixes130: shared helper. See select.c for full comments. */
+/* fixes130e: walk from target upward to node.  An element matches
+ * :hover/:active/:focus if the dynamic node (target) is that element
+ * itself or any descendant — equivalently, if `node` appears in
+ * target's ancestor chain. */
 static bool dyn_node_matches(dom_node *node, dom_node *target)
 {
-	dom_node *cursor = node;
+	dom_node *cursor = target;
 	bool own_cursor = false;
 	while (cursor != NULL) {
 		dom_node *parent = NULL;
-		if (cursor == target) {
+		if (cursor == node) {
 			if (own_cursor) dom_node_unref(cursor);
 			return true;
 		}
@@ -1789,7 +1793,13 @@ css_error set_libcss_node_data(void *pw, void *node, void *libcss_node_data)
 		return CSS_NOMEM;
 	}
 
-	assert(old_node_data == NULL);
+	/* fixes130e: during html_recascade_tree the node is cascaded a
+	 * second time. old_node_data is the libcss node data from the
+	 * first cascade; free it rather than asserting it away. */
+	if (old_node_data != NULL) {
+		css_libcss_node_data_handler(&selection_handler,
+				CSS_NODE_DELETED, NULL, n, NULL, old_node_data);
+	}
 
 	return CSS_OK;
 }
