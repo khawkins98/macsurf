@@ -2,25 +2,32 @@
  * This file is part of LibCSS.
  * Licensed under the MIT License,
  *                http://www.opensource.org/licenses/mit-license.php
- * Copyright 2026 MacSurf (fixes75)
+ * Copyright 2026 MacSurf (fixes75, fixes118)
  *
  * Parse -macsurf-grid.
  *
- * Accepted forms (V1):
+ * V1 forms (fixes75): integer column count
  *   -macsurf-grid: none
  *   -macsurf-grid: <cols>
  *   -macsurf-grid: <cols> <rows>
  *
- * <cols> and <rows> are bare integers (no unit). rows defaults to 0
- * meaning auto-rows (size to content). Container with display:grid
- * lays out children row-major in `cols` equal-width columns.
+ * V2 forms (fixes118): explicit track widths
+ *   -macsurf-grid: <track-list>
  *
- * V1 storage (one int32_t):
- *   bits 31..16: column count (0..65535)
- *   bits 15..0:  row count (0 = auto)
+ * <track-list> is a space-separated list of up to 8 tracks; each <track>
+ * is a <length>, <flex>, <percentage>, or bare number (treated as fr).
+ *
+ * Storage:
+ *   - packed cols/rows in css_computed_style_i.macsurf_grid (existing)
+ *   - 8 track ints heap-allocated in css_computed_style.macsurf_grid_tracks
+ *     (outer struct, NOT inner _i, because libcss arena interning
+ *     memcmps the inner struct as one block -- adding non-deterministic
+ *     bytes there breaks style deduplication. Outer-struct pointer
+ *     gets a dedicated comparison in arena.c:arena__compare_grid_tracks).
  *
  * Bytecode payload after appendOPV(SET):
- *   - int32_t packed value (cols<<16 | rows)
+ *   - int32 packed (cols<<16 | rows)
+ *   - int32 track[0..7]   -- always 8 entries; 0 = unused slot
  */
 
 #include <assert.h>
@@ -30,6 +37,31 @@
 #include "bytecode/opcodes.h"
 #include "parse/properties/properties.h"
 #include "parse/properties/utils.h"
+
+#define MACSURF_GRID_TRACK_UNIT_NONE    0
+#define MACSURF_GRID_TRACK_UNIT_FR      1
+#define MACSURF_GRID_TRACK_UNIT_PX      2
+#define MACSURF_GRID_TRACK_UNIT_PERCENT 3
+#define MACSURF_GRID_TRACK_MAX          8
+
+static int32_t macsurf__pack_track(uint8_t unit, int32_t value)
+{
+	uint32_t v = ((uint32_t)value) & 0x0FFFFFFFU;
+	return (int32_t)((((uint32_t)unit & 0xF) << 28) | v);
+}
+
+static bool macsurf__token_is_fr(lwc_string *unit_str)
+{
+	if (unit_str == NULL) return false;
+	if (lwc_string_length(unit_str) == 2) {
+		const char *s = lwc_string_data(unit_str);
+		if ((s[0] == 'f' || s[0] == 'F') &&
+				(s[1] == 'r' || s[1] == 'R')) {
+			return true;
+		}
+	}
+	return false;
+}
 
 css_error css__parse_macsurf_grid(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
@@ -42,6 +74,12 @@ css_error css__parse_macsurf_grid(css_language *c,
 	uint32_t cols = 0;
 	uint32_t rows = 0;
 	uint32_t packed;
+	int32_t tracks[MACSURF_GRID_TRACK_MAX];
+	int n_tracks = 0;
+	bool track_list_form = false;
+	int i;
+
+	for (i = 0; i < MACSURF_GRID_TRACK_MAX; i++) tracks[i] = 0;
 
 	token = parserutils_vector_peek(vector, *ctx);
 	if (token == NULL) return CSS_INVALID;
@@ -55,7 +93,6 @@ css_error css__parse_macsurf_grid(css_language *c,
 
 	consumeWhitespace(vector, ctx);
 
-	/* `none` keyword. */
 	token = parserutils_vector_peek(vector, *ctx);
 	if (token != NULL && token->type == CSS_TOKEN_IDENT &&
 			token->idata != NULL) {
@@ -70,37 +107,127 @@ css_error css__parse_macsurf_grid(css_language *c,
 		}
 	}
 
-	/* First integer: column count. */
 	token = parserutils_vector_peek(vector, *ctx);
-	if (token == NULL || token->type != CSS_TOKEN_NUMBER ||
-			token->idata == NULL) {
+	if (token == NULL) {
 		*ctx = orig_ctx;
 		return CSS_INVALID;
 	}
-	{
-		size_t consumed = 0;
-		css_fixed cnum = css__number_from_lwc_string(token->idata,
-				true /* int only */, &consumed);
-		int32_t cval = (int32_t)(cnum >> 10);  /* Q22.10 -> int */
-		if (cval < 1) cval = 1;
-		if (cval > 255) cval = 255;
-		cols = (uint32_t)cval;
-		parserutils_vector_iterate(vector, ctx);
+
+	if (token->type == CSS_TOKEN_DIMENSION ||
+			token->type == CSS_TOKEN_PERCENTAGE) {
+		track_list_form = true;
 	}
 
-	/* Optional second integer: row count. */
-	consumeWhitespace(vector, ctx);
-	token = parserutils_vector_peek(vector, *ctx);
-	if (token != NULL && token->type == CSS_TOKEN_NUMBER &&
-			token->idata != NULL) {
-		size_t consumed = 0;
-		css_fixed rnum = css__number_from_lwc_string(token->idata,
-				true, &consumed);
-		int32_t rval = (int32_t)(rnum >> 10);
-		if (rval < 0) rval = 0;
-		if (rval > 255) rval = 255;
-		rows = (uint32_t)rval;
-		parserutils_vector_iterate(vector, ctx);
+	if (track_list_form) {
+		while (n_tracks < MACSURF_GRID_TRACK_MAX) {
+			consumeWhitespace(vector, ctx);
+			token = parserutils_vector_peek(vector, *ctx);
+			if (token == NULL) break;
+			if (token->type != CSS_TOKEN_DIMENSION &&
+					token->type != CSS_TOKEN_PERCENTAGE &&
+					token->type != CSS_TOKEN_NUMBER) {
+				break;
+			}
+
+			if (token->type == CSS_TOKEN_DIMENSION) {
+				size_t consumed = 0;
+				css_fixed num = css__number_from_lwc_string(
+						token->idata, false, &consumed);
+				lwc_string *unit_str = NULL;
+				uint8_t unit = MACSURF_GRID_TRACK_UNIT_PX;
+				int32_t value = 0;
+
+				if (consumed < lwc_string_length(token->idata)) {
+					const char *raw =
+						lwc_string_data(token->idata);
+					size_t total =
+						lwc_string_length(token->idata);
+					if (lwc_intern_string(raw + consumed,
+							total - consumed,
+							&unit_str)
+							!= lwc_error_ok) {
+						unit_str = NULL;
+					}
+				}
+
+				if (macsurf__token_is_fr(unit_str)) {
+					int32_t fr_q88 = (int32_t)(num >> 2);
+					if (fr_q88 < 0) fr_q88 = 0;
+					if (fr_q88 > 0x0FFFFFFF)
+						fr_q88 = 0x0FFFFFFF;
+					unit = MACSURF_GRID_TRACK_UNIT_FR;
+					value = fr_q88;
+				} else {
+					int32_t px = (int32_t)(num >> 10);
+					if (px < 0) px = 0;
+					if (px > 0x0FFFFFFF) px = 0x0FFFFFFF;
+					unit = MACSURF_GRID_TRACK_UNIT_PX;
+					value = px;
+				}
+				if (unit_str != NULL) {
+					lwc_string_unref(unit_str);
+				}
+
+				tracks[n_tracks++] = macsurf__pack_track(
+						unit, value);
+			} else if (token->type == CSS_TOKEN_PERCENTAGE) {
+				size_t consumed = 0;
+				css_fixed num = css__number_from_lwc_string(
+						token->idata, false, &consumed);
+				int32_t pct_q88 = (int32_t)(num >> 2);
+				if (pct_q88 < 0) pct_q88 = 0;
+				if (pct_q88 > 0x0FFFFFFF) pct_q88 = 0x0FFFFFFF;
+				tracks[n_tracks++] = macsurf__pack_track(
+						MACSURF_GRID_TRACK_UNIT_PERCENT,
+						pct_q88);
+			} else {
+				size_t consumed = 0;
+				css_fixed num = css__number_from_lwc_string(
+						token->idata, false, &consumed);
+				int32_t fr_q88 = (int32_t)(num >> 2);
+				if (fr_q88 < 0) fr_q88 = 0;
+				if (fr_q88 > 0x0FFFFFFF) fr_q88 = 0x0FFFFFFF;
+				tracks[n_tracks++] = macsurf__pack_track(
+						MACSURF_GRID_TRACK_UNIT_FR,
+						fr_q88);
+			}
+
+			parserutils_vector_iterate(vector, ctx);
+		}
+
+		cols = (uint32_t)n_tracks;
+		if (cols < 1) cols = 1;
+		rows = 0;
+	} else {
+		if (token->type != CSS_TOKEN_NUMBER ||
+				token->idata == NULL) {
+			*ctx = orig_ctx;
+			return CSS_INVALID;
+		}
+		{
+			size_t consumed = 0;
+			css_fixed cnum = css__number_from_lwc_string(
+					token->idata, true, &consumed);
+			int32_t cval = (int32_t)(cnum >> 10);
+			if (cval < 1) cval = 1;
+			if (cval > 255) cval = 255;
+			cols = (uint32_t)cval;
+			parserutils_vector_iterate(vector, ctx);
+		}
+
+		consumeWhitespace(vector, ctx);
+		token = parserutils_vector_peek(vector, *ctx);
+		if (token != NULL && token->type == CSS_TOKEN_NUMBER &&
+				token->idata != NULL) {
+			size_t consumed = 0;
+			css_fixed rnum = css__number_from_lwc_string(
+					token->idata, true, &consumed);
+			int32_t rval = (int32_t)(rnum >> 10);
+			if (rval < 0) rval = 0;
+			if (rval > 255) rval = 255;
+			rows = (uint32_t)rval;
+			parserutils_vector_iterate(vector, ctx);
+		}
 	}
 
 	packed = (cols << 16) | (rows & 0xffff);
@@ -109,5 +236,14 @@ css_error css__parse_macsurf_grid(css_language *c,
 			CSS_PROP_MACSURF_GRID, 0, 0x0080 /* SET */);
 	if (error != CSS_OK) return error;
 
-	return css__stylesheet_style_vappend(result, 1, (css_fixed)packed);
+	error = css__stylesheet_style_vappend(result, 1, (css_fixed)packed);
+	if (error != CSS_OK) return error;
+
+	for (i = 0; i < MACSURF_GRID_TRACK_MAX; i++) {
+		error = css__stylesheet_style_vappend(result, 1,
+				(css_fixed)tracks[i]);
+		if (error != CSS_OK) return error;
+	}
+
+	return CSS_OK;
 }
