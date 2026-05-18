@@ -24,6 +24,12 @@
 #ifndef NETSURF_HTML_LAYOUT_INTERNAL_H
 #define NETSURF_HTML_LAYOUT_INTERNAL_H
 
+#ifdef __MACOS9__
+/* fixes121 -- pull in macsurf_debug_log_writef for inline probes
+ * in layout_find_dimensions below. */
+#include "macsurf_debug.h"
+#endif
+
 #define AUTO INT_MIN
 
 /**
@@ -480,6 +486,19 @@ static inline void layout_find_dimensions(
 
 		htype = css_computed_height(style, &value, &unit);
 
+#ifdef __MACOS9__
+		/* macsurf_diag fixes121 - probe replaced-element height
+		 * cascade: hunt for the source of block->height=28 on
+		 * the mactrove logo. Filter to box->object != NULL so we
+		 * only log replaced elements. */
+		if (box != NULL && box->object != NULL) {
+			macsurf_debug_log_writef(
+				"macsurf_diag: find_dim box=%p htype=%d value=%ld unit=%d",
+				(void *)box, (int)htype,
+				(long)value, (int)unit);
+		}
+#endif
+
 		if (htype == CSS_HEIGHT_SET) {
 			if (unit == CSS_UNIT_PCT) {
 				enum css_height_e cbhtype;
@@ -560,6 +579,15 @@ static inline void layout_find_dimensions(
 			layout_handle_box_sizing(unit_len_ctx, box,
 					available_width, false, height);
 		}
+
+#ifdef __MACOS9__
+		/* macsurf_diag fixes121 - what did we write to *height? */
+		if (box != NULL && box->object != NULL) {
+			macsurf_debug_log_writef(
+				"macsurf_diag: find_dim box=%p WROTE *height=%d (AUTO=%d)",
+				(void *)box, *height, AUTO);
+		}
+#endif
 	}
 
 	if (max_width) {
