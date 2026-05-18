@@ -259,15 +259,245 @@ static nserror nscss_create_css_data(struct content_css_data *c,
  * \param size  Number of bytes to process
  * \return true on success, false on failure
  */
+/* fixes115 — count column tracks in a grid-template-columns value
+ * (the substring between `:` and `;`/`}` of the declaration).
+ *
+ * Handles the dominant patterns mactrove and similar Drupal/CMS themes
+ * use without trying to be a full CSS Grid grammar parser:
+ *   none / auto                                -> 1
+ *   <track> <track> <track> ...                -> count of tokens
+ *   repeat(<int>, <inner-tracks>)              -> int * count(inner)
+ *   repeat(auto-fill|auto-fit, ...)            -> 3 * count(inner) (heuristic)
+ *   minmax(...) / fit-content(...) / calc(...) -> counts as 1 track
+ *
+ * Pure text-level parser — does NOT depend on libcss. We rewrite the
+ * declaration to `-macsurf-grid: N` before libcss parses the sheet,
+ * so the existing -macsurf-grid select/layout path handles it. */
+static int
+macsurf__count_grid_columns_text(const char *p, const char *end)
+{
+	int tracks = 0;
+	int depth = 0;
+	int in_repeat = 0;
+	int repeat_mult = 1;
+	int repeat_inner = 0;
+	int repeat_depth = 0;
+
+	while (p < end) {
+		char ch = *p;
+
+		if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' ||
+				ch == ',') {
+			p++;
+			continue;
+		}
+
+		if (ch == '(') {
+			depth++;
+			p++;
+			continue;
+		}
+
+		if (ch == ')') {
+			if (depth > 0) depth--;
+			p++;
+			if (in_repeat && depth < repeat_depth) {
+				if (repeat_inner < 1) repeat_inner = 1;
+				tracks += repeat_mult * repeat_inner;
+				in_repeat = 0;
+				repeat_inner = 0;
+				repeat_mult = 1;
+			}
+			continue;
+		}
+
+		if (depth == 0 && (end - p) >= 7 &&
+				(p[0] == 'r' || p[0] == 'R') &&
+				(p[1] == 'e' || p[1] == 'E') &&
+				(p[2] == 'p' || p[2] == 'P') &&
+				(p[3] == 'e' || p[3] == 'E') &&
+				(p[4] == 'a' || p[4] == 'A') &&
+				(p[5] == 't' || p[5] == 'T') &&
+				p[6] == '(') {
+			p += 7;
+			depth++;
+			in_repeat = 1;
+			repeat_depth = depth;
+			repeat_mult = 1;
+			repeat_inner = 0;
+			while (p < end && (*p == ' ' || *p == '\t')) p++;
+			if (p < end && *p >= '0' && *p <= '9') {
+				int n = 0;
+				while (p < end && *p >= '0' && *p <= '9') {
+					n = n * 10 + (*p - '0');
+					p++;
+				}
+				if (n > 0 && n < 1000) repeat_mult = n;
+			} else {
+				/* auto-fill / auto-fit / unknown — heuristic. */
+				repeat_mult = 3;
+				while (p < end && *p != ',' && *p != ')') p++;
+			}
+			while (p < end && (*p == ' ' || *p == '\t')) p++;
+			if (p < end && *p == ',') p++;
+			continue;
+		}
+
+		/* Any other non-whitespace token at the current depth counts
+		 * as one track at its level. Skip the rest of the token until
+		 * a separator. Nested-function bodies (minmax, fit-content,
+		 * calc) are skipped via the depth tracking above. */
+		if (depth == 0) {
+			tracks++;
+		} else if (in_repeat && depth == repeat_depth) {
+			repeat_inner++;
+		}
+		while (p < end) {
+			char c2 = *p;
+			if (c2 == ' ' || c2 == '\t' || c2 == '\n' ||
+					c2 == '\r' || c2 == ',' ||
+					c2 == '(' || c2 == ')') break;
+			p++;
+		}
+	}
+
+	if (tracks < 1) tracks = 1;
+	if (tracks > 255) tracks = 255;
+	return tracks;
+}
+
+
+/* fixes115 — case-insensitive 1-byte compare; checks word boundary so
+ * "grid-template-columns" doesn't match `xgrid-template-columns`. */
+static int
+macsurf__match_prop_name(const char *buf, size_t len, size_t pos,
+		const char *name, size_t name_len)
+{
+	size_t i;
+	if (pos + name_len > len) return 0;
+	if (pos > 0) {
+		char prev = buf[pos - 1];
+		if ((prev >= 'a' && prev <= 'z') ||
+				(prev >= 'A' && prev <= 'Z') ||
+				(prev >= '0' && prev <= '9') ||
+				prev == '-' || prev == '_') {
+			return 0;
+		}
+	}
+	for (i = 0; i < name_len; i++) {
+		char b = buf[pos + i];
+		char n = name[i];
+		if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+		if (n >= 'A' && n <= 'Z') n = (char)(n - 'A' + 'a');
+		if (b != n) return 0;
+	}
+	return 1;
+}
+
+
+/* fixes115 — rewrite every `grid-template-columns: VALUE` declaration
+ * inside the buffer to `-macsurf-grid: N` followed by enough spaces to
+ * preserve the original byte count. The replacement is always shorter
+ * (`-macsurf-grid:` is 14 chars vs `grid-template-columns:` at 22), so
+ * the padding always fits. The caller owns the returned malloc'd buffer
+ * and must free it after passing to libcss. Returns NULL on OOM; caller
+ * falls back to the original buffer. */
+static char *
+macsurf__rewrite_grid_template_columns(const char *data, size_t size)
+{
+	static const char NEEDLE[] = "grid-template-columns";
+	static const size_t NEEDLE_LEN = 21;
+	char *out;
+	size_t i;
+
+	out = (char *)malloc(size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, size);
+
+	i = 0;
+	while (i + NEEDLE_LEN < size) {
+		size_t j;
+		size_t val_start;
+		size_t val_end;
+		int columns;
+		int n;
+		char buf[40];
+		size_t total_replace;
+		int paren_depth = 0;
+
+		if (!macsurf__match_prop_name(out, size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			i++;
+			continue;
+		}
+
+		j = i + NEEDLE_LEN;
+		while (j < size && (out[j] == ' ' || out[j] == '\t' ||
+				out[j] == '\n' || out[j] == '\r')) j++;
+		if (j >= size || out[j] != ':') {
+			i++;
+			continue;
+		}
+
+		val_start = j + 1;
+		while (val_start < size && (out[val_start] == ' ' ||
+				out[val_start] == '\t')) val_start++;
+
+		val_end = val_start;
+		while (val_end < size) {
+			char c = out[val_end];
+			if (c == '(') paren_depth++;
+			else if (c == ')') {
+				if (paren_depth > 0) paren_depth--;
+			} else if (paren_depth == 0 &&
+					(c == ';' || c == '}' || c == '!')) {
+				break;
+			}
+			val_end++;
+		}
+
+		columns = macsurf__count_grid_columns_text(
+				out + val_start, out + val_end);
+
+		n = sprintf(buf, "-macsurf-grid: %d", columns);
+		total_replace = val_end - i;
+		if (n > 0 && (size_t)n <= total_replace) {
+			memcpy(out + i, buf, (size_t)n);
+			memset(out + i + n, ' ', total_replace - (size_t)n);
+		}
+		i = val_end;
+	}
+
+	return out;
+}
+
+
 static bool
 nscss_process_data(struct content *c, const char *data, unsigned int size)
 {
 	nscss_content *css = (nscss_content *) c;
 	css_error error;
+	char *rewritten;
 
 	MS_LOG("nscss process data");
 
-	error = nscss_process_css_data(&css->data, data, size);
+	/* fixes115 — pre-process the CSS bytes to convert
+	 * `grid-template-columns: ...` declarations to `-macsurf-grid: N`
+	 * so the existing -macsurf-grid select/layout path picks up
+	 * standard CSS Grid track lists from real-world stylesheets.
+	 * Mactrove and most modern Drupal themes lean on
+	 * grid-template-columns for their main 2-column sidebar layout;
+	 * without this they collapse to a single column. fixes112 tried
+	 * to do this via a new libcss property entry and destabilised
+	 * the cascade on CW8; rewriting the source text before libcss
+	 * sees it avoids touching libcss internals entirely. */
+	rewritten = macsurf__rewrite_grid_template_columns(data, (size_t)size);
+	if (rewritten != NULL) {
+		error = nscss_process_css_data(&css->data, rewritten, size);
+		free(rewritten);
+	} else {
+		error = nscss_process_css_data(&css->data, data, size);
+	}
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
 	}
