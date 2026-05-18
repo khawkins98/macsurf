@@ -695,7 +695,32 @@ int main(void) {
 	 * fix (start-gated mfs_open) lives in macos9_http_fetcher.c. */
 	nsoption_set_int(max_fetchers, 128);
 	nsoption_set_int(max_fetchers_per_host, 16);
-	MS_LOG("images enabled, author_css on, fetcher caps 128/16");
+	/* fixes106 — cap memory_cache_size at 2 MB.
+	 *
+	 * NetSurf's default is 12 MB. On a 16 MB Carbon partition with
+	 * libcss + libdom + libhubbub overhead, layout workspace, font
+	 * caches, OT buffers, and the box-tree + computed-style arenas
+	 * for the live page, 12 MB leaves almost no headroom. The llcache
+	 * fills with old visited pages (HTML + CSS + box trees + image
+	 * bitmaps, ~150-400 KB each) for back-button history and only
+	 * evicts when total cache size approaches the limit — by which
+	 * point the rest of the heap is already starved, and new
+	 * fetch / parser / layout allocations fail with NULL returns
+	 * that look like "browser stuck" from the user's side.
+	 *
+	 * 2 MB cap forces the llcache to evict the oldest entries
+	 * aggressively, freeing memory back to the heap for the live
+	 * page's working set. Back-button across the most-recent ~5-8
+	 * pages still works (typical NetSurf pages compress well in the
+	 * cache); navigations beyond that just re-fetch, which is the
+	 * intended behaviour on a memory-constrained platform.
+	 *
+	 * Symptom this fixes: post fixes98-105 the fetch ring is clean
+	 * but pages still stop loading after ~5-8 navigations. The
+	 * "stops after a number of sites" wall is memory-pressure, not
+	 * fetch-system. */
+	nsoption_set_int(memory_cache_size, 2 * 1024 * 1024);
+	MS_LOG("images enabled, author_css on, fetcher 128/16, mem cache 2MB");
 	netsurf_init(NULL);
 	MS_LOG("netsurf_init done");
 #ifdef WITH_DUKTAPE
