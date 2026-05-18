@@ -121,8 +121,31 @@ void macos9_window_te_activate_url(struct gui_window *g) { if(!g||!g->url_te||g-
 void macos9_window_te_deactivate_url(struct gui_window *g) { if(!g||!g->url_te||!g->url_field_active) return; SetPortWindowPort(g->window); TEDeactivate(g->url_te); g->url_field_active=0; InvalWindowRect(g->window, &g->url_rect); }
 
 static void set_url_te_text(struct gui_window *g, const char *u) {
-	if(!g||!g->url_te||!u) return; SetPortWindowPort(g->window);
-	TESetText(u, (long)strlen(u), g->url_te); TECalText(g->url_te); InvalWindowRect(g->window, &g->url_rect);
+	CharsHandle h;
+	long new_len;
+	long cur_len;
+	if(!g||!g->url_te||!u) return;
+	/* fixes109 — dedupe. NetSurf core calls gui_window->set_url repeatedly
+	 * during navigation (initial, after redirect, on every history nav, on
+	 * some progress events). The old unconditional InvalRect on url_rect
+	 * triggered an updateEvt → browser_window_redraw → draw_url_bar cycle
+	 * on every call, even when the URL string was byte-identical. On a
+	 * loading page the URL bar would visibly pulse for many seconds with
+	 * nothing changing — that was a big part of the "sticky" feeling. Now:
+	 * compare against the current TE buffer and skip if equal. */
+	new_len = (long)strlen(u);
+	h = TEGetText(g->url_te);
+	if (h != NULL) {
+		cur_len = GetHandleSize((Handle)h);
+		if (cur_len == new_len &&
+		    (new_len == 0 || memcmp(*h, u, (size_t)new_len) == 0)) {
+			return;
+		}
+	}
+	SetPortWindowPort(g->window);
+	TESetText(u, new_len, g->url_te);
+	TECalText(g->url_te);
+	InvalWindowRect(g->window, &g->url_rect);
 }
 
 void macos9_window_navigate(struct gui_window *g, const char *u) {
@@ -334,7 +357,21 @@ static nserror macos9_gw_event(struct gui_window *g, enum gui_window_event e) {
 }
 static void macos9_gw_set_title(struct gui_window *g, const char *t) { Str255 p; size_t l; if(!g||!g->window||!t) return; l=strlen(t); if(l>255) l=255; p[0]=(unsigned char)l; memcpy(p+1,t,l); SetWTitle(g->window,p); }
 static nserror macos9_gw_set_url(struct gui_window *g, struct nsurl *u) { const char *s; if(g&&u&&g->url_te&&(s=nsurl_access(u))) set_url_te_text(g,s); return 0; }
-static void macos9_gw_set_status(struct gui_window *g, const char *t) { if(g&&t) { strncpy(g->status,t,127); g->status[127]=0; if(g->window) InvalWindowRect(g->window,&g->status_rect); } }
+static void macos9_gw_set_status(struct gui_window *g, const char *t) {
+	/* fixes109 — dedupe. NetSurf core fires set_status on every fetch
+	 * progress callback, every hover, every link-tracking transition.
+	 * Many of those fire with the same string repeatedly (e.g. "Loading
+	 * https://X..." while bytes accumulate). Unconditional InvalRect on
+	 * status_rect was painting the status bar dozens of times per
+	 * second on a loading page, costing CPU and showing as the pulsing
+	 * status-bar redraw loop in the fixes107 log. Skip the InvalRect
+	 * unless the visible text actually changed. */
+	if (g == NULL || t == NULL) return;
+	if (strcmp(g->status, t) == 0) return;
+	strncpy(g->status, t, 127);
+	g->status[127] = 0;
+	if (g->window) InvalWindowRect(g->window, &g->status_rect);
+}
 
 static struct gui_window_table wt = {
 	macos9_window_create, macos9_window_destroy, macos9_gw_invalidate, macos9_gw_get_scroll,
