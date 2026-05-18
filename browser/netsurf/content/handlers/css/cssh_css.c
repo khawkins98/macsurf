@@ -465,7 +465,16 @@ macsurf__emit_flat_tracks(const char *p, const char *end,
 			p++;
 		}
 		tok_len = (size_t)(p - tok_start);
-		if (tok_len == 0) continue;
+		if (tok_len == 0) {
+			/* fixes118a: p is sitting on '(' or ')' which the
+			 * whitespace skip above doesn't consume and the
+			 * tokeniser above stops at -- advance past it or
+			 * we loop forever. Triggered by repeat() inner
+			 * content with nested parens like
+			 * `repeat(auto-fill, minmax(150px, 1fr))`. */
+			if (p < end) p++;
+			continue;
+		}
 
 		n = macsurf__emit_one_track(out + *out_pos,
 				cap - *out_pos, tok_start, tok_len);
