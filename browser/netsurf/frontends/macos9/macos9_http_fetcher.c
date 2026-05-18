@@ -630,10 +630,24 @@ static void mfs_poll_one(struct macos9_fetch_ctx *c) {
 	 * so this is reentrancy-safe under MacSurf's cooperative model. */
 	static char b[RECV_B];
 	OTResult n; fetch_msg m;
+	/* IDLE / NOTIFIED slots are truly inactive — nothing to do. */
+	if(c->state==MFS_IDLE || c->state==MFS_NOTIFIED) return;
+	/* fixes104 — check abort BEFORE the QUEUED early-return. Previously
+	 * an aborted-while-queued fetch (NetSurf calls ops.abort on a
+	 * fetch that hasn't yet been dispatched via ops.start — happens
+	 * every navigation that has pending sub-resources) was permanently
+	 * stranded: state stayed MFS_QUEUED, the outer state-check on the
+	 * old line 635 returned early, and the aborted-cleanup branch was
+	 * never reached. Those fetches leaked in fetch_ring forever; after
+	 * ~3 pages of accumulation the per-host cap (16) tripped and
+	 * NetSurf stopped dispatching new fetches. Now: aborted fetches
+	 * always force MFS_DONE so the outer poll loop runs the terminal
+	 * cleanup (fetch_remove_from_queues + fetch_free) regardless of
+	 * which state they were in when abort came in. */
+	if(c->aborted) { c->state=MFS_DONE; c->keep_alive_ok=0; return; }
 	/* fixes91 — MFS_QUEUED means NetSurf hasn't dispatched yet (ops.start
 	 * unfired); don't open OT until then. */
-	if(c->state==MFS_IDLE || c->state==MFS_QUEUED || c->state==MFS_NOTIFIED) return;
-	if(c->aborted) { c->state=MFS_DONE; c->keep_alive_ok=0; return; }
+	if(c->state==MFS_QUEUED) return;
 	if(c->state==MFS_INIT) { if(mfs_open(c)) c->state=MFS_HEADERS; else c->state=MFS_FAIL; return; }
 	n=OTRcv(c->ep,b,sizeof(b),NULL);
 	if(n==kOTNoDataErr) return;
@@ -684,7 +698,11 @@ static void macos9_http_poll(lwc_string *s) {
 	int i; (void)s;
 	for(i=0;i<MAX_F;i++) {
 		struct macos9_fetch_ctx *c = &f_slots[i];
-		if(c->state==MFS_IDLE || c->state==MFS_QUEUED || c->state==MFS_NOTIFIED) continue;
+		/* fixes104 — only skip TRULY-inactive slots. MFS_QUEUED used
+		 * to skip here but must be polled too so aborted-while-queued
+		 * fetches can transition to MFS_DONE and get cleaned up.
+		 * For non-aborted MFS_QUEUED, mfs_poll_one returns fast. */
+		if(c->state==MFS_IDLE || c->state==MFS_NOTIFIED) continue;
 		mfs_poll_one(c);
 		if(c->state==MFS_FAIL) {
 			fetch_msg m; m.type=FETCH_ERROR; m.data.error=c->err;
