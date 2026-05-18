@@ -66,6 +66,15 @@ static inline bool arena__compare_css_computed_counter(
 	return false;
 }
 
+/* fixes118: compare two 8-int macsurf grid track arrays. */
+static inline bool arena__compare_grid_tracks(
+		const int32_t *a, const int32_t *b)
+{
+	if (a == NULL && b == NULL) return true;
+	if (a == NULL || b == NULL) return false;
+	return memcmp(a, b, 8 * sizeof(int32_t)) == 0;
+}
+
 static inline bool arena__compare_string_list(
 		lwc_string **a,
 		lwc_string **b)
@@ -126,6 +135,12 @@ static inline bool css__arena_style_is_equal(
 	if (!arena__compare_computed_content_item(
 			a->content,
 			b->content)) {
+		return false;
+	}
+
+	if (!arena__compare_grid_tracks(
+			a->macsurf_grid_tracks,
+			b->macsurf_grid_tracks)) {
 		return false;
 	}
 

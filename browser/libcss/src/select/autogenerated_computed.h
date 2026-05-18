@@ -312,14 +312,20 @@ struct css_computed_style_i {
 
 struct css_computed_style {
 	struct css_computed_style_i i;
-	
+
 	css_computed_content_item *content;
 	css_computed_counter *counter_increment;
 	css_computed_counter *counter_reset;
 	lwc_string **cursor;
 	lwc_string **font_family;
 	lwc_string **quotes;
-	
+	/* fixes118: heap-allocated 8-int array of grid track descriptors,
+	 * or NULL when no explicit tracks are set. Each int32 packs
+	 * (unit << 28) | value. Comparison in arena.c via
+	 * arena__compare_grid_tracks. Lifetime owned by this style's
+	 * destroy path. */
+	int32_t *macsurf_grid_tracks;
+
 	struct css_computed_style *next;
 	uint32_t count;
 	uint32_t bin;
