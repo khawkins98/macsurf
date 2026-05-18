@@ -1391,6 +1391,72 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 }
 
 
+/* fixes130b: re-cascade an existing box tree in place. Top-down walk.
+ * For each box with a cached select-results, calls box_get_style with
+ * the current html_content's dyn_*_node pointers and swaps in the new
+ * style. Parent_style threads down the recursion using the NEWLY
+ * cascaded parent style, so child cascades inherit correctly. */
+static void
+html_recascade_subtree(html_content *c,
+		       struct box *box,
+		       const css_computed_style *parent_style,
+		       const css_computed_style *root_style)
+{
+	struct box *child;
+	const css_computed_style *style_for_children;
+
+	if (box == NULL) return;
+
+	if (box->node != NULL && box->styles != NULL) {
+		css_select_results *new_styles = box_get_style(c,
+				parent_style, root_style, box->node);
+		if (new_styles != NULL) {
+			css_select_results *old = box->styles;
+			box->styles = new_styles;
+			box->style = new_styles->styles[
+					CSS_PSEUDO_ELEMENT_NONE];
+			css_select_results_destroy(old);
+		}
+	}
+
+	style_for_children = (box->style != NULL) ?
+			box->style : parent_style;
+	for (child = box->children; child != NULL; child = child->next) {
+		html_recascade_subtree(c, child,
+				style_for_children, root_style);
+	}
+}
+
+nserror
+html_recascade_tree(html_content *c)
+{
+	const css_computed_style *root_style;
+	struct box *child;
+
+	if (c == NULL || c->layout == NULL) return NSERROR_OK;
+
+	if (c->layout->node != NULL && c->layout->styles != NULL) {
+		css_select_results *new_styles = box_get_style(c,
+				NULL, NULL, c->layout->node);
+		if (new_styles != NULL) {
+			css_select_results *old = c->layout->styles;
+			c->layout->styles = new_styles;
+			c->layout->style = new_styles->styles[
+					CSS_PSEUDO_ELEMENT_NONE];
+			css_select_results_destroy(old);
+		}
+	}
+
+	root_style = c->layout->style;
+	for (child = c->layout->children; child != NULL;
+			child = child->next) {
+		html_recascade_subtree(c, child, root_style, root_style);
+	}
+
+	return NSERROR_OK;
+}
+
+
 /* exported function documented in html/box_construct.h */
 nserror
 dom_to_box(dom_node *n,
