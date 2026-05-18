@@ -392,6 +392,27 @@ static void layout_flex_ctx__populate_item_data(
 				b->margin, b->padding, b->border);
 		b->float_container = NULL;
 
+		/* fixes123: CSS Sizing 3 — for replaced elements where one
+		 * dimension is auto and the other is concrete, fill in the
+		 * auto dim from the intrinsic aspect ratio BEFORE flex sizing
+		 * runs. Without this, the flex algorithm substitutes natural
+		 * width for an auto-width image, producing 324x30 squashed
+		 * icons instead of aspect-correct ~45x30. */
+		if (b->object != NULL) {
+			int intrinsic_w = content_get_width(b->object);
+			int intrinsic_h = content_get_height(b->object);
+			if (intrinsic_w > 0 && intrinsic_h > 0) {
+				if (b->width == AUTO && b->height != AUTO) {
+					b->width = (b->height * intrinsic_w) /
+							intrinsic_h;
+				} else if (b->height == AUTO &&
+						b->width != AUTO) {
+					b->height = (b->width * intrinsic_h) /
+							intrinsic_w;
+				}
+			}
+		}
+
 		NSLOG(flex, DEEPDEBUG, "flex-item box: %p: width: %i",
 				b, b->width);
 
