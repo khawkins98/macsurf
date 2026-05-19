@@ -624,6 +624,18 @@ box_construct_generate(struct box_construct_ctx *ctx,
 			return;
 		}
 
+		/* fixes140f: inline parent dispatched before it was added
+		 * to its inline_container has box->parent == NULL. Bail
+		 * now -- before counter and quote-depth mutations -- so
+		 * the after-time re-dispatch can run them cleanly. Block
+		 * parents and inline parents that ARE wired drop through. */
+		if ((box->type == BOX_INLINE ||
+				box->type == BOX_INLINE_BLOCK ||
+				box->type == BOX_INLINE_FLEX) &&
+				box->parent == NULL) {
+			return;
+		}
+
 		/* fixes134b: apply pseudo's OWN counter-reset / counter-
 		 * increment before resolving counter() items in content.
 		 * This is the half of the ordering rule that fires inside
@@ -806,11 +818,41 @@ box_construct_generate(struct box_construct_ctx *ctx,
 		text_box->text = text;
 		text_box->length = pos;
 
-		if (box->type == BOX_INLINE ||
+		if ((box->type == BOX_INLINE ||
+				box->type == BOX_INLINE_BLOCK ||
+				box->type == BOX_INLINE_FLEX) &&
+				box->parent != NULL) {
+			/* fixes140f: inline parent. The BOX_INLINE itself
+			 * is just a start marker in the parent's
+			 * INLINE_CONTAINER; the inline's content lives
+			 * flat as siblings of the marker, ending at
+			 * BOX_INLINE_END. ::before content must go right
+			 * after the INLINE marker; ::after content must
+			 * go at the end of the inline_container (just
+			 * before BOX_INLINE_END is created later). We
+			 * detect ::after by comparing the style pointer
+			 * to box->styles->styles[CSS_PSEUDO_ELEMENT_AFTER]. */
+			bool is_after = false;
+			if (box->styles != NULL &&
+					box->styles->styles[
+						CSS_PSEUDO_ELEMENT_AFTER]
+					== style) {
+				is_after = true;
+			}
+			if (is_after) {
+				box_add_child(box->parent, text_box);
+			} else {
+				box_insert_sibling(box, text_box);
+			}
+		} else if (box->type == BOX_INLINE ||
 				box->type == BOX_INLINE_BLOCK ||
 				box->type == BOX_INLINE_FLEX) {
-			/* Inline parent: attach BOX_TEXT directly. */
-			box_add_child(box, text_box);
+			/* Inline parent but box not yet wired into its
+			 * inline_container -- this can happen if ::before
+			 * is dispatched before the inline is added to the
+			 * tree. The caller in box_construct_element_after
+			 * re-dispatches once box->parent is set. */
+			return;
 		} else {
 			/* Block parent: keep the INLINE_CONTAINER wrapper
 			 * pattern from fixes134a/fix1. */
@@ -1327,6 +1369,21 @@ static void box_construct_element_after(struct box_construct_ctx *ctx,
 				(box->flags & CONVERT_CHILDREN) == 0) {
 			/* No children, or didn't want children converted */
 			return;
+		}
+
+		/* fixes140f: inline ::before and ::after generated content.
+		 * The earlier ::before call in box_construct_element bailed
+		 * because box->parent was NULL (inline not yet attached to
+		 * its inline_container). Re-dispatch here -- box->parent is
+		 * now wired -- and also fire ::after for the first time.
+		 * Both calls run BEFORE BOX_INLINE_END is created so the
+		 * ::after content lands as the last sibling before
+		 * INLINE_END. */
+		if (!(box->flags & IS_REPLACED) && box->styles != NULL) {
+			box_construct_generate(ctx, n, content, box,
+				box->styles->styles[CSS_PSEUDO_ELEMENT_BEFORE]);
+			box_construct_generate(ctx, n, content, box,
+				box->styles->styles[CSS_PSEUDO_ELEMENT_AFTER]);
 		}
 
 		if (props.inline_container == NULL) {
