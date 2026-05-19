@@ -180,6 +180,28 @@ static struct gui_window *macos9_find_gw_for_plot(void)
 	return (struct gui_window *)GetWRefCon((WindowRef)port);
 }
 
+/* fixes137: expose scroll origin + viewport dimensions for
+ * background-attachment: fixed. NetSurf core's html_redraw_background
+ * needs to know where the viewport sits in page coordinates to anchor
+ * the bg image origin instead of letting it scroll with the element box.
+ * Returns 1 on success (out_x/y/w/h written), 0 if no current gw. */
+int macos9_get_bg_fixed_origin(int *out_x, int *out_y, int *out_w, int *out_h)
+{
+	struct gui_window *gw = macos9_find_gw_for_plot();
+	if (gw == NULL) {
+		*out_x = 0;
+		*out_y = 0;
+		*out_w = 0;
+		*out_h = 0;
+		return 0;
+	}
+	*out_x = gw->scroll_x;
+	*out_y = gw->scroll_y;
+	*out_w = (int)(gw->content_rect.right - gw->content_rect.left);
+	*out_h = (int)(gw->content_rect.bottom - gw->content_rect.top);
+	return 1;
+}
+
 static RgnHandle macos9_push_clip(void)
 {
 	struct gui_window *gw;
