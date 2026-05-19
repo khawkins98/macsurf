@@ -906,19 +906,30 @@ box_construct_marker(struct box *box,
 	/** \todo marker content (list-style-type) */
 	switch (list_style_type) {
 	case CSS_LIST_STYLE_TYPE_DISC:
-		/* 2022 BULLET */
-		marker->text = (char *) "\342\200\242";
-		marker->length = 3;
+		/* fixes143a: was U+2022 BULLET ("\342\200\242"), which the
+		 * macos9 conversion correctly maps to MacRoman 0xA5 -- but
+		 * on G3 hardware the Helvetica TT glyph at byte 0xA5
+		 * renders as something semicolon-looking instead of a
+		 * bullet. Switch to U+00B7 MIDDLE DOT (UTF-8 "\302\267"),
+		 * which the conversion table already maps to MacRoman 0xE1.
+		 * A different font slot, a small centred dot, and visually
+		 * indistinguishable from a bullet at body sizes. */
+		marker->text = (char *) "\302\267";
+		marker->length = 2;
 		break;
 
 	case CSS_LIST_STYLE_TYPE_CIRCLE:
-		/* 25CB WHITE CIRCLE */
+		/* 25CB WHITE CIRCLE -- conversion maps to ASCII 'o' so
+		 * font-independent. */
 		marker->text = (char *) "\342\227\213";
 		marker->length = 3;
 		break;
 
 	case CSS_LIST_STYLE_TYPE_SQUARE:
-		/* 25AA BLACK SMALL SQUARE */
+		/* 25AA BLACK SMALL SQUARE -- conversion maps to MacRoman
+		 * 0xA5 (same bullet glyph slot as disc was). If hardware
+		 * shows the same semicolon-looking glyph here as it did
+		 * for disc, switch to ASCII '#' or 'o' in a follow-up. */
 		marker->text = (char *) "\342\226\252";
 		marker->length = 3;
 		break;

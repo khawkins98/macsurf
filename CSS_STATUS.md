@@ -121,7 +121,7 @@ These have been verified on hardware or in screenshots and produce the correct v
 - `-macsurf-gradient: radial-gradient(...)` (24-ring oval stack — fixes74d)
 
 ### Lists & content
-- `list-style-type` (disc, decimal, etc. — but bullet glyph renders as `;` on G3, see Known Issues)
+- `list-style-type` (disc/circle/square/decimal). **fixes143a (2026-05-19):** disc marker switched from U+2022 BULLET (→ MacRoman 0xA5, which Helvetica TT on G3 rendered as a semicolon-looking glyph) to U+00B7 MIDDLE DOT (→ MacRoman 0xE1, a different font slot that renders as a clean small dot). Circle stays as ASCII 'o' (no hollow-circle glyph in MacRoman). Square still uses MacRoman 0xA5 and may show the same artefact; if so, swap to ASCII fallback in a follow-up.
 - `list-style-image`
 - `content` for `::before` / `::after` pseudo-elements
   - string items (fixes134a)
@@ -227,8 +227,8 @@ Deferred to v0.4.5 (already noted in CLAUDE.md). MacSurf has a one-shot `-macsur
 - TIFF: opaque rendering only (`QTNewGWorld(k32ARGBPixelFormat)` returns `cDepthErr -157` on OS 9)
 - Path A1.5 (`CopyDeepMask` + 8-bit mask) is queued
 
-### List bullets render as `;`
-Known issue from fixes33 era. `list-style-type: disc` resolves correctly in cascade but the glyph rendering shows `;` instead of `•` on G3 hardware. Documented in [docs/css-milestone-2026-05-13.md](docs/css-milestone-2026-05-13.md).
+### ~~List bullets render as `;`~~ — fixes143a (2026-05-19)
+Disc marker switched from U+2022 BULLET (MacRoman 0xA5) to U+00B7 MIDDLE DOT (MacRoman 0xE1). The bullet glyph slot at 0xA5 in Helvetica TT on the user's G3 was rendering as a semicolon-looking artefact; middle dot uses a different font slot (0xE1) that renders cleanly. Cause never fully diagnosed — could be font-corruption, font-substitution at small sizes, or a TrueType cmap quirk — but the workaround is robust because U+00B7 → MacRoman 0xE1 conversion was already in the table.
 
 ### Inline boxes occasionally duplicate
 Known issue post-fixes33. Some inline-box runs render twice. Not blocking comprehension; cause unknown.
