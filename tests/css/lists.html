@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes143a (list markers)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 {
+    color: #003366;
+    font-size: 14pt;
+    margin: 0 0 4px 0;
+  }
+  .lede {
+    color: #666;
+    font-size: 8pt;
+    margin: 0 0 12px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+  }
+  .card-title {
+    color: #003366;
+    font-size: 10pt;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+  }
+  .expect {
+    color: #888;
+    font-style: italic;
+    font-size: 8pt;
+    margin: 8px 0 0 0;
+  }
+
+  .disc    { list-style-type: disc; }
+  .circle  { list-style-type: circle; }
+  .square  { list-style-type: square; }
+  .decimal { list-style-type: decimal; }
+</style>
+</head>
+<body>
+
+<h1>MacSurf — fixes143a (list markers)</h1>
+<p class="lede">fixes143a replaces the U+2022 BULLET that rendered
+as a semicolon-looking glyph on G3 Helvetica TT with U+00B7
+MIDDLE DOT, which the existing conversion table maps to MacRoman
+0xE1 -- a different font slot and a clean small dot.</p>
+
+<div class="card">
+  <p class="card-title">PROBE L1 — disc (default unordered)</p>
+  <ul class="disc">
+    <li>Disc alpha</li>
+    <li>Disc beta</li>
+    <li>Disc gamma</li>
+  </ul>
+  <p class="expect">EXPECT: a small centred dot before each item.
+  Pre-fixes143a this rendered as ";" on G3 hardware.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE L2 — circle</p>
+  <ul class="circle">
+    <li>Circle alpha</li>
+    <li>Circle beta</li>
+  </ul>
+  <p class="expect">EXPECT: ASCII "o" before each item. MacRoman
+  has no hollow-circle glyph; the conversion table substitutes
+  ASCII 'o' for U+25CB.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE L3 — square</p>
+  <ul class="square">
+    <li>Square alpha</li>
+    <li>Square beta</li>
+  </ul>
+  <p class="expect">EXPECT: same MacRoman bullet slot (0xA5) the
+  old disc used. If this ALSO renders as ";" then 0xA5's glyph
+  is the underlying problem and we'll switch square to an ASCII
+  fallback in a follow-up round.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE L4 — decimal (ordered)</p>
+  <ol class="decimal">
+    <li>One</li>
+    <li>Two</li>
+    <li>Three</li>
+  </ol>
+  <p class="expect">EXPECT: "1. 2. 3." -- numerical markers
+  render via layout.c's counter formatter, not through the
+  glyph-substitution path. Unchanged by fixes143a.</p>
+</div>
+
+</body>
+</html>
