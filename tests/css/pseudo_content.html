@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>::before / ::after string content (fixes134a)</title>
+<style>
+body { font-family: Geneva; margin: 8px; background: #fff; color: #000; font-size: 12pt; }
+.label { font-size: 9pt; color: #888; margin: 12px 0 2px 0; }
+
+/* Case A: ::before with string */
+.a::before { content: "\2605 "; }
+
+/* Case B: ::after with string */
+.b::after { content: " done"; }
+
+/* Case C: both ::before and ::after on same element */
+.c::before { content: "[ "; }
+.c::after { content: " ]"; }
+
+/* Case D: concatenated multi-string content */
+.d::before { content: "<<" "X" ">> "; }
+
+/* Case E: empty content string (must not crash, must not add space) */
+.e::before { content: ""; }
+
+/* Case F: pseudo on element without other rules */
+.f::before { content: "PRE: "; }
+
+/* Case G: no pseudo rule at all (control — should render normally) */
+/* .g intentionally has no ::before / ::after */
+
+/* Case H: pseudo with styled content (color + bold) */
+.h::before { content: ">>> "; color: #c00; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="label">A: ::before with "★ " — should render "★ Hello"</div>
+<p class="a">Hello</p>
+
+<div class="label">B: ::after with " done" — should render "World done"</div>
+<p class="b">World</p>
+
+<div class="label">C: both ::before "[ " and ::after " ]" — should render "[ middle ]"</div>
+<p class="c">middle</p>
+
+<div class="label">D: multi-string content "&lt;&lt;" "X" "&gt;&gt; " concatenated</div>
+<p class="d">item</p>
+
+<div class="label">E: empty ::before content — should just render "plain" (no extra space)</div>
+<p class="e">plain</p>
+
+<div class="label">F: ::before "PRE: " — should render "PRE: body"</div>
+<p class="f">body</p>
+
+<div class="label">G: no pseudo rule (control)</div>
+<p class="g">unchanged</p>
+
+<div class="label">H: ::before with styled content (red bold)</div>
+<p class="h">styled</p>
+
+</body>
+</html>

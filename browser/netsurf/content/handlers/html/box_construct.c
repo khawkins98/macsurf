@@ -365,22 +365,111 @@ box_construct_generate(dom_node *n,
 		box_add_child(box, gen);
 	}
 
-	/* NOTE on ::before / ::after:
-	 * fixes37 tried to walk the css_computed_content_item array
-	 * and synthesise BOX_TEXT children carrying the `content:`
-	 * string. That hung the browser on advanced.html (fixes38
-	 * traced it to iterating an uninitialised c_item when the
-	 * computed-content state was INHERIT or NONE rather than
-	 * SET). A subsequent attempt added BOX_INLINE / BOX_TEXT
-	 * children directly under BOX_BLOCK without an
-	 * INLINE_CONTAINER wrapper, which appears to crash
-	 * box_normalise on real pages. fixes39 reverts to the
-	 * pre-fixes37 stub behaviour and leaves real generated-
-	 * content support as a known gap. The right fix likely
-	 * builds the pseudo-element as an INLINE box that sits
-	 * inside an auto-wrapped INLINE_CONTAINER, and routes the
-	 * content text through the same UTF-8 path used by the
-	 * normal text plotter. Out of scope this round. */
+	/*
+	 * fixes134a -- generated content STRINGS ONLY.
+	 *
+	 * Walk the css_computed_content_item array and materialise
+	 * CSS_COMPUTED_CONTENT_STRING items as a BOX_TEXT inside an
+	 * INLINE_CONTAINER wrapper added as a child of `box`.
+	 *
+	 * The array walk is gated on css_computed_content() returning
+	 * CSS_CONTENT_SET -- this is the guard fixes37/fixes38 missed,
+	 * which caused iteration of an uninitialised c_item pointer when
+	 * the computed-content state was NORMAL / NONE / INHERIT.
+	 *
+	 * Phase A only. URI, ATTR, COUNTER, COUNTERS, and quote items
+	 * are silently skipped (no crash, no rendering). Counters land
+	 * in fixes134b.
+	 */
+	{
+		uint8_t cstate;
+		size_t total_len;
+		size_t pos;
+		size_t i;
+		char *text;
+		struct box *container;
+		struct box *text_box;
+
+		cstate = css_computed_content(style, &c_item);
+		if (cstate != CSS_CONTENT_SET || c_item == NULL) {
+			return;
+		}
+
+		/* Parent must accept inline-level children. BOX_BLOCK is
+		 * the only safe shape we ship in phase A. */
+		if (box->type != BOX_BLOCK) {
+			return;
+		}
+
+		/* If display is BLOCK/TABLE the existing `gen` empty-box
+		 * path above already fired; don't double-materialise the
+		 * content as a sibling inline run. (Phase A degrades that
+		 * case to an empty block; correctness in 134b+.) */
+		if (computed_display == CSS_DISPLAY_BLOCK ||
+				computed_display == CSS_DISPLAY_TABLE) {
+			return;
+		}
+
+		/* Pass 1: total STRING byte length. Loop terminates at
+		 * CSS_COMPUTED_CONTENT_NONE (type == 0) per libcss. */
+		total_len = 0;
+		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
+			if (c_item[i].type == CSS_COMPUTED_CONTENT_STRING &&
+					c_item[i].data.string != NULL) {
+				total_len += lwc_string_length(
+						c_item[i].data.string);
+			}
+		}
+		if (total_len == 0) {
+			return;
+		}
+
+		text = talloc_size(content->bctx, total_len + 1);
+		if (text == NULL) {
+			return;
+		}
+
+		/* Pass 2: copy. */
+		pos = 0;
+		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
+			const char *s;
+			size_t slen;
+			if (c_item[i].type != CSS_COMPUTED_CONTENT_STRING ||
+					c_item[i].data.string == NULL) {
+				continue;
+			}
+			s = lwc_string_data(c_item[i].data.string);
+			slen = lwc_string_length(c_item[i].data.string);
+			memcpy(text + pos, s, slen);
+			pos += slen;
+		}
+		text[pos] = '\0';
+
+		/* INLINE_CONTAINER (no style) holds the text box. Matches
+		 * the canonical pattern at convert_xml_to_box_text. */
+		container = box_create(NULL, NULL, false,
+				NULL, NULL, NULL, NULL, content->bctx);
+		if (container == NULL) {
+			return;
+		}
+		container->type = BOX_INLINE_CONTAINER;
+
+		/* BOX_TEXT carries the pseudo style (font/colour cascade
+		 * from ::before or ::after). style_owned=false because the
+		 * pseudo style is owned by the parent's styles->styles slot. */
+		text_box = box_create(NULL,
+				(css_computed_style *) style, false,
+				NULL, NULL, NULL, NULL, content->bctx);
+		if (text_box == NULL) {
+			return;
+		}
+		text_box->type = BOX_TEXT;
+		text_box->text = text;
+		text_box->length = pos;
+
+		box_add_child(container, text_box);
+		box_add_child(box, container);
+	}
 }
 
 
