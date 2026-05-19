@@ -342,7 +342,7 @@ The CSS pipeline parses 167 properties via libcss but layout/redraw only consume
 
 - **P0 — `z-index` / stacking contexts (NOT consumed anywhere).** Modals paint UNDER content; dropdowns paint UNDER the rest of the page. Author CSS specifies z-index, libcss parses it, redraw walks DOM in document order and ignores the computed value. **Highest-impact single fix on the table.**
 - **P1 — `min-height` (NOT consumed in layout).** Hero sections (`min-height: 400px` or `100vh`) collapse to text height. Five-line fix mirroring the `min-width` logic at [layout.c:158-205](browser/netsurf/content/handlers/html/layout.c#L158).
-- **P2 — `text-overflow: ellipsis` (no parser).** Card titles overflow instead of truncating to `…`. Needs new parser + select + layout_inline integration.
+- ~~**P2 — `text-overflow: ellipsis` (no parser).**~~ **Shipped at fixes135a + fixes135c (2026-05-19).** libcss parses `clip` / `ellipsis`; redraw paints an ellipsis overlay on the rightmost slice when a styled ancestor declares `text-overflow: ellipsis` + `overflow-x != visible` AND the text would paint past the active clip rect. See "Native CSS3 Strategy" / "Last shipped fix" below.
 - **P3 — Viewport units `vw` / `vh` (likely incomplete in unit conversion).** Author CSS `height: 100vh` evaluates incorrectly. One-site fix in `css_unit_len2px` or its caller.
 - ~~**P4 — `counter-increment` / `counter-reset` (NOT consumed).**~~ **Shipped at fixes134d (2026-05-18).** Counter table populates from `counter-reset` / `counter-increment` rules at element NORMAL and `::before`/`::after` pseudo sites; `content: counter(name)` resolves to the current decimal value; named counters distinguish correctly (e.g. `d_section` and `d_chapter` independent). Flat document-scope table (nested CSS scopes deferred), decimal-only formatting, `counters()` (plural) deferred.
 
@@ -563,7 +563,7 @@ Real-world impact ranked, lowest-effort first within each priority. Numbering re
 
 - **fixes134 — viewport units `vw` / `vh` (P3, low effort, high impact on responsive).** `height: 100vh` used constantly for hero sections. Patch `css_unit_len2px` (or our shim) to resolve `CSS_UNIT_VW` and `CSS_UNIT_VH` against the viewport stored in `unit_len_ctx`. One file.
 
-- **fixes135 — `text-overflow: ellipsis` (P2, medium effort).** Ships native parser + selector + `layout_inline.c` integration. With fixes131 already clipping flex/grid overflow, ellipsis makes card titles look polished. New files: `p_text_overflow.c`, `s_text_overflow.c`. Modifications to `propstrings.h`, dispatch tables, `layout_inline.c`. Adds `CSS_PROP_TEXT_OVERFLOW` to property enum.
+- ~~**fixes135 — `text-overflow: ellipsis` (P2, medium effort).**~~ **Done at fixes135a + fixes135c.** New files: `p_text_overflow.c`, `s_text_overflow.c`. Bit slot at word 15 shift 5 mask 0x60. Visual rendering took two attempts: fixes135b mutated `box->text` in place and produced corrupted output; fixes135c switched to a paint-after-clip architecture (original text draws clipped, then a background rect + ellipsis text overlay on the rightmost slice) and accepted on hardware.
 
 - **fixes136 — `word-break` / `overflow-wrap` (P5, low effort).** Long URLs in body text overflow containers. Allow mid-word breaks in `layout_inline.c` when a word exceeds the line width and the property allows it. Already parsed.
 
