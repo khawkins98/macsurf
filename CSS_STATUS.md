@@ -23,15 +23,24 @@ z-index: ✓ Partial
 - Equal z-index preserves DOM order.
 - Negative z-index and full CSS stacking-context paint order are deferred.
 
-content for ::before / ::after: ✓ string content only
+content for ::before / ::after: ✓ string + counter()
 - fixes134a + fix1 materialize STRING items as BOX_TEXT under an
   INLINE_CONTAINER wrapper. CSS_CONTENT_SET guard prevents the fixes37
   uninitialised-c_item hang.
 - fix1 reuses an existing trailing INLINE_CONTAINER for ::after so the
   generated content renders inline-adjacent to the element text instead
   of dropping to a new line.
-- Skipped without crashing: URI, ATTR, COUNTER, COUNTERS, open/close-quote
-  items. Counter resolution lands in fixes134b.
+- Still skipped without crashing: URI, ATTR, COUNTERS (plural),
+  open/close-quote items.
+
+CSS counters: ✓ flat decimal
+- fixes134b adds counter-reset, counter-increment, content: counter(name).
+- Flat document-scope table on box_construct_ctx. Element NORMAL
+  counter-reset/increment fires before ::before; pseudo's own
+  counter-reset/increment fires inside box_construct_generate before
+  content materialises.
+- Decimal output only. counters(name, ".") plural form, roman/alpha
+  styles, nested CSS counter scopes deferred.
 ```
 
 ## fixes132 revision
@@ -147,8 +156,6 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 | `column-rule-*` | yes | no | no | rule between columns ignored |
 | `column-span` | yes | no | no | |
 | `column-width` | yes | no | no | |
-| `counter-increment` | yes | no | no | numbered counters don't increment |
-| `counter-reset` | yes | no | no | |
 | `quotes` | yes | no | no | `q { quotes: ... }` ignored |
 | `empty-cells` | yes | no | no | empty table cell handling |
 | `table-layout` | yes | no | no | fixed vs auto table layout |
@@ -163,10 +170,9 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 **Highest-impact silent fails on real pages, ranked:**
 
 1. **`background-attachment: fixed`** — Parallax sites scroll their backgrounds. Visible only on specific sites.
-2. **`counter-increment` / `counter-reset`** — Auto-numbered lists, table-of-contents, footnotes. Visible on documentation sites.
-3. **`column-count`** — Magazine-style multi-column text. Visible on news / blog reading layouts.
+2. **`column-count`** — Magazine-style multi-column text. Visible on news / blog reading layouts.
 
-(`min-height` and viewport units were previously listed here. Both shipped in fixes132. `z-index` shipped in fixes133 — see "What actually works" section.)
+(`min-height` and viewport units were previously listed here. Both shipped in fixes132. `z-index` shipped in fixes133. `counter-increment` / `counter-reset` shipped in fixes134b — see "What actually works" section.)
 
 ---
 
