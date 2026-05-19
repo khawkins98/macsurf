@@ -215,6 +215,13 @@ uint8_t css_computed_macsurf_grid(
 const int32_t *css_computed_macsurf_grid_tracks(
 		const css_computed_style *style);
 
+/* fixes150: returns a pointer to an 8-int row-track descriptor array,
+ * or NULL when no explicit grid-template-rows tracks are set. Same
+ * encoding as macsurf_grid_tracks. Lifetime tied to the computed
+ * style. */
+const int32_t *css_computed_macsurf_grid_row_tracks(
+		const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

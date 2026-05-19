@@ -762,12 +762,111 @@ macsurf__rewrite_grid_template_columns(const char *data, size_t size)
 }
 
 
+/* fixes150 — rewrite every `grid-template-rows: VALUE` declaration to
+ * `-macsurf-grid-rows: <tracks>` in place. Both names are 18 chars so
+ * the prefix substitution is byte-for-byte; only the value is reformed
+ * via macsurf__emit_grid_tracks (same flat-tokeniser as columns, with
+ * the fixes148b3 minmax/fit-content/calc collapse). The caller owns the
+ * returned malloc'd buffer and must free it. Returns NULL on OOM. */
+static char *
+macsurf__rewrite_grid_template_rows(const char *data, size_t size)
+{
+	static const char NEEDLE[] = "grid-template-rows";
+	static const size_t NEEDLE_LEN = 18;
+	char *out;
+	size_t i;
+
+	out = (char *)malloc(size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, size);
+
+	i = 0;
+	while (i + NEEDLE_LEN < size) {
+		size_t j;
+		size_t val_start;
+		size_t val_end;
+		size_t total_replace;
+		size_t prefix_len;
+		size_t tracks_room;
+		size_t tracks_written;
+		char buf[256];
+		int paren_depth = 0;
+
+		if (!macsurf__match_prop_name(out, size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			i++;
+			continue;
+		}
+
+		j = i + NEEDLE_LEN;
+		while (j < size && (out[j] == ' ' || out[j] == '\t' ||
+				out[j] == '\n' || out[j] == '\r')) j++;
+		if (j >= size || out[j] != ':') {
+			i++;
+			continue;
+		}
+
+		val_start = j + 1;
+		while (val_start < size && (out[val_start] == ' ' ||
+				out[val_start] == '\t')) val_start++;
+
+		val_end = val_start;
+		while (val_end < size) {
+			char c = out[val_end];
+			if (c == '(') paren_depth++;
+			else if (c == ')') {
+				if (paren_depth > 0) paren_depth--;
+			} else if (paren_depth == 0 &&
+					(c == ';' || c == '}' || c == '!')) {
+				break;
+			}
+			val_end++;
+		}
+
+		total_replace = val_end - i;
+		prefix_len = (size_t)sprintf(buf, "-macsurf-grid-rows: ");
+		if (prefix_len >= total_replace) {
+			i = val_end;
+			continue;
+		}
+
+		tracks_room = total_replace - prefix_len;
+		if (tracks_room > sizeof(buf) - prefix_len - 1) {
+			tracks_room = sizeof(buf) - prefix_len - 1;
+		}
+
+		tracks_written = macsurf__emit_grid_tracks(
+				out + val_start, out + val_end,
+				buf + prefix_len, tracks_room);
+
+		if (tracks_written == 0 ||
+				prefix_len + tracks_written > total_replace) {
+			/* No usable tracks -- leave the original declaration
+			 * in place. libcss will reject the unknown
+			 * grid-template-rows property and skip it. */
+			i = val_end;
+			continue;
+		}
+
+		{
+			size_t total = prefix_len + tracks_written;
+			memcpy(out + i, buf, total);
+			memset(out + i + total, ' ', total_replace - total);
+		}
+		i = val_end;
+	}
+
+	return out;
+}
+
+
 static bool
 nscss_process_data(struct content *c, const char *data, unsigned int size)
 {
 	nscss_content *css = (nscss_content *) c;
 	css_error error;
 	char *rewritten;
+	char *rewritten_rows;
 
 	MS_LOG("nscss process data");
 
@@ -782,11 +881,23 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	 * the cascade on CW8; rewriting the source text before libcss
 	 * sees it avoids touching libcss internals entirely. */
 	rewritten = macsurf__rewrite_grid_template_columns(data, (size_t)size);
-	if (rewritten != NULL) {
-		error = nscss_process_css_data(&css->data, rewritten, size);
-		free(rewritten);
-	} else {
+	if (rewritten == NULL) {
 		error = nscss_process_css_data(&css->data, data, size);
+	} else {
+		/* fixes150 — second pass for grid-template-rows. Same
+		 * in-place rewrite scheme; runs against the columns-rewritten
+		 * buffer so both passes see the same source layout. */
+		rewritten_rows = macsurf__rewrite_grid_template_rows(
+				rewritten, (size_t)size);
+		if (rewritten_rows != NULL) {
+			error = nscss_process_css_data(&css->data,
+					rewritten_rows, size);
+			free(rewritten_rows);
+		} else {
+			error = nscss_process_css_data(&css->data,
+					rewritten, size);
+		}
+		free(rewritten);
 	}
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);

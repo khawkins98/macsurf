@@ -144,6 +144,12 @@ static inline bool css__arena_style_is_equal(
 		return false;
 	}
 
+	if (!arena__compare_grid_tracks(
+			a->macsurf_grid_row_tracks,
+			b->macsurf_grid_row_tracks)) {
+		return false;
+	}
+
 	if (!arena__compare_string_list(
 			a->cursor,
 			b->cursor)) {

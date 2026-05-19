@@ -177,11 +177,18 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	int track_x[MACSURF_GRID_TRACK_MAX];
 	int n_tracks = 0;
 	bool has_tracks = false;
+	/* fixes150 -- row tracks (px-only V1; fr/percent degrade to
+	 * tallest-child sizing when no definite container height). */
+	const int32_t *raw_row_tracks;
+	int row_track_h[MACSURF_GRID_TRACK_MAX];
+	int n_row_tracks = 0;
+	bool has_row_tracks = false;
 	int i;
 
 	for (i = 0; i < MACSURF_GRID_TRACK_MAX; i++) {
 		track_widths[i] = 0;
 		track_x[i] = 0;
+		row_track_h[i] = 0;
 	}
 
 	if (grid == NULL || grid->style == NULL) return false;
@@ -336,6 +343,35 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		col_width = container_width;
 	}
 
+	/* fixes150 -- read row tracks. V1 honours PX heights; FR and
+	 * PERCENT row tracks degrade to tallest-child sizing (the
+	 * existing auto-row behaviour) because we don't have a definite
+	 * container height to distribute against in the auto case. */
+	raw_row_tracks = css_computed_macsurf_grid_row_tracks(grid->style);
+	if (raw_row_tracks != NULL && raw_row_tracks[0] != 0) {
+		for (i = 0; i < MACSURF_GRID_TRACK_MAX; i++) {
+			int32_t pk = raw_row_tracks[i];
+			uint8_t unit;
+			int32_t value;
+			if (pk == 0) break;
+			unit = (uint8_t)(((uint32_t)pk >> 28) & 0xF);
+			value = (int32_t)((uint32_t)pk & 0x0FFFFFFFU);
+			if (value & 0x08000000) {
+				value |= (int32_t)0xF0000000;
+			}
+			n_row_tracks++;
+			if (unit == MACSURF_GRID_TRACK_UNIT_PX) {
+				row_track_h[i] = value;
+			} else {
+				/* FR / PERCENT placeholder: 0 means "use
+				 * tallest-child for this row" in the walker
+				 * below. */
+				row_track_h[i] = 0;
+			}
+		}
+		has_row_tracks = (n_row_tracks > 0);
+	}
+
 	/* Walk children. */
 	child = grid->children;
 	while (child != NULL) {
@@ -406,7 +442,15 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		/* End of row — advance row_y by the tallest cell height
 		 * plus the row gap. */
 		if ((child_index % cols) == 0) {
-			row_y += row_max_height + row_gap;
+			int this_row_h = row_max_height;
+			/* fixes150: if grid-template-rows specified a fixed
+			 * px height for this row, force the row to exactly
+			 * that height (overriding tallest-child). */
+			if (has_row_tracks && row_index < n_row_tracks &&
+					row_track_h[row_index] > 0) {
+				this_row_h = row_track_h[row_index];
+			}
+			row_y += this_row_h + row_gap;
 			row_max_height = 0;
 			row_index++;
 		}
@@ -417,7 +461,12 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	/* Last partial row (e.g. 5 items in 3 cols leaves 2 items in the
 	 * final row). */
 	if ((child_index % cols) != 0) {
-		row_y += row_max_height;
+		int this_row_h = row_max_height;
+		if (has_row_tracks && row_index < n_row_tracks &&
+				row_track_h[row_index] > 0) {
+			this_row_h = row_track_h[row_index];
+		}
+		row_y += this_row_h;
 	} else if (row_index > 0) {
 		/* Final completed row added a trailing row_gap that has no
 		 * row after it; back it out so grid->height is tight. */
