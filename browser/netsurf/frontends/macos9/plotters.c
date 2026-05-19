@@ -75,8 +75,18 @@ long macos9_plot_rect_count = 0;
  * is real per-font ascent/descent through gui_layout_table (deferred
  * -- needs NetSurf-core work). This flag is the experiment: ship the
  * alias dispatch, hardware-probe for inline-mix drift, revert if it
- * reproduces. Set to 0 to fall back to fixes52's behaviour. */
-#define MACSURF_FONT_FAMILY_ALIASES 1
+ * reproduces. Set to 0 to fall back to fixes52's behaviour.
+ *
+ * fixes145b (2026-05-19): REVERTED to 0 after hardware probe. The
+ * baseline-drift bug from fixes52 also manifests horizontally on
+ * mixed-family inline content: text segments from adjacent <code>
+ * vs body runs scrambled into each other on the FF1-FF4 probe cards
+ * ("MonacoaroumsHflfaes", "diralijoeranzas thank") because NetSurf's
+ * inline layout reserves widths assuming one font's metrics while
+ * individual segments paint with different fonts. The fix is real
+ * per-font ascent/descent + gui_layout_table family awareness, which
+ * is a NetSurf-core-side change beyond this round's scope. */
+#define MACSURF_FONT_FAMILY_ALIASES 0
 
 /* fixes74b: counters incremented by redraw.c when it detects
  * CSS_MACSURF_GRADIENT_SET. Lets us see whether the cascade returned
