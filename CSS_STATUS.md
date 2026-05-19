@@ -4,7 +4,7 @@ Generated 2026-05-19. Last revised 2026-05-19 (fixes132 + fixes133 hardware-acce
 
 This is a brutal, hedge-free audit of CSS support in MacSurf. The goal is to identify what works, what doesn't, and what to implement next.
 
-## Hardware-verified status (post fixes133)
+## Hardware-verified status (post fixes134a)
 
 ```text
 viewport units: ✓ Works
@@ -22,6 +22,16 @@ z-index: ✓ Partial
 - Positive z-index overlays/dropdowns now paint above normal content.
 - Equal z-index preserves DOM order.
 - Negative z-index and full CSS stacking-context paint order are deferred.
+
+content for ::before / ::after: ✓ string content only
+- fixes134a + fix1 materialize STRING items as BOX_TEXT under an
+  INLINE_CONTAINER wrapper. CSS_CONTENT_SET guard prevents the fixes37
+  uninitialised-c_item hang.
+- fix1 reuses an existing trailing INLINE_CONTAINER for ::after so the
+  generated content renders inline-adjacent to the element text instead
+  of dropping to a new line.
+- Skipped without crashing: URI, ATTR, COUNTER, COUNTERS, open/close-quote
+  items. Counter resolution lands in fixes134b.
 ```
 
 ## fixes132 revision
