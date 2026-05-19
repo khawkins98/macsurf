@@ -114,7 +114,8 @@ These have been verified on hardware or in screenshots and produce the correct v
 - `background-color`
 - `background-image: url(...)` (PNG/GIF/BMP/TIFF/JPEG via lodepng + QT — fixes78-79b)
 - `background-position`
-- `background-repeat`
+- `background-repeat` (repeat / repeat-x / repeat-y / no-repeat all honored by macos9 plot_bitmap tile loop — fixes138)
+- `background-attachment: fixed` (viewport-anchored origin + tiles parallax-correct against fixes138 — fixes137 + fixes138)
 - `-macsurf-gradient: linear-gradient(...)` (multi-stop — fixes49)
 - `-macsurf-gradient: radial-gradient(...)` (24-ring oval stack — fixes74d)
 
