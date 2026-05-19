@@ -94,6 +94,15 @@ static const char css_default[] =
 	"del{color:#a00}"
 	"b,strong{font-weight:bold}"
 	"i,em,cite,var,dfn,q{font-style:italic}"
+	/* fixes140c: HTML 5 / CSS 2.1 default <q> rendering. quotes
+	 * gives the open/close pair for nesting depth 0 and 1; ::before
+	 * and ::after wrap the element content in typographic quotes
+	 * via generated content. \\201C / \\201D = "" curly double,
+	 * \\2018 / \\2019 = '' curly single, encoded in UTF-8 so libcss's
+	 * string parser sees the right bytes. */
+	"q{quotes:\"\xE2\x80\x9C\" \"\xE2\x80\x9D\" \"\xE2\x80\x98\" \"\xE2\x80\x99\"}"
+	"q::before{content:open-quote}"
+	"q::after{content:close-quote}"
 	"address{font-style:italic;display:block}"
 	"abbr,acronym{font-variant:small-caps}"
 	/* Monospace */
