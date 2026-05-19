@@ -301,13 +301,19 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			if (remaining < 0) remaining = 0;
 
 			macsurf_debug_log_writef(
-				"grid148b:   tracks_parsed n=%d "
-				"raw0=%lx raw1=%lx raw2=%lx raw3=%lx",
+				"grid148b2:  tracks_parsed n=%d "
+				"raw0=%ld raw1=%ld raw2=%ld raw3=%ld",
 				n_tracks,
-				(unsigned long)raw_tracks[0],
-				(unsigned long)raw_tracks[1],
-				(unsigned long)raw_tracks[2],
-				(unsigned long)raw_tracks[3]);
+				(long)raw_tracks[0],
+				(long)raw_tracks[1],
+				(long)raw_tracks[2],
+				(long)raw_tracks[3]);
+			macsurf_debug_log_writef(
+				"grid148b2:  raw4=%ld raw5=%ld raw6=%ld raw7=%ld",
+				(long)raw_tracks[4],
+				(long)raw_tracks[5],
+				(long)raw_tracks[6],
+				(long)raw_tracks[7]);
 			macsurf_debug_log_writef(
 				"grid148b:   fixed_total=%d fr_total_q88=%d "
 				"col_gap=%d total_gap=%d remaining=%d",
