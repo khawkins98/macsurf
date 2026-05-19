@@ -1,8 +1,28 @@
 # MacSurf CSS Status Report
 
-Generated 2026-05-19. Last revised 2026-05-19 (fixes132).
+Generated 2026-05-19. Last revised 2026-05-19 (fixes132 + fixes133 hardware-accepted).
 
 This is a brutal, hedge-free audit of CSS support in MacSurf. The goal is to identify what works, what doesn't, and what to implement next.
+
+## Hardware-verified status (post fixes133)
+
+```text
+viewport units: ✓ Works
+- fixes132 corrected swapped VH/VW conversion in unit.c.
+- Affects height/min-height/width/etc. using vh/vw/vmin/vmax.
+
+min-height: ✓ Works
+- Source audit showed it was already consumed in layout_apply_minmax_height,
+  flex, grid, tables, and replaced/replaced-like paths.
+- Previous status was wrong; the visible failure was caused by swapped vh/vw
+  unit conversion.
+
+z-index: ✓ Partial
+- fixes133 implements basic positioned explicit numeric z-index paint ordering.
+- Positive z-index overlays/dropdowns now paint above normal content.
+- Equal z-index preserves DOM order.
+- Negative z-index and full CSS stacking-context paint order are deferred.
+```
 
 ## fixes132 revision
 
