@@ -1809,6 +1809,33 @@ static bool html_redraw_text_decoration(struct box *box,
  * \return true iff successful and redraw should proceed
  */
 
+/* fixes135b/135c: locate the nearest styled ancestor and check whether
+ * it specifies text-overflow: ellipsis on a clipped (overflow != visible)
+ * inline axis. Returns true when an ellipsis paint should fire.
+ *
+ * Synthetic INLINE_CONTAINER / BOX_TEXT nodes have NULL style; the walk
+ * skips them naturally. We stop at the first styled ancestor: the
+ * containing block carries the text-overflow declaration. */
+static bool
+html_redraw_text_overflow_ellipsis_active(const struct box *box)
+{
+	const struct box *p;
+
+	for (p = box->parent; p != NULL; p = p->parent) {
+		if (p->style == NULL) continue;
+		if (css_computed_text_overflow(p->style) !=
+				CSS_TEXT_OVERFLOW_ELLIPSIS) {
+			return false;
+		}
+		if (css_computed_overflow_x(p->style) ==
+				CSS_OVERFLOW_VISIBLE) {
+			return false;
+		}
+		return true;
+	}
+	return false;
+}
+
 static bool html_redraw_text_box(const html_content *html, struct box *box,
 		int x, int y, const struct rect *clip, float scale,
 		colour current_background_color,
@@ -1821,14 +1848,6 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 
 	font_plot_style_from_css(&html->unit_len_ctx, box->style, &fstyle);
 	fstyle.background = current_background_color;
-
-	/* fixes135b reverted (fixes135b2): the redraw-time prefix-fit-and-
-	 * append-marker logic produced corrupted output (text starting with
-	 * "...PSIS" instead of "ELLI..." and non-deterministic random byte
-	 * patterns across redraws). Root cause not yet identified from code
-	 * review. The 135a libcss plumbing (parser/cascade/computed style)
-	 * stays in place; only the visual truncation is reverted. A future
-	 * fixes135c will reinstate truncation with proper diagnostics. */
 
 	if (!text_redraw(box->text,
 			 box->length,
@@ -1844,6 +1863,65 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 			 html->sel,
 			 ctx))
 		return false;
+
+	/* fixes135c: paint-after-truncate ellipsis.
+	 *
+	 * fixes135b mutated box->text into a stack-buffer truncated copy
+	 * before passing it to text_redraw; that produced corrupted output
+	 * I couldn't pin from code review (text starting mid-word with
+	 * non-deterministic byte patterns). 135c sidesteps the whole
+	 * text-buffer-mutation class of bug: the original text draws
+	 * normally (clipped at clip->x1 by overflow:hidden), then we paint
+	 * an ellipsis on top of the rightmost slice. Two extra plot calls
+	 * per truncated box. No binary search, no UTF-8 byte-boundary
+	 * arithmetic, no temporary buffers.
+	 *
+	 * Trigger: text-overflow:ellipsis ancestor with overflow != visible
+	 * AND the text box would paint past clip->x1 (so overflow:hidden
+	 * has actually clipped something) AND x is still within the clip
+	 * (so there's room to paint the marker). */
+	if (box->text != NULL && box->length > 0 && box->width > 0 &&
+			(x + box->width > clip->x1) && (x < clip->x1) &&
+			html_redraw_text_overflow_ellipsis_active(box)) {
+		const char *marker = "\xE2\x80\xA6"; /* U+2026 -> MacRoman 0xC9 */
+		size_t marker_len = 3;
+		int marker_w = 0;
+		nserror res;
+
+		res = guit->layout->width(&fstyle, marker, marker_len,
+				&marker_w);
+		if (res == NSERROR_OK && marker_w > 0 &&
+				marker_w < (clip->x1 - x)) {
+			plot_style_t fill_style;
+			struct rect r;
+			int ell_x = clip->x1 - marker_w;
+
+			/* Clear the rightmost marker_w pixels with the
+			 * container's background colour so the partial glyph
+			 * the original text painted there doesn't bleed
+			 * through. CW8 C89 positional init order:
+			 *   stroke_type, stroke_width, stroke_colour,
+			 *   fill_type, fill_colour. */
+			fill_style.stroke_type = PLOT_OP_TYPE_NONE;
+			fill_style.stroke_width = 0;
+			fill_style.stroke_colour = 0;
+			fill_style.fill_type = PLOT_OP_TYPE_SOLID;
+			fill_style.fill_colour = current_background_color;
+
+			r.x0 = ell_x;
+			r.y0 = y;
+			r.x1 = clip->x1;
+			r.y1 = y + box->height;
+			(void) ctx->plot->rectangle(ctx, &fill_style, &r);
+
+			/* Paint the ellipsis at the cleared slot. Use the
+			 * same baseline math text_redraw uses. */
+			(void) ctx->plot->text(ctx, &fstyle,
+					ell_x,
+					y + (int)(box->height * 0.75 * scale),
+					marker, marker_len);
+		}
+	}
 
 	return true;
 }
