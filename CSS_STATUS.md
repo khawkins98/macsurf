@@ -1,8 +1,12 @@
 # MacSurf CSS Status Report
 
-Generated 2026-05-19.
+Generated 2026-05-19. Last revised 2026-05-19 (fixes132).
 
 This is a brutal, hedge-free audit of CSS support in MacSurf. The goal is to identify what works, what doesn't, and what to implement next.
+
+## fixes132 revision
+
+The original audit claimed `min-height` was "NOT consumed in layout". A direct source audit refuted this: `layout_apply_minmax_height` (layout.c:2165) calls `ns_computed_min_height` and applies it via two sites in `layout_block_context` (layout.c:4031, 4089). Flex (layout_flex.c:1360-1362), grid (layout_grid.c:432-434), tables (layout.c:2086), and replaced elements (layout.c:175-178) also honor it. The user-visible "min-height collapses" symptom was actually a **VH/VW swap in `css_unit__px_per_unit`** (unit.c:271-275): `CSS_UNIT_VH` was returning `viewport_width/100` and `CSS_UNIT_VW` was returning `viewport_height/100`. The same file's `css_unit__absolute_len2pt` (lines 107-113) had them correct, so the bug was internal inconsistency, not a missing case. Swapped back in fixes132. This also fixes `height: 100vh`, `width: 100vw`, `vmin`, `vmax`, and any other viewport-unit property — they all routed through the broken `px_per_unit` path.
 
 ---
 
@@ -121,7 +125,6 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 | `writing-mode` | yes | no | no | vertical-writing pages broken |
 | `word-spacing` | yes | no | no | typography accuracy |
 | `z-index` | yes | no | no | **stacking order ignored — overlaps wrong** |
-| `min-height` | yes | no | no | layout constraint missing |
 | `break-after`, `break-before`, `break-inside` | yes | no | no | print/column breaks |
 | `page-break-*` | yes | no | no | print breaks |
 | `orphans`, `widows` | yes | no | no | print typography |
@@ -130,10 +133,11 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 **Highest-impact silent fails on real pages, ranked:**
 
 1. **`z-index`** — Modal dialogs, dropdowns, fixed nav bars, tooltips all rely on z-index to stack above page content. Without it, the cascade falls back to DOM tree order. Visible symptom: dropdowns paint UNDER the content below them; modals paint UNDER the page that called them.
-2. **`min-height`** — Hero sections (`min-height: 100vh`) collapse to text height. Visible symptom: large coloured hero blocks appear tiny.
-3. **`background-attachment: fixed`** — Parallax sites scroll their backgrounds. Visible only on specific sites.
-4. **`counter-increment` / `counter-reset`** — Auto-numbered lists, table-of-contents, footnotes. Visible on documentation sites.
-5. **`column-count`** — Magazine-style multi-column text. Visible on news / blog reading layouts.
+2. **`background-attachment: fixed`** — Parallax sites scroll their backgrounds. Visible only on specific sites.
+3. **`counter-increment` / `counter-reset`** — Auto-numbered lists, table-of-contents, footnotes. Visible on documentation sites.
+4. **`column-count`** — Magazine-style multi-column text. Visible on news / blog reading layouts.
+
+(`min-height` was previously listed here. It is fully consumed in layout — the symptom was a viewport-unit conversion bug fixed in fixes132.)
 
 ---
 
@@ -192,17 +196,9 @@ Modern pages cannot render correctly without z-index. Every dropdown, modal, too
 **Files:** `redraw.c`, possibly a new `redraw_stacking.c` helper.
 **Estimated rounds:** 1-2 (one for `z-index: N` on positioned elements, second for stacking contexts proper).
 
-### P1 — `min-height` (HIGH impact, LOW effort)
+### P1 — `min-height` — SHIPPED (fixes132)
 
-Hero sections everywhere use `min-height: 400px` or `min-height: 100vh`. Without it, the hero collapses to text height and the page looks broken.
-
-**Scope:**
-- Find `layout_find_dimensions` callers that read `max_height` and `min_width`
-- Add parallel read of `css_computed_min_height`
-- Apply same way `min_width` is currently applied (`if (min_height > 0 && min_height > *height) *height = min_height`)
-
-**Files:** `layout.c` (one site, mirroring the existing min_width logic at line ~158-205).
-**Estimated rounds:** 1.
+`min-height` was already wired across block, flex, grid, table, and replaced-element layout paths. The user-visible symptom (`min-height: 100vh` collapsing to text height) traced to the VH/VW swap in `css_unit__px_per_unit`, which fixes132 corrected.
 
 ### P2 — `text-overflow: ellipsis` (MEDIUM-HIGH impact, MEDIUM effort)
 
@@ -216,16 +212,9 @@ Card components on every modern UI use this to truncate long titles. Combined wi
 **Files:** new `p_text_overflow.c`, `s_text_overflow.c`, modifications to `layout_inline.c`, `propstrings.h`, dispatch tables.
 **Estimated rounds:** 1-2.
 
-### P3 — Viewport units `vw` / `vh` (HIGH impact on responsive sites, LOW effort)
+### P3 — Viewport units `vw` / `vh` / `vmin` / `vmax` — SHIPPED (fixes132)
 
-Author CSS uses `100vh` for hero sections constantly. libcss already parses unit suffixes; the unit conversion in `css_unit_len2px` is where this lands.
-
-**Scope:**
-- In `css_unit_len2px` (or our wrapper), when unit == `CSS_UNIT_VW` return `viewport_width * value / 100`; same for VH
-- Plumb viewport dimensions through the unit-context. Already partially done — viewport width is in `unit_len_ctx`.
-
-**Files:** `browser/libcss/src/select/calc.c` or our calc shim, possibly `select.c` in the html handler.
-**Estimated rounds:** 1.
+The unit-handler in `css_unit__px_per_unit` (unit.c:271-275) had `CSS_UNIT_VH` and `CSS_UNIT_VW` swapped — VH returned `viewport_width/100` and VW returned `viewport_height/100`. The same file's `css_unit__absolute_len2pt` had them correct. Swapped back in fixes132. `vmin`/`vmax` route through `css_unit__map_viewport_units` to VH or VW, so they get fixed automatically.
 
 ### P4 — `counter-increment` / `counter-reset` (MEDIUM impact, MEDIUM effort)
 
@@ -291,6 +280,4 @@ These are not CSS properties but affect whether pages "load properly":
 
 ## What I would ship next
 
-Top of stack: **P0 (z-index) and P1 (min-height) in one round.** P1 is a 5-line change; P0 needs a paint-order pass but is the biggest visual fix on the table. Together they would close the two most visible structural gaps on modern pages.
-
-After that, P3 (viewport units) is the smallest valuable round, and P2 (text-overflow ellipsis) the polish round.
+P1 (min-height) and P3 (viewport units) shipped in fixes132 as a 2-line swap. Top of remaining stack: **P0 (z-index) — biggest visual fix left**, then P2 (text-overflow ellipsis), then P5 (word-break / overflow-wrap), then P4 (counters).
