@@ -58,6 +58,27 @@ long macos9_box_text_created = 0;
 /**
  * Context for box tree construction
  */
+/*
+ * fixes134b: flat counter table.
+ *
+ * One linked list head per box-construct pass. CSS counter scoping in
+ * the strict spec is hierarchical (each element with counter-reset
+ * starts a new counter in its own scope, descendants increment that
+ * nested counter, and the outer counter is restored on element exit).
+ * We deliberately simplify to a flat table -- works for the common
+ * single-level pattern (body counter-reset + h2::before
+ * counter-increment) which is the only counter usage we'll see on real
+ * pages. Nested scopes are deferred.
+ *
+ * Entries are talloc-allocated against the content->bctx so they share
+ * the box tree's lifetime.
+ */
+struct macsurf_counter_entry {
+	lwc_string *name;
+	int32_t value;
+	struct macsurf_counter_entry *next;
+};
+
 struct box_construct_ctx {
 	html_content *content;		/**< Content we're constructing for */
 
@@ -68,6 +89,10 @@ struct box_construct_ctx {
 	box_construct_complete_cb cb;	/**< Callback to invoke on completion */
 
 	int *bctx;			/**< talloc context */
+
+	/** fixes134b: head of the flat counter table.  Linear lookup is
+	 * fine -- real pages have at most a handful of named counters. */
+	struct macsurf_counter_entry *counters;
 };
 
 /**
@@ -310,19 +335,154 @@ box_get_style(html_content *c,
 }
 
 
+/*
+ * fixes134b: counter table helpers.
+ *
+ * Flat lookup-or-create + apply / read. All four routines are NULL-style-
+ * safe (no-op on NULL style). We store the lwc_string name as a weak
+ * pointer (no ref) -- the libcss cascade owns these strings via the
+ * computed style, and the counter table is talloc'd against ctx->bctx
+ * which shares lifetime with the styles. lwc_string_isequal handles
+ * cross-object equivalence so pointer equality isn't required.
+ */
+
+static struct macsurf_counter_entry *
+counter_lookup_or_create(struct box_construct_ctx *ctx, lwc_string *name)
+{
+	struct macsurf_counter_entry *e;
+	bool same;
+
+	if (name == NULL) return NULL;
+
+	for (e = ctx->counters; e != NULL; e = e->next) {
+		if (lwc_string_isequal(e->name, name, &same) ==
+				lwc_error_ok && same) {
+			return e;
+		}
+	}
+
+	e = talloc_size(ctx->bctx,
+			sizeof(struct macsurf_counter_entry));
+	if (e == NULL) return NULL;
+	e->name = name;
+	e->value = 0;
+	e->next = ctx->counters;
+	ctx->counters = e;
+	return e;
+}
+
+static void
+counter_apply_reset(struct box_construct_ctx *ctx,
+		const css_computed_style *style)
+{
+	const css_computed_counter *arr;
+	struct macsurf_counter_entry *e;
+	uint8_t state;
+
+	if (style == NULL) return;
+	state = css_computed_counter_reset(style, &arr);
+	if (state != CSS_COUNTER_RESET_NAMED || arr == NULL) return;
+
+	while (arr->name != NULL) {
+		e = counter_lookup_or_create(ctx, arr->name);
+		if (e != NULL) {
+			e->value = FIXTOINT(arr->value);
+		}
+		arr++;
+	}
+}
+
+static void
+counter_apply_increment(struct box_construct_ctx *ctx,
+		const css_computed_style *style)
+{
+	const css_computed_counter *arr;
+	struct macsurf_counter_entry *e;
+	uint8_t state;
+
+	if (style == NULL) return;
+	state = css_computed_counter_increment(style, &arr);
+	if (state != CSS_COUNTER_INCREMENT_NAMED || arr == NULL) return;
+
+	while (arr->name != NULL) {
+		e = counter_lookup_or_create(ctx, arr->name);
+		if (e != NULL) {
+			e->value += FIXTOINT(arr->value);
+		}
+		arr++;
+	}
+}
+
+static int32_t
+counter_get_value(struct box_construct_ctx *ctx, lwc_string *name)
+{
+	struct macsurf_counter_entry *e;
+	bool same;
+
+	if (name == NULL) return 0;
+
+	for (e = ctx->counters; e != NULL; e = e->next) {
+		if (lwc_string_isequal(e->name, name, &same) ==
+				lwc_error_ok && same) {
+			return e->value;
+		}
+	}
+	return 0;
+}
+
+/*
+ * fixes134b: int32 decimal formatter.
+ *
+ * MSL snprintf is flagged unreliable on CW8 (see CLAUDE.md file-backed
+ * log channel notes). Hand-rolled. Returns characters written (excluding
+ * NUL); buf is always NUL-terminated when bufsize > 0.
+ */
+static size_t
+counter_fmt_decimal(int32_t v, char *buf, size_t bufsize)
+{
+	char tmp[16];
+	size_t n;
+	size_t i;
+	bool neg;
+
+	if (bufsize == 0) return 0;
+
+	neg = false;
+	if (v < 0) {
+		neg = true;
+		v = -v;
+	}
+
+	n = 0;
+	do {
+		tmp[n++] = (char)('0' + (v % 10));
+		v /= 10;
+	} while (v > 0 && n < sizeof(tmp));
+
+	if (neg && n < sizeof(tmp)) {
+		tmp[n++] = '-';
+	}
+
+	if (n >= bufsize) n = bufsize - 1;
+	for (i = 0; i < n; i++) {
+		buf[i] = tmp[n - 1 - i];
+	}
+	buf[n] = '\0';
+	return n;
+}
+
 /**
  * Construct the box required for a generated element.
  *
+ * \param ctx      Box-construct context (carries counter table)
  * \param n        XML node of type XML_ELEMENT_NODE
  * \param content  Content of type CONTENT_HTML that is being processed
  * \param box      Box which may have generated content
  * \param style    Complete computed style for pseudo element, or NULL
- *
- * \todo This is currently incomplete. It just does enough to support
- * the clearfix hack. (http://www.positioniseverything.net/easyclearing.html )
  */
 static void
-box_construct_generate(dom_node *n,
+box_construct_generate(struct box_construct_ctx *ctx,
+		       dom_node *n,
 		       html_content *content,
 		       struct box *box,
 		       const css_computed_style *style)
@@ -366,20 +526,28 @@ box_construct_generate(dom_node *n,
 	}
 
 	/*
-	 * fixes134a -- generated content STRINGS ONLY.
+	 * fixes134a -- generated content STRINGS.
+	 * fixes134b -- adds CSS_COMPUTED_CONTENT_COUNTER (decimal).
 	 *
-	 * Walk the css_computed_content_item array and materialise
-	 * CSS_COMPUTED_CONTENT_STRING items as a BOX_TEXT inside an
-	 * INLINE_CONTAINER wrapper added as a child of `box`.
+	 * Walk the css_computed_content_item array and materialise:
+	 *   - CSS_COMPUTED_CONTENT_STRING  -> literal text (134a)
+	 *   - CSS_COMPUTED_CONTENT_COUNTER -> decimal of the named counter (134b)
+	 * as a BOX_TEXT inside an INLINE_CONTAINER wrapper added as a
+	 * child of `box`.
 	 *
 	 * The array walk is gated on css_computed_content() returning
 	 * CSS_CONTENT_SET -- this is the guard fixes37/fixes38 missed,
 	 * which caused iteration of an uninitialised c_item pointer when
 	 * the computed-content state was NORMAL / NONE / INHERIT.
 	 *
-	 * Phase A only. URI, ATTR, COUNTER, COUNTERS, and quote items
-	 * are silently skipped (no crash, no rendering). Counters land
-	 * in fixes134b.
+	 * Pseudo-element counter-reset / counter-increment applied
+	 * before the content walk so e.g. `h2::before { counter-increment:
+	 * section; content: counter(section) ". " }` produces the
+	 * post-increment value.
+	 *
+	 * Still skipped without crashing in 134b: URI, ATTR, COUNTERS
+	 * (plural), open/close-quote. Custom counter styles (roman, alpha,
+	 * etc.) are decimal-only.
 	 */
 	{
 		uint8_t cstate;
@@ -410,14 +578,31 @@ box_construct_generate(dom_node *n,
 			return;
 		}
 
-		/* Pass 1: total STRING byte length. Loop terminates at
-		 * CSS_COMPUTED_CONTENT_NONE (type == 0) per libcss. */
+		/* fixes134b: apply pseudo's OWN counter-reset / counter-
+		 * increment before resolving counter() items in content.
+		 * This is the half of the ordering rule that fires inside
+		 * the pseudo's lifetime; the element's NORMAL style
+		 * mutations fired earlier in box_construct_element. */
+		counter_apply_reset(ctx, style);
+		counter_apply_increment(ctx, style);
+
+		/* Pass 1: total byte length across STRING and COUNTER
+		 * items. Loop terminates at CSS_COMPUTED_CONTENT_NONE
+		 * (type == 0) per libcss. */
 		total_len = 0;
 		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
 			if (c_item[i].type == CSS_COMPUTED_CONTENT_STRING &&
 					c_item[i].data.string != NULL) {
 				total_len += lwc_string_length(
 						c_item[i].data.string);
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_COUNTER &&
+					c_item[i].data.counter.name != NULL) {
+				char nbuf[16];
+				total_len += counter_fmt_decimal(
+					counter_get_value(ctx,
+						c_item[i].data.counter.name),
+					nbuf, sizeof(nbuf));
 			}
 		}
 		if (total_len == 0) {
@@ -432,16 +617,27 @@ box_construct_generate(dom_node *n,
 		/* Pass 2: copy. */
 		pos = 0;
 		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
-			const char *s;
-			size_t slen;
-			if (c_item[i].type != CSS_COMPUTED_CONTENT_STRING ||
-					c_item[i].data.string == NULL) {
-				continue;
+			if (c_item[i].type == CSS_COMPUTED_CONTENT_STRING &&
+					c_item[i].data.string != NULL) {
+				const char *s = lwc_string_data(
+						c_item[i].data.string);
+				size_t slen = lwc_string_length(
+						c_item[i].data.string);
+				memcpy(text + pos, s, slen);
+				pos += slen;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_COUNTER &&
+					c_item[i].data.counter.name != NULL) {
+				char nbuf[16];
+				size_t nlen;
+				nlen = counter_fmt_decimal(
+					counter_get_value(ctx,
+						c_item[i].data.counter.name),
+					nbuf, sizeof(nbuf));
+				memcpy(text + pos, nbuf, nlen);
+				pos += nlen;
 			}
-			s = lwc_string_data(c_item[i].data.string);
-			slen = lwc_string_length(c_item[i].data.string);
-			memcpy(text + pos, s, slen);
-			pos += slen;
+			/* Other types silently skipped. */
 		}
 		text[pos] = '\0';
 
@@ -803,9 +999,19 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 		return false;
 	}
 
+	/* fixes134b: element NORMAL counter-reset / counter-increment
+	 * fire HERE, before the ::before pseudo runs. This is half of
+	 * the ordering rule:
+	 *   element normal mutations -> ::before -> children -> ::after
+	 * with each pseudo's own (rare) counter mutations applied
+	 * inside box_construct_generate just before its content
+	 * materialises. */
+	counter_apply_reset(ctx, box->style);
+	counter_apply_increment(ctx, box->style);
+
 	/* Handle the :before pseudo element */
 	if (!(box->flags & IS_REPLACED)) {
-		box_construct_generate(ctx->n, ctx->content, box,
+		box_construct_generate(ctx, ctx->n, ctx->content, box,
 				box->styles->styles[CSS_PSEUDO_ELEMENT_BEFORE]);
 	}
 
@@ -953,7 +1159,8 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
  *
  * This will be called after all children of an element have been processed
  */
-static void box_construct_element_after(dom_node *n, html_content *content)
+static void box_construct_element_after(struct box_construct_ctx *ctx,
+		dom_node *n, html_content *content)
 {
 	struct box_construct_props props;
 	struct box *box = box_for_node(n);
@@ -1006,8 +1213,10 @@ static void box_construct_element_after(dom_node *n, html_content *content)
 			inline_end->inline_end = box;
 		}
 	} else if (!(box->flags & IS_REPLACED)) {
-		/* Handle the :after pseudo element */
-		box_construct_generate(n, content, box,
+		/* Handle the :after pseudo element. fixes134b: ctx threaded
+		 * through next_node so counter mutations from this pseudo
+		 * and counter() resolution can use the live counter table. */
+		box_construct_generate(ctx, n, content, box,
 				box->styles->styles[CSS_PSEUDO_ELEMENT_AFTER]);
 	}
 }
@@ -1025,7 +1234,8 @@ static void box_construct_element_after(dom_node *n, html_content *content)
  * \note \a n will be unreferenced
  */
 static dom_node *
-next_node(dom_node *n, html_content *content, bool convert_children)
+next_node(struct box_construct_ctx *ctx, dom_node *n,
+		html_content *content, bool convert_children)
 {
 	dom_node *next = NULL;
 	bool has_children;
@@ -1053,11 +1263,11 @@ next_node(dom_node *n, html_content *content, bool convert_children)
 
 		if (next != NULL) {
 			if (box_for_node(n) != NULL)
-				box_construct_element_after(n, content);
+				box_construct_element_after(ctx, n, content);
 			dom_node_unref(n);
 		} else {
 			if (box_for_node(n) != NULL)
-				box_construct_element_after(n, content);
+				box_construct_element_after(ctx, n, content);
 
 			while (box_is_root(n) == false) {
 				dom_node *parent = NULL;
@@ -1091,7 +1301,7 @@ next_node(dom_node *n, html_content *content, bool convert_children)
 
 				if (box_for_node(n) != NULL) {
 					box_construct_element_after(
-							n, content);
+							ctx, n, content);
 				}
 			}
 
@@ -1114,8 +1324,8 @@ next_node(dom_node *n, html_content *content, bool convert_children)
 				}
 
 				if (box_for_node(parent) != NULL) {
-					box_construct_element_after(parent,
-							content);
+					box_construct_element_after(ctx,
+							parent, content);
 				}
 
 				dom_node_unref(parent);
@@ -1436,7 +1646,7 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 		}
 
 		/* Find next element to process, converting text nodes as we go */
-		next = next_node(ctx->n, ctx->content, convert_children);
+		next = next_node(ctx, ctx->n, ctx->content, convert_children);
 		while (next != NULL) {
 			dom_node_type type;
 			dom_exception err;
@@ -1462,7 +1672,7 @@ static void convert_xml_to_box(struct box_construct_ctx *ctx)
 				}
 			}
 
-			next = next_node(next, ctx->content, true);
+			next = next_node(ctx, next, ctx->content, true);
 		}
 
 		ctx->n = next;
@@ -1669,6 +1879,7 @@ dom_to_box(dom_node *n,
 	ctx->root_box = NULL;
 	ctx->cb = cb;
 	ctx->bctx = c->bctx;
+	ctx->counters = NULL;	/* fixes134b: empty counter table */
 
 	*box_conversion_context = ctx;
 
