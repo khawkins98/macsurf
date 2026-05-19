@@ -102,7 +102,7 @@ A single Go binary that strips TLS — receives plain HTTP from the Mac, fetches
 
 ## Key Technical Constraints
 
-- Development environment: Mac OS 9.1 on a Power Macintosh G3 Minitower (beige). All verified-working results come from this machine.
+- Development environment: Mac OS 9.1 on a G3 iMac. All verified-working results come from this machine.
 - Community compatibility target: Mac OS 9.2.2 on a Power Mac G4. Most-common active OS 9 setup today; **font rendering verified clean on 9.2.2 G4 at fixes67 (2026-05-15)** — outline + AA path produces smooth, well-spaced text.
 - **Known visual delta between 9.1 and 9.2.2:** font rendering is noticeably rougher on 9.1 than on 9.2.2 even with identical binary and identical `SetOutlinePreferred(true)` / `SetAntiAliasedTextEnabled(true, 8)` calls (the fixes51 settings). QuickDraw's AA path was significantly improved in 9.2 — 9.1 implements `SetAntiAliasedTextEnabled` weakly above 8pt. This is an OS-side limitation, not a MacSurf bug; the same code emits noticeably crisper text on 9.2.2. When working on the dev 9.1 G3 and font output looks rough, don't chase it as a MacSurf regression — confirm on a 9.2.2 machine first.
 - Broader target range: Power Mac G3/G4, Mac OS 9.1-9.2.2, minimum 64MB RAM
