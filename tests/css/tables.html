@@ -87,13 +87,16 @@ background of cells with no visible content; show keeps them.</p>
 </div>
 
 <div class="card">
-  <p class="card-title">PROBE E3 — empty-cells: hide with whitespace-only cell</p>
+  <p class="card-title">PROBE E3 — empty-cells: hide with NBSP-only cell</p>
   <table class="probe empty-hide">
     <tr><td>A</td><td>&nbsp;&nbsp;&nbsp;</td><td>C</td></tr>
   </table>
-  <p class="expect">EXPECT: middle cell contains only non-breaking
-  spaces, which CSS 2.1 still considers empty. Border and background
-  should be suppressed exactly as in E2.</p>
+  <p class="expect">EXPECT: middle cell is painted (NOT hidden).
+  Chrome, Firefox, and Safari all treat non-breaking space as
+  visible content, and fixes139a follows their lead. The CSS 2.1
+  spec wording is ambiguous on NBSP, but real-browser behaviour is
+  unanimous: only structurally-empty cells and ASCII-whitespace
+  cells get hidden.</p>
 </div>
 
 </body>

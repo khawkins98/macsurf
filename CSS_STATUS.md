@@ -172,7 +172,7 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 **Highest-impact silent fails on real pages, ranked:**
 
 1. ~~**`background-attachment: fixed`**~~ **Shipped at fixes137 + fixes138 (2026-05-19).** Viewport-anchored origin + repeating-tile parallax both work end-to-end. Gradient-fixed still deferred.
-2. ~~**`empty-cells`**~~ **Shipped at fixes139a (2026-05-19).** Hidden empty cells skip background + border paint; cell still occupies its layout slot. Whitespace-only counts as empty per spec.
+2. ~~**`empty-cells`**~~ **Shipped at fixes139a (2026-05-19).** Hidden empty cells skip background + border paint; cell still occupies its layout slot. Truly empty cells (no children, no text) and ASCII-whitespace-only cells are treated as empty. `&nbsp;` is treated as visible content matching Chrome/Firefox/Safari behavior (the test's `html_box_table_cell_is_empty` checks raw UTF-8 bytes and U+00A0 encodes as `0xC2 0xA0`, whose leading `0xC2` correctly disqualifies the cell from emptiness — spec phrasing is ambiguous on NBSP, but real-browser behavior is unanimous).
 3. ~~**`word-spacing`**~~ **Shipped at fixes139b (2026-05-19).** Length values resolve through the same plot_font_style_t field as letter-spacing; macos9_font_measure counts ASCII spaces and updates the wrap point so layout and paint agree.
 4. **`column-count`** — Magazine-style multi-column text. Deferred — text-balancing across columns is genuinely complex.
 5. **`caption-side`** — Audited fixes139, **deferred**. Captions currently fall through as BOX_INLINE because no BOX_TABLE_CAPTION type exists in this fork. Real support needs box_construct + box_normalise + table-layout coordination.
