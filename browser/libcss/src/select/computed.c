@@ -201,6 +201,12 @@ css_error css_computed_style_destroy(css_computed_style *style)
 		style->macsurf_grid_tracks = NULL;
 	}
 
+	/* fixes150: free heap-allocated grid ROW track array if any. */
+	if (style->macsurf_grid_row_tracks != NULL) {
+		free(style->macsurf_grid_row_tracks);
+		style->macsurf_grid_row_tracks = NULL;
+	}
+
 	lwc_string_unref(style->i.list_style_image);
 	lwc_string_unref(style->i.background_image);
 
@@ -494,6 +500,12 @@ const int32_t *css_computed_macsurf_grid_tracks(
 		const css_computed_style *style)
 {
 	return style->macsurf_grid_tracks;
+}
+
+const int32_t *css_computed_macsurf_grid_row_tracks(
+		const css_computed_style *style)
+{
+	return style->macsurf_grid_row_tracks;
 }
 
 uint8_t css_computed_macsurf_animation_opacity(

@@ -329,6 +329,12 @@ struct css_computed_style {
 	 * destroy path. */
 	int32_t *macsurf_grid_tracks;
 
+	/* fixes150: heap-allocated 8-int array of grid ROW track
+	 * descriptors, or NULL when no explicit row tracks are set.
+	 * Same encoding as macsurf_grid_tracks. Comparison in arena.c
+	 * via arena__compare_grid_row_tracks. */
+	int32_t *macsurf_grid_row_tracks;
+
 	struct css_computed_style *next;
 	uint32_t count;
 	uint32_t bin;
