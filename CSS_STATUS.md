@@ -136,7 +136,6 @@ These have been verified on hardware or in screenshots and produce the correct v
 - `outline`, `outline-color`, `outline-style`, `outline-width` (parsed and consumed in redraw)
 - `clip` (CSS 2 `clip: rect(...)`)
 - `-macsurf-transform: rotate() translate() scale()` (fixes73)
-- standard `transform: rotate() translate() scale()` (fixes141) — bridged to the fixes73 plotter via a parser-level alias; both vendor and standard names emit identical bytecode and cascade tie-breaks resolve by source order. Deferred: `transform-origin`, `matrix()`, `skew()`, 3D transforms, full stacking-context semantics, individual `rotate` / `translate` / `scale` properties.
 - `-macsurf-text-shadow` (fixes50)
 - `object-fit: fill | contain | cover | none | scale-down` (fixes116)
 - `overflow: visible | hidden | scroll | auto` (clipping applies on block / inline-block / table-cell / flex / inline-flex / grid — fixes131 added flex/grid)
@@ -246,19 +245,38 @@ fixes132–fixes140 sprint sequence. The shipped backlog is folded
 into [What actually works on real pages](#what-actually-works-on-real-pages);
 this section only lists outstanding work.
 
-### ~~Q1 — Standard `transform` property bridge~~ — SHIPPED (fixes141)
+### Q1 — Standard `transform` property bridge (LOW–MEDIUM impact, LOW effort) — **fixes141 ATTEMPTED + REVERTED**
 
-Standard `transform` is now a parser-level alias of
-`-macsurf-transform`. Both names map to the same parser, emit
-identical bytecode (`CSS_PROP_MACSURF_TRANSFORM`), share storage
-slots, and cascade tie-breaks resolve by source order so a later
-`transform: rotate(15deg)` correctly overrides an earlier
-`-macsurf-transform: rotate(5deg)` and vice versa. No new compositor,
-no new cascade handler, no redraw changes — the bridge happens at the
-property-name lookup table only (mirrors the `word-wrap` -> `overflow-wrap`
-pattern). Deferred: `transform-origin`, `matrix()`, `skew()`, 3D
-transforms, full stacking-context semantics, individual `rotate` /
-`translate` / `scale` properties.
+MacSurf consumes its private `-macsurf-transform`; modern pages emit
+the standard `transform: rotate() translate() scale()`. A small
+bridge would route standard `transform` through the existing
+fixes73 plotter, picking up real-page CSS without any new layout
+or paint code.
+
+**fixes141 attempted this** as a parser-level alias mirroring the
+`word-wrap` → `overflow-wrap` pattern (new propstring entry +
+SMAP entry + property_handlers entry pointing at
+`css__parse_macsurf_transform`). On hardware the build still ran
+but every page that referenced standard `transform: ...` hung the
+Mac just before the first reformat (log truncates at
+`content broadcast READY`, no `reformat:` lines fire). The
+simplified test page (inline-block, no flex) crashed identically.
+Reverted in the same round.
+
+**Hypotheses for future investigation:**
+1. The parser is reentrant-unsafe when called for two different
+   prop indices (TRANSFORM and MACSURF_TRANSFORM in the same
+   ruleset).
+2. A select-side dispatch table indexed by FIRST_PROP–LAST_PROP
+   range is sized statically somewhere outside the explicit
+   property_handlers/propstrings arrays.
+3. The bytecode emitted with `CSS_PROP_MACSURF_TRANSFORM` opcode
+   but reached via a different `parser_handlers[]` slot index
+   confuses something in the deferred `var()` resolution path.
+
+Next attempt should add MS_LOG instrumentation **before** shipping,
+and bisect against an even more minimal page (single inline `<span
+style="transform: rotate(10deg)">` against `<span style="-macsurf-transform: ...">`).
 
 ### Q2 — Full-fidelity two-value `gap: A B` (LOW impact, MEDIUM effort)
 
