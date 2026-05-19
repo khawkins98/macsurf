@@ -476,6 +476,37 @@ macsurf__emit_flat_tracks(const char *p, const char *end,
 			continue;
 		}
 
+		/* fixes148b3: if this token is immediately followed by '(',
+		 * it's a function name (minmax / fit-content / calc / ...).
+		 * Skip the balanced parenthesised body so its inner tokens
+		 * don't get flat-tokenised into extra tracks, and emit ONE
+		 * "1fr" for the function as a whole -- matching the top-
+		 * level emit_grid_tracks handling.  Without this branch,
+		 * repeat(3, minmax(100px, 1fr)) flat-tokenises each
+		 * minmax(...) inside the repeat into three tokens
+		 * (minmax-name -> "1fr", 100px, 1fr) and emits 3 * 3 = 9
+		 * tokens (capped to MAX 8). */
+		if (p < end && *p == '(') {
+			int depth = 1;
+			int nfr;
+			p++;
+			while (p < end && depth > 0) {
+				if (*p == '(') depth++;
+				else if (*p == ')') {
+					depth--;
+					if (depth == 0) { p++; break; }
+				}
+				p++;
+			}
+			nfr = macsurf__emit_one_track(out + *out_pos,
+					cap - *out_pos, "1fr", 3);
+			if (nfr < 0) return;
+			*out_pos += (size_t)nfr;
+			(*room)--;
+			(*emitted)++;
+			continue;
+		}
+
 		n = macsurf__emit_one_track(out + *out_pos,
 				cap - *out_pos, tok_start, tok_len);
 		if (n < 0) return;
