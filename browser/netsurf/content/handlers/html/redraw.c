@@ -890,6 +890,17 @@ static bool html_redraw_file(int x, int y, int width, int height,
  * \return true if successful, false otherwise
  */
 
+/* fixes137: cross-module helper exposing scroll origin + viewport
+ * dimensions on the macos9 frontend. NetSurf core has no notion of
+ * scroll position during paint, so html_redraw_background reads them
+ * via this extern when background-attachment: fixed is active. On
+ * non-macos9 builds the symbol is missing; the #ifdef gate keeps the
+ * call site out. */
+#ifdef __MACOS9__
+extern int macos9_get_bg_fixed_origin(int *out_x, int *out_y,
+		int *out_w, int *out_h);
+#endif
+
 static bool html_redraw_background(int x, int y, struct box *box, float scale,
 		const struct rect *clip, colour *background_colour,
 		struct box *background,
@@ -900,6 +911,7 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	bool repeat_y = false;
 	bool plot_colour = true;
 	bool plot_content;
+	bool bg_fixed = false;
 	bool clip_to_children = false;
 	struct box *clip_box = box;
 	int ox = x, oy = y;
@@ -1093,6 +1105,43 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 			height = box->padding[TOP] + box->height +
 					box->padding[BOTTOM];
 		}
+
+		/* fixes137: background-attachment: fixed.
+		 *
+		 * When fixed, the image anchors to the viewport instead of
+		 * the element's box: as the page scrolls, the image stays
+		 * still on screen. We override (x, y) to the viewport's
+		 * top-left in page-coords (= scroll offset), and use
+		 * viewport dims as the position-percent context so the
+		 * 50%/50% case lands at the centre of the visible window,
+		 * not the centre of the element.
+		 *
+		 * The box's clip rect `r` stays unchanged below, so the
+		 * fixed image is still only visible inside the element's
+		 * bounds -- the rest is clipped by the active QD clipRgn.
+		 *
+		 * The image-clip-narrowing further down (for non-repeating
+		 * images) is skipped when bg_fixed is true, because that
+		 * code narrows `r` to (image_at_viewport_x, image_at_
+		 * viewport_y, +width, +height), which would land far
+		 * outside the box when scrolled. */
+		if (background->style &&
+				css_computed_background_attachment(
+					background->style) ==
+				CSS_BACKGROUND_ATTACHMENT_FIXED) {
+#ifdef __MACOS9__
+			int fx = 0, fy = 0, fw = 0, fh = 0;
+			(void) macos9_get_bg_fixed_origin(&fx, &fy, &fw, &fh);
+			if (fw > 0 && fh > 0) {
+				x = fx;
+				y = fy;
+				width = fw;
+				height = fh;
+				bg_fixed = true;
+			}
+#endif
+		}
+
 		/* handle background-repeat */
 		switch (css_computed_background_repeat(background->style)) {
 		case CSS_BACKGROUND_REPEAT_REPEAT:
@@ -1257,14 +1306,20 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 			width = content_get_width(background->background);
 			height = content_get_height(background->background);
 
-			/* ensure clip area only as large as required */
-			if (!repeat_x) {
+			/* ensure clip area only as large as required.
+			 * fixes137: skip narrowing when bg-attachment is
+			 * fixed -- the image is anchored to the viewport,
+			 * not the box, so (x, +width) may lie far outside
+			 * the box and would null the clip. Let the QD
+			 * clipRgn (already box-bound) handle the natural
+			 * clipping instead. */
+			if (!repeat_x && !bg_fixed) {
 				if (r.x0 < x)
 					r.x0 = x;
 				if (r.x1 > x + width * scale)
 					r.x1 = x + width * scale;
 			}
-			if (!repeat_y) {
+			if (!repeat_y && !bg_fixed) {
 				if (r.y0 < y)
 					r.y0 = y;
 				if (r.y1 > y + height * scale)

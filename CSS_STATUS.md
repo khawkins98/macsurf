@@ -149,7 +149,7 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 
 | Property | Parsed | Layout reads? | Redraw reads? | Impact |
 |---|---|---|---|---|
-| `background-attachment` | yes | no | no | parallax / fixed bg won't stick |
+| `background-attachment` | yes | no | **yes (fixes137)** | non-repeating bg-image: anchors to viewport. Repeat-fixed and gradient-fixed deferred. |
 | `caption-side` | yes | no | no | table caption position ignored |
 | `column-count` | yes | no | no | multi-column text layout broken |
 | `column-fill` | yes | no | no | |
@@ -169,7 +169,7 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 
 **Highest-impact silent fails on real pages, ranked:**
 
-1. **`background-attachment: fixed`** — Parallax sites scroll their backgrounds. Visible only on specific sites.
+1. ~~**`background-attachment: fixed`**~~ **Shipped at fixes137 (2026-05-19)** for non-repeating bg-image. Parallax bg images now anchor to the viewport during scroll. Repeating-tile fixed and gradient-fixed still deferred.
 2. **`column-count`** — Magazine-style multi-column text. Visible on news / blog reading layouts.
 
 (`min-height` and viewport units were previously listed here. Both shipped in fixes132. `z-index` shipped in fixes133. `counter-increment` / `counter-reset` shipped in fixes134b — see "What actually works" section.)
@@ -190,8 +190,21 @@ Only `bold` (>= 600) vs `normal` (< 600). Numeric weights 100/200/300/400/500/60
 ### `text-overflow: ellipsis`
 **fixes135a + fixes135c (2026-05-19): WORKS on hardware.** Parser/cascade/computed plumbing in 135a; visual paint-after rendering in 135c, accepted on G3. The 135c architecture paints the ellipsis as a separate overlay: the original text draws normally (overflow:hidden clips at the container edge), then a background-coloured rect followed by a `…` text call paints over the rightmost slice. Avoids the text-buffer-mutation bug that broke the earlier fixes135b attempt. The macos9 plot_text path folds U+2026 to MacRoman 0xC9 ([macos9_font.c:109](browser/netsurf/frontends/macos9/macos9_font.c#L109)) so the same three UTF-8 bytes render correctly. Deferred to V2: multi-line ellipsis, two-value form (`text-overflow: clip ellipsis`), custom string marker, RTL/start-side ellipsis, ellipsis across complex nested inline boxes.
 
-### `word-break` / `overflow-wrap`
-**fixes136a (2026-05-19): plumbing only. ACCEPTED on G3.** libcss now parses `word-break: normal | break-all | keep-all`, `overflow-wrap: normal | break-word | anywhere`, and the legacy `word-wrap: break-word` alias (which emits the same bytecode as `overflow-wrap`). Computed style stores the bits; `css_computed_word_break()` and `css_computed_overflow_wrap()` return the right enums. Invalid values fall back to `normal`. Layout integration ships in **fixes136b**; until then long unbreakable strings still overflow their containers — but observed in hardware testing, NetSurf's default `white-space: normal` already breaks at `/`, `-`, and other punctuation, so the visible regression is narrower than expected: only fully-unbreakable runs (long hashes, base64 strings, no-punctuation IDs) actually need `break-word` to wrap. `keep-all` is parsed for forward-compat but inert without CJK segmentation. `anywhere` aliases to `break-word` semantically.
+### `word-break` / `overflow-wrap` / `word-wrap`
+**fixes136a (2026-05-19): plumbing accepted. fixes136b deferred.**
+
+Parsed/computed status:
+- `word-break: normal | break-all | keep-all` — parses, computes correctly.
+- `overflow-wrap: normal | break-word | anywhere` — parses, computes correctly.
+- `word-wrap: break-word` — parses as a legacy alias for `overflow-wrap`.
+- Invalid values fall back to `normal`. `css_computed_word_break()` and `css_computed_overflow_wrap()` return the right enum.
+- `keep-all` is parsed for forward-compat but inert without CJK segmentation. `anywhere` aliases to `break-word` semantically.
+
+**Current layout behaviour (intentional deviation from spec).** MacSurf's inline layout already performs emergency character-boundary wrapping for long unbreakable runs even when the author has not set `overflow-wrap: break-word`. [macos9_font_split](browser/netsurf/frontends/macos9/macos9_font.c#L310) line 352-364: if no space character fits in the available width, it hard-breaks at the next character boundary. This matches the practical effect of `overflow-wrap: break-word` / `word-break: break-all` for URLs and hashes, but does **not** yet distinguish strict `normal` vs `break-word` vs `break-all` semantics. Hardware-confirmed at fixes136a: long URLs and 64-char hash tokens wrap mid-character without needing any author CSS.
+
+A strict-spec fixes136b that disables this hard-break for `overflow-wrap: normal` was considered and rejected: real pages do not explicitly opt into `break-word`, so making `normal` strict would horizontally overflow every long URL or hash that authors haven't pre-formatted. Practical readability wins over spec strictness. The libcss plumbing still pays off when a future caller (e.g. a CSS reset that wants strict non-breaking, or richer line-break logic for `break-all`'s aggressive mode) needs to read the computed value.
+
+If a real page later breaks because the default is too aggressive, fixes136b can revisit a narrower change: make `overflow-wrap: normal` + `word-break: normal` together signal "do not character-break", while leaving every other combination on the friendly default.
 
 ### `clip-path` and `mask`
 Not implemented. Decorative shape clipping silently ignored. Pages degrade to rectangular fallback (usually fine).
