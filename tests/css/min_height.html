@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>min-height test (fixes132)</title>
+<style>
+body { font-family: Geneva; margin: 8px; background: #fff; color: #000; }
+.label { font-size: 10pt; margin: 4px 0; }
+.box { background: #cce; border: 1px solid #336; margin-bottom: 8px; padding: 4px; }
+
+/* Case A: min-height in px, no explicit height. Should be 300px tall. */
+.a { min-height: 300px; }
+
+/* Case B: short explicit height overridden by larger min-height. */
+.b { height: 50px; min-height: 200px; background: #ecc; }
+
+/* Case C: min-height: 100vh — should fill viewport height. */
+.c { min-height: 100vh; background: #cec; }
+
+/* Case D: min-height in px on a flex container. */
+.d {
+  display: flex;
+  flex-direction: row;
+  min-height: 150px;
+  background: #ece;
+}
+.d > span {
+  background: #336;
+  color: #fff;
+  padding: 4px;
+  margin: 2px;
+}
+
+/* Case E: min-height in px on a grid container. */
+.e {
+  display: grid;
+  -macsurf-grid: 2;
+  min-height: 180px;
+  background: #cee;
+}
+.e > span {
+  background: #633;
+  color: #fff;
+  padding: 4px;
+  margin: 2px;
+}
+</style>
+</head>
+<body>
+
+<div class="label">A: min-height 300px (one line of text, box should be 300px tall):</div>
+<div class="box a">short</div>
+
+<div class="label">B: height 50px + min-height 200px (should be 200px, not 50px):</div>
+<div class="box b">short</div>
+
+<div class="label">C: min-height 100vh (should fill viewport height):</div>
+<div class="box c">short</div>
+
+<div class="label">D: flex container, min-height 150px:</div>
+<div class="box d"><span>A</span><span>B</span><span>C</span></div>
+
+<div class="label">E: grid container 2 cols, min-height 180px:</div>
+<div class="box e"><span>1</span><span>2</span></div>
+
+</body>
+</html>
