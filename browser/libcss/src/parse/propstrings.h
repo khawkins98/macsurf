@@ -80,13 +80,8 @@ enum {
 	MACSURF_TRANSFORM, MACSURF_GRID, MACSURF_ANIMATION_OPACITY,
 	MACSURF_ANIMATION_ROTATE, OBJECT_FIT, TEXT_OVERFLOW,
 	WORD_BREAK, OVERFLOW_WRAP, WORD_WRAP,
-	/* fixes141: standard `transform` aliases -macsurf-transform.
-	 * Same parser, same bytecode opcode (CSS_PROP_MACSURF_TRANSFORM),
-	 * same computed-style slot. Pattern mirrors WORD_WRAP -> OVERFLOW_WRAP
-	 * a few lines up. */
-	TRANSFORM,
 
-	LAST_PROP = TRANSFORM,
+	LAST_PROP = WORD_WRAP,
 
 	/* Other keywords */
 	INHERIT, UNSET, IMPORTANT, NONE, BOTH, FIXED, SCROLL, TRANSPARENT,

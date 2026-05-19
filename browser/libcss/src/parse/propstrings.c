@@ -248,9 +248,6 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("word-break"),
 	SMAP("overflow-wrap"),
 	SMAP("word-wrap"),
-	/* fixes141: standard transform name, parser-level alias of
-	 * -macsurf-transform. */
-	SMAP("transform"),
 
 	SMAP("inherit"),
 	SMAP("unset"),
