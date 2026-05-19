@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes141 (standard transform)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 {
+    color: #003366;
+    font-size: 14pt;
+    margin: 0 0 4px 0;
+  }
+  .lede {
+    color: #666;
+    font-size: 8pt;
+    margin: 0 0 12px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+  }
+  .card-title {
+    color: #003366;
+    font-size: 10pt;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+  }
+  .expect {
+    color: #888;
+    font-style: italic;
+    font-size: 8pt;
+    margin: 8px 0 0 0;
+  }
+  .pair { display: flex; gap: 24px; align-items: flex-start; }
+  .box {
+    width: 100px;
+    height: 50px;
+    background: #cde;
+    border: 2px solid #036;
+    color: #003366;
+    text-align: center;
+    line-height: 50px;
+    font-weight: bold;
+  }
+
+  /* fixes141 probes. Each pair has a vendor (-macsurf-transform)
+   * box and a standard (transform) box -- they should render
+   * identically because standard transform now aliases the
+   * vendor parser at the property-name level. */
+
+  .vendor-rotate    { -macsurf-transform: rotate(10deg); }
+  .standard-rotate  {          transform: rotate(10deg); }
+
+  .vendor-translate    { -macsurf-transform: translate(30px, 10px); }
+  .standard-translate  {          transform: translate(30px, 10px); }
+
+  .vendor-scale    { -macsurf-transform: scale(1.2); }
+  .standard-scale  {          transform: scale(1.2); }
+
+  .chain { transform: translate(20px, 5px) rotate(8deg) scale(1.1); }
+  .none  { transform: none; }
+
+  /* cascade tie-break: both properties target the same internal
+   * slot so the LATER declaration wins. With transform written
+   * second, transform's rotate(15deg) overrides the vendor
+   * rotate(5deg). */
+  .both {
+    -macsurf-transform: rotate(5deg);
+             transform: rotate(15deg);
+  }
+</style>
+</head>
+<body>
+
+<h1>MacSurf — fixes141 (standard transform)</h1>
+<p class="lede">Standard CSS transform now bridges into the
+existing fixes73 -macsurf-transform engine. Each vendor box (left)
+and standard box (right) should render identically.</p>
+
+<div class="card">
+  <p class="card-title">PROBE T1 — rotate(10deg)</p>
+  <div class="pair">
+    <div class="box vendor-rotate">vendor</div>
+    <div class="box standard-rotate">standard</div>
+  </div>
+  <p class="expect">EXPECT: identical 10-degree rotations.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE T2 — translate(30px, 10px)</p>
+  <div class="pair">
+    <div class="box vendor-translate">vendor</div>
+    <div class="box standard-translate">standard</div>
+  </div>
+  <p class="expect">EXPECT: identical 30px right + 10px down
+  translation.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE T3 — scale(1.2)</p>
+  <div class="pair">
+    <div class="box vendor-scale">vendor</div>
+    <div class="box standard-scale">standard</div>
+  </div>
+  <p class="expect">EXPECT: identical 1.2x scale on both.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE T4 — chain (translate + rotate + scale)</p>
+  <div class="box chain">chain</div>
+  <p class="expect">EXPECT: visibly translated, rotated, and
+  scaled. All three components apply in one declaration.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE T5 — none</p>
+  <div class="box none">none</div>
+  <p class="expect">EXPECT: untransformed box (no rotation,
+  translation, or scale).</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE T6 — cascade (standard wins by source order)</p>
+  <div class="box both">both</div>
+  <p class="expect">EXPECT: rotate(15deg) -- the standard
+  declaration wins because it comes later in source order. If
+  you saw rotate(5deg) the vendor rule incorrectly overrode the
+  standard one.</p>
+</div>
+
+</body>
+</html>

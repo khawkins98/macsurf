@@ -173,7 +173,8 @@ const css_prop_handler property_handlers[LAST_PROP + 1 - FIRST_PROP] =
 	css__parse_text_overflow,
 	css__parse_word_break,
 	css__parse_overflow_wrap,
-	css__parse_overflow_wrap  /* word-wrap is a legacy alias for overflow-wrap */
+	css__parse_overflow_wrap,  /* word-wrap is a legacy alias for overflow-wrap */
+	css__parse_macsurf_transform  /* fixes141: standard `transform` alias */
 	};/** Mapping from property bytecode index to bytecode unit class mask. */
 const uint32_t property_unit_mask[CSS_N_PROPERTIES] = {
 	[CSS_PROP_AZIMUTH]               = UNIT_MASK_AZIMUTH,
