@@ -124,6 +124,10 @@ These have been verified on hardware or in screenshots and produce the correct v
 - `list-style-type` (disc, decimal, etc. — but bullet glyph renders as `;` on G3, see Known Issues)
 - `list-style-image`
 - `content` for `::before` / `::after` pseudo-elements
+  - string items (fixes134a)
+  - decimal `counter(name)` items (fixes134b/d)
+  - `open-quote` / `close-quote` / `no-open-quote` / `no-close-quote` with document-scope depth tracking (fixes140a)
+- `quotes` list (fixes140b); UA defaults wrap `<q>` in curly typographic quotes via the macos9 resource CSS (fixes140c)
 
 ### Custom & visual
 - CSS Custom Properties / `var()` — full native resolution (fixes133-139)
@@ -158,7 +162,7 @@ These accept author CSS without complaint but have zero effect on rendering. Eve
 | `column-rule-*` | yes | no | no | depends on column-count |
 | `column-span` | yes | no | no | depends on column-count |
 | `column-width` | yes | no | no | depends on column-count |
-| `quotes` | yes | no | no | `q { quotes: ... }` ignored |
+| `quotes` | yes | no | **yes (fixes140b)** | resolved at generated-content materialisation; depth-indexed open/close strings emitted from `content: open-quote / close-quote` |
 | `empty-cells` | yes | no | **yes (fixes139a)** | show/hide both honored; hidden empty cells skip background + border paint while keeping their layout slot |
 | `table-layout` | yes | no | no | **Audited fixes139: deferred.** 1064 lines of dedicated table.c + table integration in layout.c. Too risky for one round per sprint rule "do not destabilize all table layout". |
 | `unicode-bidi` | yes | no | no | bidi text |
@@ -236,66 +240,64 @@ Probably fixed by fixes77g, needs verification. Workaround: File → New Window.
 
 ## Implementation priorities
 
-Ranked by visual impact on real-world pages. Each priority is a discrete shippable round.
+Ranked by current visual impact on real-world pages, after the
+fixes132–fixes140 sprint sequence. The shipped backlog is folded
+into [What actually works on real pages](#what-actually-works-on-real-pages);
+this section only lists outstanding work.
 
-### P0 — `z-index` basic positioned stacking — SHIPPED (fixes133)
+### Q1 — Standard `transform` property bridge (LOW–MEDIUM impact, LOW effort)
 
-`html_redraw_box_children` in `redraw.c` now paints in two passes: pass 1 walks non-z-indexed children in DOM order; pass 2 stable-sorts positioned children with explicit `z-index` by ascending z-index and paints them on top. Fixed-size buffer (64) per level — overflow falls back to DOM order paint. Negative z-index treated same as zero in this pass (paints after parent's content, not before). Full CSS 2.1 painting order (negative-z-before-parent, opacity/transform stacking contexts, full 7-level paint order) is deferred to v2.
+MacSurf consumes its private `-macsurf-transform`; modern pages emit
+the standard `transform: rotate() translate() scale()`. A small
+bridge would route standard `transform` through the existing
+fixes73 plotter, picking up real-page CSS without any new layout
+or paint code. Easiest visible CSS3 win on the table.
 
-### P1 — `min-height` — SHIPPED (fixes132)
+### Q2 — Full-fidelity two-value `gap: A B` (LOW impact, MEDIUM effort)
 
-`min-height` was already wired across block, flex, grid, table, and replaced-element layout paths. The user-visible symptom (`min-height: 100vh` collapsing to text height) traced to the VH/VW swap in `css_unit__px_per_unit`, which fixes132 corrected.
+Currently single-value `gap: N` and standalone `row-gap: N` work;
+two-value `gap: A B` collapses A to column-gap. Splitting row-gap
+into its own bit slot is ~17 files of cross-cutting plumbing.
+Real-world impact is small.
 
-### P2 — `text-overflow: ellipsis` (MEDIUM-HIGH impact, MEDIUM effort)
+### Q3 — `caption-side: top | bottom` (MEDIUM impact, HIGH effort)
 
-Card components on every modern UI use this to truncate long titles. Combined with fixes131's overflow-clipping on flex containers, ellipsis would finally make cards look polished.
+Audited at fixes139. `<caption>` currently maps to `BOX_INLINE` in
+`box_construct.c:139`; no `BOX_TABLE_CAPTION` type exists. Real
+support needs a new box type, normalise rewrite, and table-layout
+sibling placement. Structural change, not a minimal round.
 
-**Scope:**
-- Parse `text-overflow` property (new parser + selector files)
-- In `layout_inline.c` (or wherever line boxes are finalized), when overflow:hidden is set and a line would exceed its container, truncate at the last fitting character and append `…`
-- Mac OS 9 `…` glyph = `0xC9` in MacRoman, which we already convert from UTF-8
+### Q4 — `table-layout: fixed` (MEDIUM impact, HIGH effort)
 
-**Files:** new `p_text_overflow.c`, `s_text_overflow.c`, modifications to `layout_inline.c`, `propstrings.h`, dispatch tables.
-**Estimated rounds:** 1-2.
+Audited at fixes139. 1064 lines of dedicated table layout in
+`table.c` plus table integration in `layout.c`. Per sprint rule
+"do not destabilize all table layout", deferred until a
+contained-scope follow-up audit finds a tractable seam.
 
-### P3 — Viewport units `vw` / `vh` / `vmin` / `vmax` — SHIPPED (fixes132)
+### Q5 — `column-count` / `column-rule-*` / `column-gap` (LOW–MEDIUM impact, HIGH effort)
 
-The unit-handler in `css_unit__px_per_unit` (unit.c:271-275) had `CSS_UNIT_VH` and `CSS_UNIT_VW` swapped — VH returned `viewport_width/100` and VW returned `viewport_height/100`. The same file's `css_unit__absolute_len2pt` had them correct. Swapped back in fixes132. `vmin`/`vmax` route through `css_unit__map_viewport_units` to VH or VW, so they get fixed automatically.
+Multi-column text layout. Genuinely complex — text balancing,
+column breaks, orphan/widow handling. Defer until proven needed
+on a real page.
 
-### P4 — `counter-increment` / `counter-reset` (MEDIUM impact, MEDIUM effort)
+### Q6 — Strict `word-break: break-all` / `overflow-wrap: normal` (LOW impact)
 
-Numbered headings, ordered lists with custom numbering, table-of-contents formats. NetSurf's `content_item` already has counter types in the cascade; we just don't drive them.
+Plumbing landed in fixes136a; layout currently always allows
+character-boundary breaks on long unbreakable runs because real
+pages benefit. A strict mode that respects `overflow-wrap: normal`
+is parked behind "show me a real page where this matters" because
+flipping the default would regress every URL-heavy page that
+doesn't explicitly opt in.
 
-**Scope:**
-- Walk DOM in document order, maintaining a counter table per scope
-- Resolve `counter(name)` in `content: counter(chapter)` to the current value
-- Reset on `counter-reset` declarations
+### Q7 — `transition` / `animation` (v0.4.5+)
 
-**Files:** new `redraw_counters.c` helper invoked from `html_redraw_box` for boxes with `content` containing counter items.
-**Estimated rounds:** 2-3.
+Animation framework would touch event loop, paint scheduling, time
+tracking. Substantial scope. Defer to v0.4.5.
 
-### P5 — `word-break: break-all` / `overflow-wrap: break-word` (LOW-MEDIUM impact, LOW effort)
+### Q8 — `clip-path`, `mask`, `filter` (LOW impact, HIGH effort)
 
-Long URLs in body text overflow containers. Word-break forces character-level wrapping when normal word breaks won't fit.
-
-**Scope:**
-- In `layout_inline.c`, when measuring a line and a single word exceeds the line width, allow mid-word breaks
-- Property already parsed by NetSurf's libcss
-
-**Files:** `layout_inline.c`.
-**Estimated rounds:** 1.
-
-### P6 — `transition` / `animation` (deferred to v0.4.5)
-
-Animation framework would touch event loop, paint scheduling, time tracking. Substantial scope. Defer.
-
-### P7 — `column-count` for multi-column text (LOW-MEDIUM impact, HIGH effort)
-
-Magazine-style layout. Genuinely complex (text balancing across columns). Defer until proven needed.
-
-### P8 — `clip-path`, `mask`, `filter` (LOW impact, HIGH effort)
-
-Decorative. Pages degrade to rectangular fallback which is acceptable. Defer indefinitely.
+Decorative. Pages degrade to rectangular fallback which is
+acceptable. Defer indefinitely.
 
 ---
 
@@ -326,4 +328,4 @@ These are not CSS properties but affect whether pages "load properly":
 
 ## What I would ship next
 
-P1 (min-height) and P3 (viewport units) shipped in fixes132 as a 2-line swap. Top of remaining stack: **P0 (z-index) — biggest visual fix left**, then P2 (text-overflow ellipsis), then P5 (word-break / overflow-wrap), then P4 (counters).
+Top of remaining stack after fixes132–fixes140: **Q1 (standard `transform` bridge)** is the lowest-effort visible CSS3 win — route the standard `transform` property through fixes73's existing `-macsurf-transform` plotter. Real pages emit the standard name; nothing else needs to change. Everything else outstanding (caption-side, table-layout, multi-column, animations) carries structural-change risk and should wait for a contained-scope audit.

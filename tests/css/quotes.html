@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes140 (quotes + open/close-quote)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 {
+    color: #003366;
+    font-size: 14pt;
+    margin: 0 0 4px 0;
+  }
+  .lede {
+    color: #666;
+    font-size: 8pt;
+    margin: 0 0 12px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+  }
+  .card-title {
+    color: #003366;
+    font-size: 10pt;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+  }
+  .expect {
+    color: #888;
+    font-style: italic;
+    font-size: 8pt;
+    margin: 8px 0 0 0;
+  }
+  p { margin: 4px 0; }
+
+  /* fixes140 probes. fixes140c adds UA default quotes for <q> so
+   * Q1 works without any author CSS. The other probes exercise the
+   * explicit quotes/open-quote/close-quote/no-* paths. */
+
+  .author-quotes {
+    quotes: "<<" ">>" "<" ">";
+  }
+  .author-quotes q::before { content: open-quote; }
+  .author-quotes q::after  { content: close-quote; }
+
+  .silent {
+    quotes: "[" "]";
+  }
+  .silent::before { content: no-open-quote; }
+  .silent::after  { content: no-close-quote " (no close)"; }
+
+  .qfallback q::before { content: open-quote; }
+  .qfallback q::after  { content: close-quote; }
+</style>
+</head>
+<body>
+
+<h1>MacSurf — fixes140 (quotes + open/close-quote)</h1>
+<p class="lede">fixes140 wires the four quote content items
+(open-quote, close-quote, no-open-quote, no-close-quote) and the
+quotes property. Depth tracks across the document so nested
+&lt;q&gt; produces the secondary quote pair from the list.</p>
+
+<div class="card">
+  <p class="card-title">PROBE Q1 — UA default quotes via &lt;q&gt;</p>
+  <p>The captain said <q>land ho</q> from the crow's nest.</p>
+  <p class="expect">EXPECT: <q>land ho</q> wrapped in curly double
+  quotes from the UA stylesheet. No author CSS needed -- fixes140c
+  adds the q rule and ::before/::after defaults inline in the macos9
+  resource CSS.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE Q2 — nested &lt;q&gt; uses the second pair</p>
+  <p>She replied <q>he said <q>land ho</q> twice</q>.</p>
+  <p class="expect">EXPECT: outer <q>...</q> uses curly double; inner
+  <q>...</q> uses curly single. Depth increments through open-quote,
+  decrements through close-quote, so nesting picks the second
+  pair.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE Q3 — author-defined ASCII quotes</p>
+  <div class="author-quotes">
+    <p>Outer <q>level one <q>level two</q> back out</q> again.</p>
+  </div>
+  <p class="expect">EXPECT: outer wrapped in &lt;&lt; &gt;&gt;,
+  inner wrapped in &lt; &gt;. Same depth behaviour as Q2 but with
+  author-supplied strings.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE Q4 — no-open-quote / no-close-quote</p>
+  <p class="silent">silent: emits nothing on either side but still
+  bumps quote depth.</p>
+  <p class="expect">EXPECT: text reads exactly as authored, plus the
+  literal trailing string " (no close)" from the ::after content.
+  No quote characters are emitted. fixes140a still updates depth so
+  later siblings see the right nesting level.</p>
+</div>
+
+<div class="card">
+  <p class="card-title">PROBE Q5 — depth carries across paragraphs</p>
+  <div class="qfallback">
+    <p>First <q>alpha</q></p>
+    <p>Second <q>beta <q>gamma</q></q></p>
+  </div>
+  <p class="expect">EXPECT: alpha and beta wrapped in curly double
+  (depth 0), gamma in curly single (depth 1). Depth resets only
+  via balanced close-quote pairs, not by paragraph boundaries.</p>
+</div>
+
+</body>
+</html>

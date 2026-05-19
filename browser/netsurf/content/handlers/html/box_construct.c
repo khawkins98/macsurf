@@ -93,6 +93,14 @@ struct box_construct_ctx {
 	/** fixes134b: head of the flat counter table.  Linear lookup is
 	 * fine -- real pages have at most a handful of named counters. */
 	struct macsurf_counter_entry *counters;
+
+	/** fixes140a: document-scope quote nesting depth. Incremented by
+	 * each materialised open-quote / no-open-quote item, decremented
+	 * (floored at 0) by each close-quote / no-close-quote item. Per
+	 * CSS 2.1 §12.3 the depth indexes into the resolved `quotes`
+	 * list to choose which pair of opening/closing strings to emit
+	 * for the current nesting level. */
+	int32_t quote_depth;
 };
 
 /**
@@ -547,9 +555,16 @@ box_construct_generate(struct box_construct_ctx *ctx,
 	 * section; content: counter(section) ". " }` produces the
 	 * post-increment value.
 	 *
-	 * Still skipped without crashing in 134b: URI, ATTR, COUNTERS
-	 * (plural), open/close-quote. Custom counter styles (roman, alpha,
-	 * etc.) are decimal-only.
+	 * fixes140a -- adds OPEN_QUOTE / CLOSE_QUOTE / NO_OPEN_QUOTE /
+	 * NO_CLOSE_QUOTE. Quote depth on box_construct_ctx is the
+	 * document-wide running counter; depth indexes the resolved
+	 * `quotes` list to choose which open/close pair to emit. The
+	 * NO_* variants update depth but emit no characters. If the
+	 * quotes list is shorter than the current depth, CSS 2.1 §12.3
+	 * says the last pair is reused.
+	 *
+	 * Still skipped without crashing: URI, ATTR, COUNTERS (plural).
+	 * Custom counter styles (roman, alpha, etc.) are decimal-only.
 	 */
 	{
 		uint8_t cstate;
@@ -559,10 +574,27 @@ box_construct_generate(struct box_construct_ctx *ctx,
 		char *text;
 		struct box *container;
 		struct box *text_box;
+		lwc_string **quotes_arr = NULL;
+		uint32_t n_quotes = 0;
+		int32_t local_depth;
 
 		cstate = css_computed_content(style, &c_item);
 		if (cstate != CSS_CONTENT_SET || c_item == NULL) {
 			return;
+		}
+
+		/* Resolve quotes list. CSS_QUOTES_STRING => a NULL-terminated
+		 * array of lwc_string * pairs (open0, close0, open1, close1,
+		 * ..., NULL). CSS_QUOTES_NONE / INHERIT-without-ancestor =>
+		 * quotes_arr stays NULL and open-quote / close-quote items
+		 * become inert (depth still tracked per spec). */
+		{
+			uint8_t qstate = css_computed_quotes(style, &quotes_arr);
+			(void) qstate;
+			if (quotes_arr != NULL) {
+				while (quotes_arr[n_quotes] != NULL)
+					n_quotes++;
+			}
 		}
 
 		/* Parent must accept inline-level children. BOX_BLOCK is
@@ -588,10 +620,13 @@ box_construct_generate(struct box_construct_ctx *ctx,
 		counter_apply_reset(ctx, style);
 		counter_apply_increment(ctx, style);
 
-		/* Pass 1: total byte length across STRING and COUNTER
+		/* Pass 1: total byte length across STRING / COUNTER / quote
 		 * items. Loop terminates at CSS_COMPUTED_CONTENT_NONE
-		 * (type == 0) per libcss. */
+		 * (type == 0) per libcss. local_depth walks the same path
+		 * Pass 2 will, so both passes pick the same quote string
+		 * for each open/close-quote item. */
 		total_len = 0;
+		local_depth = ctx->quote_depth;
 		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
 			if (c_item[i].type == CSS_COMPUTED_CONTENT_STRING &&
 					c_item[i].data.string != NULL) {
@@ -605,9 +640,48 @@ box_construct_generate(struct box_construct_ctx *ctx,
 					counter_get_value(ctx,
 						c_item[i].data.counter.name),
 					nbuf, sizeof(nbuf));
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_OPEN_QUOTE) {
+				/* fixes140a: open-quote emits quotes[2*idx]
+				 * then bumps depth. idx is clamped to the
+				 * last pair when depth exceeds the list. */
+				if (n_quotes >= 2) {
+					uint32_t idx = (uint32_t)
+						(2 * local_depth);
+					if (idx + 1 >= n_quotes)
+						idx = n_quotes - 2;
+					total_len += lwc_string_length(
+							quotes_arr[idx]);
+				}
+				local_depth++;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_CLOSE_QUOTE) {
+				/* fixes140a: close-quote first decrements
+				 * depth (floored at 0) then emits
+				 * quotes[2*idx+1]. */
+				if (local_depth > 0) local_depth--;
+				if (n_quotes >= 2) {
+					uint32_t idx = (uint32_t)
+						(2 * local_depth);
+					if (idx + 1 >= n_quotes)
+						idx = n_quotes - 2;
+					total_len += lwc_string_length(
+							quotes_arr[idx + 1]);
+				}
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_NO_OPEN_QUOTE) {
+				local_depth++;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_NO_CLOSE_QUOTE) {
+				if (local_depth > 0) local_depth--;
 			}
 		}
 		if (total_len == 0) {
+			/* fixes140a: even when the content materialises no
+			 * characters (e.g. all-no-*-quote items), commit the
+			 * depth update so subsequent siblings see the right
+			 * nesting level. */
+			ctx->quote_depth = local_depth;
 			return;
 		}
 
@@ -616,8 +690,10 @@ box_construct_generate(struct box_construct_ctx *ctx,
 			return;
 		}
 
-		/* Pass 2: copy. */
+		/* Pass 2: copy. Re-walk depth from the same start so the
+		 * picks match Pass 1 exactly. */
 		pos = 0;
+		local_depth = ctx->quote_depth;
 		for (i = 0; c_item[i].type != CSS_COMPUTED_CONTENT_NONE; i++) {
 			if (c_item[i].type == CSS_COMPUTED_CONTENT_STRING &&
 					c_item[i].data.string != NULL) {
@@ -638,10 +714,50 @@ box_construct_generate(struct box_construct_ctx *ctx,
 					nbuf, sizeof(nbuf));
 				memcpy(text + pos, nbuf, nlen);
 				pos += nlen;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_OPEN_QUOTE) {
+				if (n_quotes >= 2) {
+					uint32_t idx = (uint32_t)
+						(2 * local_depth);
+					const char *s;
+					size_t slen;
+					if (idx + 1 >= n_quotes)
+						idx = n_quotes - 2;
+					s = lwc_string_data(quotes_arr[idx]);
+					slen = lwc_string_length(
+							quotes_arr[idx]);
+					memcpy(text + pos, s, slen);
+					pos += slen;
+				}
+				local_depth++;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_CLOSE_QUOTE) {
+				if (local_depth > 0) local_depth--;
+				if (n_quotes >= 2) {
+					uint32_t idx = (uint32_t)
+						(2 * local_depth);
+					const char *s;
+					size_t slen;
+					if (idx + 1 >= n_quotes)
+						idx = n_quotes - 2;
+					s = lwc_string_data(
+							quotes_arr[idx + 1]);
+					slen = lwc_string_length(
+							quotes_arr[idx + 1]);
+					memcpy(text + pos, s, slen);
+					pos += slen;
+				}
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_NO_OPEN_QUOTE) {
+				local_depth++;
+			} else if (c_item[i].type ==
+					CSS_COMPUTED_CONTENT_NO_CLOSE_QUOTE) {
+				if (local_depth > 0) local_depth--;
 			}
-			/* Other types silently skipped. */
+			/* URI / ATTR / COUNTERS plural still silently skipped. */
 		}
 		text[pos] = '\0';
+		ctx->quote_depth = local_depth;
 
 		/* INLINE_CONTAINER (no style) holds the text box. Matches
 		 * the canonical pattern at convert_xml_to_box_text.
@@ -1882,6 +1998,7 @@ dom_to_box(dom_node *n,
 	ctx->cb = cb;
 	ctx->bctx = c->bctx;
 	ctx->counters = NULL;	/* fixes134b: empty counter table */
+	ctx->quote_depth = 0;	/* fixes140a: quote nesting starts at 0 */
 
 	*box_conversion_context = ctx;
 
