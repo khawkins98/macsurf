@@ -62,6 +62,11 @@
 #include "bytecode/opcodes.h"
 #include "parse/properties/properties.h"
 #include "parse/properties/utils.h"
+#ifdef __MACOS9__
+#include "macsurf_debug.h"
+#else
+#define macsurf_debug_log_writef(...) do{}while(0)
+#endif
 
 #define MACSURF_GRID_TRACK_UNIT_NONE    0
 #define MACSURF_GRID_TRACK_UNIT_FR      1
@@ -328,12 +333,20 @@ static void parse_minmax(css_language *c,
 		parserutils_vector_iterate(vector, ctx);
 	}
 
+	macsurf_debug_log_writef(
+		"grid148b2:  parse_minmax in n=%d min_type=%d max_type=%d",
+		*n_tracks,
+		min_tok ? (int)min_tok->type : -1,
+		max_tok ? (int)max_tok->type : -1);
 	if (max_tok != NULL && token_is_fr_track(max_tok)) {
 		if (max_tok->type == CSS_TOKEN_NUMBER) {
 			emit_number_as_fr(max_tok, tracks, n_tracks);
 		} else {
 			emit_dimension(max_tok, tracks, n_tracks);
 		}
+		macsurf_debug_log_writef(
+			"grid148b2:  parse_minmax out (max-fr branch) n=%d",
+			*n_tracks);
 		return;
 	}
 	if (min_tok != NULL && token_is_fr_track(min_tok)) {
@@ -437,12 +450,27 @@ static void parse_repeat(css_language *c,
 		return;
 	}
 
+	macsurf_debug_log_writef(
+		"grid148b2:  parse_repeat mult=%d n_inner=%d n_tracks_before=%d "
+		"inner0=%ld inner1=%ld",
+		multiplier, n_inner, *n_tracks,
+		(long)inner[0], (long)inner[1]);
+
 	for (k = 0; k < multiplier; k++) {
 		for (i = 0; i < n_inner; i++) {
-			if (*n_tracks >= MACSURF_GRID_TRACK_MAX) return;
+			if (*n_tracks >= MACSURF_GRID_TRACK_MAX) {
+				macsurf_debug_log_writef(
+					"grid148b2:  parse_repeat CAP HIT "
+					"n_tracks=%d k=%d i=%d",
+					*n_tracks, k, i);
+				return;
+			}
 			tracks[(*n_tracks)++] = inner[i];
 		}
 	}
+	macsurf_debug_log_writef(
+		"grid148b2:  parse_repeat done n_tracks_after=%d",
+		*n_tracks);
 }
 
 /* Walk and parse tracks at this scope. */
