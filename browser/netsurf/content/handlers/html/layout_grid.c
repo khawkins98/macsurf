@@ -48,7 +48,6 @@
 
 #include "css/utils.h"
 
-#include "macsurf_debug.h"
 
 
 /**
@@ -189,15 +188,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 
 	unit_len_ctx = &content->unit_len_ctx;
 
-	/* fixes148b -- diagnostic: log the inputs to grid layout so we
-	 * can see why minmax() containers are coming out narrower than
-	 * bare-fr containers. Fires once per layout_grid call (one per
-	 * grid box on the page, per reflow). */
-	macsurf_debug_log_writef(
-		"grid148b: enter box=%p avail_w=%d css_w=%d css_h=%d",
-		(void *)grid, (int)available_width,
-		(int)grid->width, (int)grid->height);
-
 	/* Read -macsurf-grid packed value. cols default 1, rows default 0
 	 * (auto). If the property isn't set, fall back to a 1-column
 	 * grid which is visually identical to block layout — the
@@ -222,12 +212,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		container_width = available_width;
 		grid->width = available_width;
 	}
-
-	macsurf_debug_log_writef(
-		"grid148b:   after find_dimensions container_w=%d grid_w=%d "
-		"cols_from_packed=%d packed=%lx",
-		(int)container_width, (int)grid->width, (int)cols,
-		(unsigned long)packed);
 
 	/* column-gap applies between adjacent columns. fixes148 already
 	 * wired -macsurf-column-gap as the storage; reuse it here. */
@@ -300,26 +284,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 					fixed_total;
 			if (remaining < 0) remaining = 0;
 
-			macsurf_debug_log_writef(
-				"grid148b2:  tracks_parsed n=%d "
-				"raw0=%ld raw1=%ld raw2=%ld raw3=%ld",
-				n_tracks,
-				(long)raw_tracks[0],
-				(long)raw_tracks[1],
-				(long)raw_tracks[2],
-				(long)raw_tracks[3]);
-			macsurf_debug_log_writef(
-				"grid148b2:  raw4=%ld raw5=%ld raw6=%ld raw7=%ld",
-				(long)raw_tracks[4],
-				(long)raw_tracks[5],
-				(long)raw_tracks[6],
-				(long)raw_tracks[7]);
-			macsurf_debug_log_writef(
-				"grid148b:   fixed_total=%d fr_total_q88=%d "
-				"col_gap=%d total_gap=%d remaining=%d",
-				fixed_total, fr_total_q88, col_gap,
-				total_gap, remaining);
-
 			if (fr_total_q88 > 0) {
 				/* Distribute `remaining` across fr tracks
 				 * proportionally to their Q8.8 ratio.
@@ -354,13 +318,6 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 				}
 			}
 
-			macsurf_debug_log_writef(
-				"grid148b:   resolved w[0..3]=%d %d %d %d "
-				"x[0..3]=%d %d %d %d",
-				track_widths[0], track_widths[1],
-				track_widths[2], track_widths[3],
-				track_x[0], track_x[1],
-				track_x[2], track_x[3]);
 		}
 	}
 
