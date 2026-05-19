@@ -1,8 +1,47 @@
 # MacSurf CSS Status Report
 
-Generated 2026-05-19. Last revised 2026-05-19 (fixes147 hardware-verified).
+Generated 2026-05-19. Last revised 2026-05-19 (fixes148 hardware-verified, G4 minmax follow-up queued).
 
 This is a brutal, hedge-free audit of CSS support in MacSurf. The goal is to identify what works, what doesn't, and what to implement next.
+
+## Hardware-verified status (post fixes148)
+
+```text
+CSS Grid V2 — grid-template-columns: ✓ Standard tracks (most patterns)
+- fixes148 (2026-05-19): rewrites p_grid_template_columns.c to extract
+  real track widths from the standard CSS Grid grammar and emit them in
+  the same packed bytecode format p_macsurf_grid.c uses. Both properties
+  target CSS_PROP_MACSURF_GRID so the select side reads identically.
+- Also fixes a latent bytecode-format bug from fixes112 where the parser
+  emitted only 2 entries (OPV + packed) but the select side reads 10
+  (OPV + packed + 8 track ints) — silent for years because identical
+  sources produced identical garbage that survived arena interning.
+- Grammar: <length>, <percentage>, <flex>, bare <number>, repeat(N, ...),
+  repeat(auto-fill|auto-fit, ...) heuristic *3, minmax(min, max),
+  fit-content(...), auto/min-content/max-content idents, [<line-name>].
+- Track encoding: bits 31..28 unit (NONE/FR/PX/PERCENT), bits 27..0 value
+  (FR/PERCENT Q20.8, PX pixels).
+- Test cards G1-G6 on G3 iMac:
+  G1 (1fr 1fr 1fr): ✓ three equal cells fill row
+  G2 (200px 1fr): ✓ fixed sidebar + flex content (canonical MacTrove
+                    layout — was 50/50 pre-fixes148)
+  G3 (repeat(4, 1fr)): ✓ four equal columns
+  G4 (repeat(3, minmax(100px, 1fr))): ⚠️ cells render side-by-side but
+                    container appears narrower than full width; FR
+                    distribution math holds but intrinsic-width interaction
+                    with minmax() unresolved. Queued as fixes148b.
+  G5 (100px 2fr 1fr): ✓ mixed PX + FR with 2:1 ratio
+  G6 (-macsurf-grid: 3): ✓ V1 syntax still works (separate parser)
+- Trade-offs: minmax min-floor NOT honored (treated as 1fr); 8 tracks max;
+  named-line lists parsed but skipped.
+- Out of scope (deferred to later sprints):
+  - grid-template-rows
+  - grid-row / grid-column / grid-area explicit placement
+  - grid-template-areas
+  - subgrid
+  - auto-flow: dense / column
+  - per-cell align-items / justify-items
+```
 
 ## Hardware-verified status (post fixes147)
 
