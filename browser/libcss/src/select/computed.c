@@ -517,6 +517,12 @@ uint8_t css_computed_macsurf_grid_col_span(
 	return (uint8_t)v;
 }
 
+int32_t css_computed_aspect_ratio(
+		const css_computed_style *style)
+{
+	return style->i.aspect_ratio;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

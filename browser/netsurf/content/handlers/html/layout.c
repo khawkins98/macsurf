@@ -1513,9 +1513,51 @@ layout_block_find_dimensions(const css_unit_ctx *unit_len_ctx,
 				min_width, max_width, min_height, max_height);
 	}
 
-	box->width = layout_solve_width(box, available_width, width, lm, rm,
-			max_width, min_width);
-	box->height = height;
+	/* fixes152: capture pre-solve width/height state for aspect-ratio
+	 * derivation. layout_solve_width below converts AUTO to container
+	 * width, which would defeat the "width is auto" check. */
+	{
+		int width_was_auto = (width == AUTO);
+		int height_was_auto = (height == AUTO);
+
+		box->width = layout_solve_width(box, available_width, width,
+				lm, rm, max_width, min_width);
+		box->height = height;
+
+		if (style != NULL) {
+			int32_t ar = css_computed_aspect_ratio(style);
+			if (ar != 0) {
+				int num = (int)(((uint32_t)ar >> 16) & 0xffff);
+				int denom = (int)((uint32_t)ar & 0xffff);
+				if (num > 0 && denom > 0) {
+					if (height_was_auto &&
+							!width_was_auto &&
+							box->width != AUTO) {
+						/* width: Npx; aspect-ratio: A/B
+						 * -> height = width * B / A. */
+						box->height = (int)(((long)
+							box->width * denom) /
+							num);
+					} else if (width_was_auto &&
+							!height_was_auto &&
+							box->height != AUTO) {
+						/* height: Npx; aspect-ratio:
+						 * A/B -> width = height * A / B.
+						 * Overrides the container-width
+						 * default that layout_solve_width
+						 * picked for the auto width. */
+						box->width = (int)(((long)
+							box->height * num) /
+							denom);
+					}
+					/* Both AUTO: ratio is undefined here
+					 * because there's nothing to derive
+					 * from. V1 leaves both as the layout
+					 * default. */
+				}
+			}
+		}
+	}
 
 	if (margin[TOP] == AUTO)
 		margin[TOP] = 0;
