@@ -574,5 +574,9 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 	        PROPERTY_FUNCS(macsurf_grid_rows),
 	        0,
+	},
+	{
+	        PROPERTY_FUNCS(macsurf_grid_col_span),
+	        0,
 	}
 	};

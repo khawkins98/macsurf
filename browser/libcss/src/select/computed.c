@@ -508,6 +508,12 @@ const int32_t *css_computed_macsurf_grid_row_tracks(
 	return style->macsurf_grid_row_tracks;
 }
 
+uint8_t css_computed_macsurf_grid_col_span(
+		const css_computed_style *style)
+{
+	return style->i.macsurf_grid_col_span;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

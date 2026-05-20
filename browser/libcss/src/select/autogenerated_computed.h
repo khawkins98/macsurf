@@ -277,6 +277,10 @@ struct css_computed_style_i {
 	/* fixes75: -macsurf-grid: cols (bits 31..16) and rows (bits 15..0).
 	 * rows == 0 means auto-rows. */
 	int32_t macsurf_grid;
+	/* fixes151: -macsurf-grid-col-span. 0 = unset (treat as 1 in
+	 * layout). 1..254 = literal span. 255 = sentinel "fill remainder
+	 * of row" (from `grid-column: 1 / -1` preprocessor rewrite). */
+	uint8_t macsurf_grid_col_span;
 	/* fixes76: -macsurf-animation-opacity.
 	 * bits 31..16: duration_ms (uint16, full from->to->from cycle).
 	 * bits 15..8:  to_opacity (uint8 0..255).

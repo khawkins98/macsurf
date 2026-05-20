@@ -860,6 +860,217 @@ macsurf__rewrite_grid_template_rows(const char *data, size_t size)
 }
 
 
+/* fixes151 — rewrite each `grid-column: VALUE` declaration to
+ * `-macsurf-grid-col-span: N`. Unlike the in-place columns/rows
+ * rewriters, the new property name is LONGER than the source
+ * (`grid-column` 11 chars -> `-macsurf-grid-col-span` 22), so this
+ * pass allocates a growable output buffer (input_size + 64 bytes per
+ * potential occurrence, capped at 2x input) and returns the result via
+ * out parameters.
+ *
+ * Supported value forms:
+ *   span N            -> col-span N
+ *   A / B (ints>0)    -> col-span (B-A)
+ *   A / span N        -> col-span N
+ *   A / -1            -> col-span 255 (sentinel "fill row")
+ *   1 / -1            -> col-span 255
+ * Anything else (auto, named lines, calc) -> declaration left alone;
+ * libcss rejects the unknown property and falls back to single-cell. */
+static char *
+macsurf__rewrite_grid_column(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	static const char NEEDLE[] = "grid-column";
+	static const size_t NEEDLE_LEN = 11;
+	size_t cap;
+	size_t pos = 0;
+	char *out;
+	size_t i = 0;
+
+	cap = in_size + 256;
+	if (cap < in_size * 2) cap = in_size * 2;
+	if (cap < 1024) cap = 1024;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		size_t j;
+		size_t val_start;
+		size_t val_end;
+		int span = 0;
+		bool got_span = false;
+		const char *p;
+		const char *end;
+
+		if (!macsurf__match_prop_name(data, in_size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			if (pos >= cap - 1) {
+				size_t newcap = cap * 2;
+				char *neu = (char *)realloc(out, newcap);
+				if (neu == NULL) { free(out); return NULL; }
+				out = neu;
+				cap = newcap;
+			}
+			out[pos++] = data[i++];
+			continue;
+		}
+
+		j = i + NEEDLE_LEN;
+		while (j < in_size && (data[j] == ' ' || data[j] == '\t' ||
+				data[j] == '\n' || data[j] == '\r')) j++;
+		if (j >= in_size || data[j] != ':') {
+			if (pos >= cap - 1) {
+				size_t newcap = cap * 2;
+				char *neu = (char *)realloc(out, newcap);
+				if (neu == NULL) { free(out); return NULL; }
+				out = neu;
+				cap = newcap;
+			}
+			out[pos++] = data[i++];
+			continue;
+		}
+
+		val_start = j + 1;
+		while (val_start < in_size && (data[val_start] == ' ' ||
+				data[val_start] == '\t')) val_start++;
+
+		val_end = val_start;
+		while (val_end < in_size) {
+			char c = data[val_end];
+			if (c == ';' || c == '}' || c == '!') break;
+			val_end++;
+		}
+
+		/* Parse the value range. */
+		p = data + val_start;
+		end = data + val_end;
+
+		/* "span N" form. */
+		if ((end - p) >= 4 &&
+				(p[0] == 's' || p[0] == 'S') &&
+				(p[1] == 'p' || p[1] == 'P') &&
+				(p[2] == 'a' || p[2] == 'A') &&
+				(p[3] == 'n' || p[3] == 'N') &&
+				(p[4] == ' ' || p[4] == '\t')) {
+			const char *q = p + 4;
+			int n = 0;
+			while (q < end && (*q == ' ' || *q == '\t')) q++;
+			while (q < end && *q >= '0' && *q <= '9') {
+				n = n * 10 + (*q - '0');
+				q++;
+			}
+			if (n > 0) {
+				span = (n > 255) ? 255 : n;
+				got_span = true;
+			}
+		} else if (*p >= '0' && *p <= '9') {
+			/* "A / B" or "A / span N" or "A / -1" form. */
+			int a = 0;
+			int b = 0;
+			bool b_neg = false;
+			const char *q = p;
+			while (q < end && *q >= '0' && *q <= '9') {
+				a = a * 10 + (*q - '0');
+				q++;
+			}
+			while (q < end && (*q == ' ' || *q == '\t')) q++;
+			if (q < end && *q == '/') {
+				q++;
+				while (q < end && (*q == ' ' || *q == '\t')) q++;
+				if (q < end && *q == '-') {
+					b_neg = true;
+					q++;
+				}
+				if (q < end && (*q == 's' || *q == 'S')) {
+					/* "span N" tail. */
+					const char *r = q;
+					if ((end - r) >= 4 &&
+							(r[1] == 'p' || r[1] == 'P') &&
+							(r[2] == 'a' || r[2] == 'A') &&
+							(r[3] == 'n' || r[3] == 'N')) {
+						r += 4;
+						while (r < end &&
+								(*r == ' ' || *r == '\t'))
+							r++;
+						while (r < end && *r >= '0' &&
+								*r <= '9') {
+							b = b * 10 + (*r - '0');
+							r++;
+						}
+						if (b > 0) {
+							span = (b > 255) ? 255 : b;
+							got_span = true;
+						}
+					}
+				} else {
+					while (q < end && *q >= '0' && *q <= '9') {
+						b = b * 10 + (*q - '0');
+						q++;
+					}
+					if (b_neg) {
+						/* `A / -1` style — fill to end. */
+						span = 255;
+						got_span = true;
+					} else if (b > a) {
+						int n = b - a;
+						span = (n > 255) ? 255 : n;
+						got_span = true;
+					}
+				}
+			}
+		}
+
+		if (got_span) {
+			/* Emit "-macsurf-grid-col-span: N;" (~28 bytes max
+			 * for N<=255). Skip the original declaration up to
+			 * and including the terminator. */
+			char tmp[64];
+			int n = sprintf(tmp,
+					"-macsurf-grid-col-span: %d", span);
+			if (n > 0) {
+				size_t need = pos + (size_t)n + 16;
+				while (need >= cap) {
+					size_t newcap = cap * 2;
+					char *neu = (char *)realloc(out,
+							newcap);
+					if (neu == NULL) {
+						free(out);
+						return NULL;
+					}
+					out = neu;
+					cap = newcap;
+				}
+				memcpy(out + pos, tmp, (size_t)n);
+				pos += (size_t)n;
+				i = val_end;
+				continue;
+			}
+		}
+
+		/* Couldn't parse -- pass through unchanged. */
+		{
+			size_t span_bytes = val_end - i;
+			while (pos + span_bytes >= cap) {
+				size_t newcap = cap * 2;
+				char *neu = (char *)realloc(out, newcap);
+				if (neu == NULL) {
+					free(out);
+					return NULL;
+				}
+				out = neu;
+				cap = newcap;
+			}
+			memcpy(out + pos, data + i, span_bytes);
+			pos += span_bytes;
+			i = val_end;
+		}
+	}
+
+	*out_size_p = pos;
+	return out;
+}
+
+
 static bool
 nscss_process_data(struct content *c, const char *data, unsigned int size)
 {
@@ -867,6 +1078,10 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	css_error error;
 	char *rewritten;
 	char *rewritten_rows;
+	char *rewritten_col_span = NULL;
+	size_t col_span_size = 0;
+	const char *final_data;
+	unsigned int final_size;
 
 	MS_LOG("nscss process data");
 
@@ -881,24 +1096,38 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	 * the cascade on CW8; rewriting the source text before libcss
 	 * sees it avoids touching libcss internals entirely. */
 	rewritten = macsurf__rewrite_grid_template_columns(data, (size_t)size);
-	if (rewritten == NULL) {
-		error = nscss_process_css_data(&css->data, data, size);
-	} else {
+	rewritten_rows = NULL;
+	if (rewritten != NULL) {
 		/* fixes150 — second pass for grid-template-rows. Same
 		 * in-place rewrite scheme; runs against the columns-rewritten
 		 * buffer so both passes see the same source layout. */
 		rewritten_rows = macsurf__rewrite_grid_template_rows(
 				rewritten, (size_t)size);
-		if (rewritten_rows != NULL) {
-			error = nscss_process_css_data(&css->data,
-					rewritten_rows, size);
-			free(rewritten_rows);
-		} else {
-			error = nscss_process_css_data(&css->data,
-					rewritten, size);
-		}
-		free(rewritten);
 	}
+
+	/* Pick the buffer for the final pass: rows-rewritten if available,
+	 * else columns-rewritten, else original. All previous passes are
+	 * in-place rewrites of the same size, so size stays the same here. */
+	final_data = rewritten_rows ? (const char *)rewritten_rows :
+			rewritten ? (const char *)rewritten : data;
+	final_size = size;
+
+	/* fixes151 — third pass for `grid-column: VALUE`. This pass needs
+	 * a growable output buffer (new property name is longer than the
+	 * source), so it allocates fresh and returns the new size. */
+	rewritten_col_span = macsurf__rewrite_grid_column(final_data,
+			(size_t)final_size, &col_span_size);
+	if (rewritten_col_span != NULL && col_span_size <= (size_t)0x7fffffff) {
+		final_data = (const char *)rewritten_col_span;
+		final_size = (unsigned int)col_span_size;
+	}
+
+	error = nscss_process_css_data(&css->data, final_data, final_size);
+
+	if (rewritten_col_span != NULL) free(rewritten_col_span);
+	if (rewritten_rows != NULL) free(rewritten_rows);
+	if (rewritten != NULL) free(rewritten);
+
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
 	}
