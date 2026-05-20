@@ -1,30 +1,60 @@
+# Private / non-public — never commit
+.private/
+.claude/
+CLAUDE.md
+GEMINI.md
+.gemini/
+
+# Build archives & fix tars (these go to .private/archives/)
 *.zip
+*.tar
+*.tar.gz
+*.tgz
+*.sit
+*.hqx
+
+# Build artifacts
+MacSurf
+MacSurf.xml
+*.o
+*.a
+*.lib
+
+# Runtime logs
+*.log
+MacSurf Debug.log
+StdLog
 
 # macOS resource-fork metadata
 ._*
 .DS_Store
 
-# Build error logs / scratch text
-errors
+# Scratch error logs
 errors*.txt
 errrors*.txt
 newerrors*.txt
 newerrors*txt
-text.txt
-test_ending.txt
-test_pragma.c
+build-error-*.txt
 
-# Scratch / parallel build trees
+# Node / Gemini CLI dependencies (moved to .private)
+node_modules/
+package.json
+package-lock.json
+
+# Legacy / scratch build trees
 clean_macsurf/
 flat_macsurf_sources/
 tree_macsurf/
 build/
 builds/
 for-gemini/
-node_modules/
 
-# Legacy archives
-*.sit
+# Misc scratch
+text.txt
+test_ending.txt
+test_pragma.c
+animation.as
+forgem/
 
-# Old fix archives (already preserved separately)
-Old Zips/
+# macSSL is its own git repo at macSSL/ — manage separately (submodule or merge later)
+macSSL/
