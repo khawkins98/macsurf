@@ -769,6 +769,10 @@ int main(void) {
 	 * initial window exists so TextWidth has a valid GrafPort. Writes to
 	 * MacSurf Debug.log; no behaviour change. */
 	macos9_font_metric_probe_run();
+	/* fixes153 -- dump GetFontInfo per font/size/face. Ground truth
+	 * for the gui_layout_table per-font work and the font-family
+	 * alias retry deferred since fixes145b. */
+	macos9_font_vmetric_probe_run();
 	while (!macos9_done) macos9_poll();
 	MS_LOG("event loop exited");
 	macos9_quitting = (bool)1; netsurf_exit();

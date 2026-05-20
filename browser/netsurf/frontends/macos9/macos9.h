@@ -183,6 +183,7 @@ void macos9_poll(void);
 extern nserror macos9_schedule(int t, void (*callback)(void *p), void *p);
 short macos9_font_id_from_style(const struct plot_font_style *fstyle);
 void  macos9_font_metric_probe_run(void); /* fixes144a -- diagnostic probe */
+void  macos9_font_vmetric_probe_run(void); /* fixes153 -- FontInfo dump */
 short macos9_face_from_style(const struct plot_font_style *fstyle);
 size_t macos9_utf8_to_macroman(const char *u, size_t l, char *m, size_t mx);
 

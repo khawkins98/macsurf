@@ -446,7 +446,10 @@ static const macos9_metric_probe_font macos9_metric_probe_fonts[] = {
         {  3, "Geneva"    },
         { 21, "Helvetica" },
         {  0, "Chicago"   }, /* System font; Chicago on classic Mac OS. */
-        {  4, "Monaco"    }
+        {  4, "Monaco"    },
+        { 20, "Times"     }, /* fixes153: probe for serif alias retry. */
+        { 16, "Palatino"  }, /* fixes153: alternative serif. */
+        { 22, "Courier"   }  /* fixes153: alternative monospace. */
 };
 
 static const short macos9_metric_probe_sizes[] = { 9, 10, 12 };
@@ -553,6 +556,100 @@ macos9_font_metric_probe_run(void)
         }
 
         macsurf_debug_log_write("=== FONT METRIC PROBE END ===");
+
+        SetPort(old_port);
+}
+
+/* fixes153: vertical-metric probe. Calls GetFontInfo for each
+ * font x size x face combination in the probe matrix and dumps
+ * ascent / descent / widMax / leading. Ground-truth values for
+ * the gui_layout_table per-font work and the font-family alias
+ * retry deferred from fixes145b. Like fixes144a2 this is single-
+ * shot at startup, gated by a static has_run, no work after the
+ * first call. */
+void
+macos9_font_vmetric_probe_run(void)
+{
+        static int has_run = 0;
+        GrafPtr old_port;
+        size_t fi, si, ff;
+        size_t n_fonts;
+        size_t n_sizes;
+        size_t n_faces;
+
+        if (has_run) {
+                return;
+        }
+        has_run = 1;
+
+        n_fonts   = sizeof(macos9_metric_probe_fonts) /
+                    sizeof(macos9_metric_probe_fonts[0]);
+        n_sizes   = sizeof(macos9_metric_probe_sizes) /
+                    sizeof(macos9_metric_probe_sizes[0]);
+        n_faces   = sizeof(macos9_metric_probe_faces) /
+                    sizeof(macos9_metric_probe_faces[0]);
+
+        GetPort(&old_port);
+        if (initial_win != NULL && initial_win->window != NULL) {
+                SetPortWindowPort(initial_win->window);
+        } else if (FrontWindow() != NULL) {
+                SetPortWindowPort(FrontWindow());
+        } else {
+                macsurf_debug_log_write(
+                    "FONT VMETRIC PROBE: no window available, skipping");
+                return;
+        }
+
+        macsurf_debug_log_write(
+            "=== FONT VMETRIC PROBE BEGIN (fixes153) ===");
+
+        for (fi = 0; fi < n_fonts; fi++) {
+                short font_id = macos9_metric_probe_fonts[fi].font_id;
+                const char *font_name = macos9_metric_probe_fonts[fi].font_name;
+
+                for (si = 0; si < n_sizes; si++) {
+                        short sz = macos9_metric_probe_sizes[si];
+
+                        for (ff = 0; ff < n_faces; ff++) {
+                                short face = macos9_metric_probe_faces[ff];
+                                const char *face_name =
+                                    macos9_metric_probe_faces_name[ff];
+                                FontInfo fi_info;
+
+                                TextFont(font_id);
+                                TextSize(sz);
+                                TextFace(face);
+
+                                /* Zero out the struct first -- FontInfo
+                                 * fields are filled by GetFontInfo but
+                                 * defensive zero catches the case where
+                                 * the toolbox call fails silently. */
+                                fi_info.ascent  = 0;
+                                fi_info.descent = 0;
+                                fi_info.widMax  = 0;
+                                fi_info.leading = 0;
+
+                                GetFontInfo(&fi_info);
+
+                                macsurf_debug_log_writef(
+                                    "[VMETRIC] font=%s id=%d size=%d "
+                                    "face=%s ascent=%d descent=%d "
+                                    "widMax=%d leading=%d lineheight=%d",
+                                    font_name, (int)font_id,
+                                    (int)sz, face_name,
+                                    (int)fi_info.ascent,
+                                    (int)fi_info.descent,
+                                    (int)fi_info.widMax,
+                                    (int)fi_info.leading,
+                                    (int)(fi_info.ascent +
+                                          fi_info.descent +
+                                          fi_info.leading));
+                        }
+                }
+        }
+
+        macsurf_debug_log_write(
+            "=== FONT VMETRIC PROBE END ===");
 
         SetPort(old_port);
 }
