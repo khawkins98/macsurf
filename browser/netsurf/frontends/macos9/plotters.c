@@ -103,22 +103,20 @@ long macos9_plot_rect_count = 0;
  *   stacking. The vmetric data showed mixed-family lines at CSS
  *   line-height >= 1.3 (the normal default) accommodate all OS 9
  *   families. The line-height: 1 edge case is rare on real pages. */
-/* fixes154b: hardware-rejected. Re-enable produced an empty render —
- * box-tree walker visited only 1-2 blocks after reformat despite layout
- * producing 1002 boxes (c_h=10051). No [FONTDIAG] op=paint entries
- * appeared in the log, confirming the walker never reached text/inline
- * nodes. Width/paint font_id dispatch itself was correct in the
- * captured measure logs (Helvetica=21, Times=20, Monaco=4 all resolved
- * to expected ids). The empty-render symptom is downstream of the alias
- * enable — likely the same mixed-family inline-width-vs-segment-width
- * drift class as fixes145, manifesting as bbox-out-of-clip rather than
- * horizontal scramble on this content. Pinning the alias gate back to
- * 0 returns to the fixes153 (force-Helvetica) baseline that renders
- * cleanly. Path forward remains gui_layout_table per-font metrics. */
+/* fixes154c: hardware-rejected fixes154 + fixes154b — page rendered
+ * empty on G3 regardless of whether MACSURF_FONT_FAMILY_ALIASES was 1
+ * (fixes154) or 0 (fixes154b). The fixes154b revert kept its diagnostic
+ * block compiled in but on the Mac the gated MACSURF_FONT_ALIAS_DIAG
+ * macro change didn't propagate to macos9_font.c's stale .o (CW8 misses
+ * header-only changes), so the per-call FONTDIAG measure logging was
+ * still firing — hundreds of file writes + FlushVol per layout pass.
+ * Suspect that I/O load (or whatever else the diagnostic block
+ * inadvertently changed) is what broke layout/redraw, not the alias
+ * dispatch itself. fixes154c strips the FONTDIAG block from BOTH
+ * plotters.c and macos9_font.c so a clean rebuild eliminates the
+ * diagnostic as a variable, and reships both files plus macos9.h so
+ * the CW8 dependency mismatch can't recur. Alias gate stays at 0. */
 #define MACSURF_FONT_FAMILY_ALIASES 0
-/* MACSURF_FONT_ALIAS_DIAG lives in macos9.h so macos9_font.c sees it
- * too. Default OFF after fixes154b; the diagnostic block stays in
- * place for the next probe round. */
 
 /* fixes74b: counters incremented by redraw.c when it detects
  * CSS_MACSURF_GRADIENT_SET. Lets us see whether the cascade returned
@@ -1364,31 +1362,6 @@ macos9_plot_text(const struct redraw_context *ctx,
 
 		mac_len = macos9_utf8_to_macroman(text, length, mac_buf,
 				sizeof(mac_buf));
-
-#if MACSURF_FONT_ALIAS_DIAG
-		/* fixes154: mirror of the macos9_font_measure diagnostic at
-		 * the paint site. Same format so a side-by-side diff against
-		 * the measure logs will show any width-vs-paint font_id
-		 * divergence directly. */
-		{
-			char dpv[24];
-			size_t pn = (mac_len < 16) ? mac_len : 16;
-			size_t pk;
-			for (pk = 0; pk < pn; pk++) {
-				char c = mac_buf[pk];
-				dpv[pk] = (c >= 0x20 && c < 0x7f) ? c : '.';
-			}
-			dpv[pn] = '\0';
-			macsurf_debug_log_writef(
-			    "[FONTDIAG] op=paint   fam=%d id=%d sz=%d face=%d "
-			    "ls=%d ws=%d mac=%d xy=(%d,%d) str=\"%s\"",
-			    (int)(fstyle ? fstyle->family : 0),
-			    (int)font_id, (int)size, (int)face,
-			    (int)(fstyle ? fstyle->letter_spacing : 0),
-			    (int)(fstyle ? fstyle->word_spacing : 0),
-			    (int)mac_len, (int)x, (int)y, dpv);
-		}
-#endif
 
 		saved_clip = macos9_push_clip();
 		ls = (fstyle != NULL) ? fstyle->letter_spacing : 0;
