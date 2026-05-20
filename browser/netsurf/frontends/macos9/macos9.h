@@ -186,6 +186,22 @@ void  macos9_font_metric_probe_run(void); /* fixes144a -- diagnostic probe */
 void  macos9_font_vmetric_probe_run(void); /* fixes153 -- FontInfo dump */
 short macos9_face_from_style(const struct plot_font_style *fstyle);
 
+/* fixes157: font-family alias retry post-fixes156 (defensive-clamp fix).
+ * MACSURF_FONT_ALIAS_DIAG gates the FONTDIAG width/paint log block in
+ * macos9_font_measure and macos9_plot_text. Default ON for this round so
+ * hardware probing can capture width-vs-paint dispatch divergence if any.
+ * Flip to 0 here after hardware acceptance to silence — keep the code
+ * gated rather than stripped so a future scrambling regression can reuse
+ * the probe handle without rebuilding it.
+ *
+ * MACSURF_FONT_ALIAS_DIAG_SMART = 1 filters the firehose: log only when
+ * the computed style requests a non-SANS_SERIF family (SERIF / MONOSPACE /
+ * CURSIVE / FANTASY) — the cases where alias dispatch actually maps to
+ * something other than Helvetica. Set to 0 to log every call (fixes154
+ * behaviour) if a Helvetica-path mismatch is suspected. */
+#define MACSURF_FONT_ALIAS_DIAG 1
+#define MACSURF_FONT_ALIAS_DIAG_SMART 1
+
 size_t macos9_utf8_to_macroman(const char *u, size_t l, char *m, size_t mx);
 
 /* MACSURF_HOME_URL canonical definition is in macsurf_config.h.
