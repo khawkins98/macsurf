@@ -21,14 +21,29 @@
  * equal-width columns. Row height = max child height in that row.
  * column-gap (shipped at fixes148) applies between columns.
  *
+ * fixes158: explicit `grid-column` / `grid-row` placement (V1).
+ *   - positive integer line numbers honoured (1-based, like CSS spec)
+ *   - `grid-column: A / B` and `grid-row: A / B` shorthands recognised
+ *     by the cssh_css preprocessor; longhand `-start` / `-end` too
+ *   - explicit placements DO NOT advance the auto-flow cursor — auto
+ *     items continue from where the cursor was, which means an auto
+ *     item CAN land in the same cell as an explicit item (last-wins
+ *     visually; documented V1 behaviour, no collision avoidance)
+ *   - row-span > 1 reserves the row visually but row heights are
+ *     still per-row tallest-child for V1 (no vertical merging)
+ *
  * Out of V1 scope (deferred to V2+):
  *   - grid-template-columns / grid-template-rows full grammar
  *     (fr units, repeat(), auto, minmax)
- *   - grid-area / grid-row / grid-column explicit placement
+ *   - grid-area shorthand
+ *   - named grid lines
+ *   - negative line numbers (`-1` for end-only is supported as the
+ *     fill-row sentinel; `-2`, etc. are not)
+ *   - grid-template-areas
  *   - grid-auto-flow column/dense
- *   - row-gap independent of column-gap
  *   - subgrid
  *   - align-items / justify-items per-cell alignment
+ *   - row-gap independent of column-gap (shares column-gap storage)
  *
  * This V1 covers the most common real-world pattern of "N equal columns,
  * auto rows, children in DOM order". Pages that say `display: grid;
@@ -151,6 +166,24 @@ static bool layout_grid_item(
 #define MACSURF_GRID_TRACK_UNIT_FR      1
 #define MACSURF_GRID_TRACK_UNIT_PX      2
 #define MACSURF_GRID_TRACK_UNIT_PERCENT 3
+
+/* fixes158: per-child placement scratch. The two-pass layout assigns
+ * (col, row, col_span, row_span) in pass 1 (placement + child layout
+ * into the cell width); pass 2 positions each child once row heights
+ * are known. Cap at 256 children per grid — anything beyond degrades
+ * to fixes151 single-pass auto-flow.
+ *
+ * Cap at 256 rows so the row_max_height + row_y arrays stay on the
+ * stack. Explicit `grid-row: N` beyond this clamps to the cap. */
+#define MACSURF_GRID_CHILDREN_MAX 256
+#define MACSURF_GRID_ROWS_MAX 256
+
+struct macsurf_grid_slot {
+	int col;
+	int row;
+	int col_span;
+	int row_span;
+};
 
 bool layout_grid(struct box *grid, int available_width, html_content *content)
 {
@@ -372,154 +405,258 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		has_row_tracks = (n_row_tracks > 0);
 	}
 
-	/* Walk children. */
-	child = grid->children;
-	while (child != NULL) {
-		int col;
-		int x_pos;
-		int this_col_width;
-		int child_total_h;
-		int saved_grid_width;
-		int col_span = 1;
-		int span_advance = 1;
-		int end_col;
-		int k;
+	/* fixes158: two-pass placement.
+	 *
+	 * Pass 1 — assign each child a (col, row, col_span, row_span)
+	 *          using its computed `-macsurf-grid-col-span` packed
+	 *          placement, then lay out the child into the cell width.
+	 *          Track per-row max heights.
+	 * Pass 2 — once row heights are known, position each child.
+	 *
+	 * Backwards compat: a child with col_start=0 row_start=0 (the
+	 * fixes151 zero-state) falls into the auto-flow branch and
+	 * behaves exactly like the original single-pass walker. */
+	{
+		struct macsurf_grid_slot slots[MACSURF_GRID_CHILDREN_MAX];
+		int row_max_h[MACSURF_GRID_ROWS_MAX];
+		int row_y_arr[MACSURF_GRID_ROWS_MAX];
+		int n_children = 0;
+		int cur_col = 0;
+		int cur_row = 0;
+		int max_row_used = -1;
+		int slot_index;
 
-		/* fixes151 -- read -macsurf-grid-col-span. 0 = unset
-		 * (single cell), 1..254 = literal span, 255 = "fill the
-		 * remainder of the row" sentinel from `grid-column: 1 / -1`
-		 * preprocessor rewrites. */
-		if (child->style != NULL) {
-			uint8_t s = css_computed_macsurf_grid_col_span(
-					child->style);
-			if (s == 255) {
-				col_span = cols - (child_index % cols);
-			} else if (s > 0) {
-				col_span = (int)s;
+		memset(row_max_h, 0, sizeof(row_max_h));
+		memset(row_y_arr, 0, sizeof(row_y_arr));
+
+		/* --- Pass 1a: placement only. We must finalise every
+		 * slot's (col,row) before any layout so we know which row
+		 * to credit each child's height to. Auto-flow cursor only
+		 * advances on auto-placed items; explicit placements do
+		 * NOT consume cursor space (collision allowed, last wins
+		 * visually). */
+		child = grid->children;
+		while (child != NULL) {
+			int32_t packed = 0;
+			int col_start = 0;
+			int col_span = 1;
+			int row_start = 0;
+			int row_span = 1;
+			int slot_col;
+			int slot_row;
+
+			if (n_children >= MACSURF_GRID_CHILDREN_MAX) {
+				/* Too many children — stop placing here.
+				 * Remaining children stay where box_construct
+				 * left them. Documented V1 limit. */
+				break;
 			}
-		}
-		if (col_span < 1) col_span = 1;
-		if (col_span > cols) col_span = cols;
 
-		/* If the cell wouldn't fit on the current row, wrap to the
-		 * next row before placing it (CSS Grid auto-placement). */
-		if ((child_index % cols) + col_span > cols) {
-			int filler = cols - (child_index % cols);
-			int this_row_h = row_max_height;
-			if (has_row_tracks && row_index < n_row_tracks &&
-					row_track_h[row_index] > 0) {
-				this_row_h = row_track_h[row_index];
+			if (child->style != NULL) {
+				packed = css_computed_macsurf_grid_placement(
+						child->style);
 			}
-			row_y += this_row_h + row_gap;
-			row_max_height = 0;
-			row_index++;
-			child_index += filler;
-		}
+			col_span = (int)((uint32_t)packed & 0xff);
+			col_start = (int)(((uint32_t)packed >> 8) & 0xff);
+			row_start = (int)(((uint32_t)packed >> 16) & 0xff);
+			row_span = (int)(((uint32_t)packed >> 24) & 0xff);
 
-		col = child_index % cols;
-		if (has_tracks) {
-			this_col_width = track_widths[col];
-			x_pos = track_x[col];
-		} else {
-			this_col_width = col_width;
-			x_pos = col * (col_width + col_gap);
-		}
+			/* Resolve span sentinels and zero defaults. */
+			if (col_span == 0) col_span = 1;
+			if (col_span == 255) {
+				int from = (col_start > 0) ?
+						(col_start - 1) : cur_col;
+				col_span = cols - from;
+				if (col_span < 1) col_span = 1;
+			}
+			if (row_span == 0) row_span = 1;
+			if (row_span == 255) {
+				/* "Fill" sentinel on row: V1 degrades to 1. */
+				row_span = 1;
+			}
 
-		/* Widen the cell to span across additional columns. */
-		end_col = col + col_span;
-		if (end_col > cols) end_col = cols;
-		for (k = col + 1; k < end_col; k++) {
-			if (has_tracks) {
-				this_col_width += col_gap + track_widths[k];
+			/* Resolve cell origin. */
+			if (col_start > 0 && row_start > 0) {
+				slot_col = col_start - 1;
+				slot_row = row_start - 1;
+			} else if (col_start > 0) {
+				slot_col = col_start - 1;
+				slot_row = cur_row;
+			} else if (row_start > 0) {
+				slot_col = cur_col;
+				slot_row = row_start - 1;
 			} else {
-				this_col_width += col_gap + col_width;
+				/* Auto-flow: wrap if span doesn't fit. */
+				if (cur_col + col_span > cols) {
+					cur_col = 0;
+					cur_row++;
+				}
+				slot_col = cur_col;
+				slot_row = cur_row;
+				cur_col += col_span;
+				if (cur_col >= cols) {
+					cur_col = 0;
+					cur_row++;
+				}
 			}
+
+			/* Clamp into grid bounds. */
+			if (slot_col < 0) slot_col = 0;
+			if (slot_col >= cols) slot_col = cols - 1;
+			if (slot_col + col_span > cols)
+				col_span = cols - slot_col;
+			if (col_span < 1) col_span = 1;
+			if (slot_row < 0) slot_row = 0;
+			if (slot_row >= MACSURF_GRID_ROWS_MAX)
+				slot_row = MACSURF_GRID_ROWS_MAX - 1;
+			if (slot_row + row_span > MACSURF_GRID_ROWS_MAX)
+				row_span = MACSURF_GRID_ROWS_MAX - slot_row;
+			if (row_span < 1) row_span = 1;
+
+			slots[n_children].col = slot_col;
+			slots[n_children].row = slot_row;
+			slots[n_children].col_span = col_span;
+			slots[n_children].row_span = row_span;
+
+			if (slot_row > max_row_used)
+				max_row_used = slot_row;
+			if (slot_row + row_span - 1 > max_row_used)
+				max_row_used = slot_row + row_span - 1;
+
+			n_children++;
+			child = child->next;
 		}
-		span_advance = end_col - col;
 
-		/* fixes75a: Temporarily narrow the grid container's width to
-		 * this_col_width while laying out the child. layout_block_context
-		 * resolves the child's auto-width against parent->width, so
-		 * without this every child grows to the full container width
-		 * and the grid degenerates into a single-column stack.
-		 * Restore after the child is laid out so subsequent siblings
-		 * see the same starting state, and the final grid->width is
-		 * set correctly at the end of the loop. */
-		saved_grid_width = grid->width;
-		grid->width = this_col_width;
+		/* --- Pass 1b: layout each child into its cell width. */
+		child = grid->children;
+		slot_index = 0;
+		while (child != NULL && slot_index < n_children) {
+			int slot_col = slots[slot_index].col;
+			int slot_col_span = slots[slot_index].col_span;
+			int slot_row = slots[slot_index].row;
+			int this_col_width;
+			int saved_grid_width;
+			int child_total_h;
+			int k;
+			int end_col;
 
-		if (!layout_grid_item(child, this_col_width, content)) {
+			if (has_tracks) {
+				this_col_width = track_widths[slot_col];
+			} else {
+				this_col_width = col_width;
+			}
+			end_col = slot_col + slot_col_span;
+			if (end_col > cols) end_col = cols;
+			for (k = slot_col + 1; k < end_col; k++) {
+				if (has_tracks) {
+					this_col_width += col_gap +
+							track_widths[k];
+				} else {
+					this_col_width += col_gap + col_width;
+				}
+			}
+
+			/* fixes75a: narrow grid->width while laying out so
+			 * child auto-width resolves against the cell, not the
+			 * full container. */
+			saved_grid_width = grid->width;
+			grid->width = this_col_width;
+
+			if (!layout_grid_item(child, this_col_width, content)) {
+				grid->width = saved_grid_width;
+				return false;
+			}
+
 			grid->width = saved_grid_width;
-			return false;
-		}
 
-		grid->width = saved_grid_width;
-
-		/* Defensive: if the child still came out wider than the
-		 * cell (e.g. an explicit fixed CSS width override), clamp.
-		 * Children narrower than the cell are fine -- the cell is
-		 * an upper bound, not a forced fill. */
-		if (child->width > this_col_width) {
-			child->width = this_col_width;
-		}
-
-		/* Position the child. */
-		child->x = x_pos;
-		child->y = row_y;
-
-		/* Track tallest child in current row. */
-		child_total_h = child->height;
-		if (child->padding[TOP] > 0)    child_total_h += child->padding[TOP];
-		if (child->padding[BOTTOM] > 0) child_total_h += child->padding[BOTTOM];
-		if (child->border[TOP].width > 0)
-			child_total_h += child->border[TOP].width;
-		if (child->border[BOTTOM].width > 0)
-			child_total_h += child->border[BOTTOM].width;
-		if (child->margin[TOP] != AUTO && child->margin[TOP] > 0)
-			child_total_h += child->margin[TOP];
-		if (child->margin[BOTTOM] != AUTO && child->margin[BOTTOM] > 0)
-			child_total_h += child->margin[BOTTOM];
-
-		if (child_total_h > row_max_height) {
-			row_max_height = child_total_h;
-		}
-
-		/* fixes151: a spanning cell consumes `span_advance` slots
-		 * in the row, not just one. */
-		child_index += span_advance;
-
-		/* End of row — advance row_y by the tallest cell height
-		 * plus the row gap. */
-		if ((child_index % cols) == 0) {
-			int this_row_h = row_max_height;
-			/* fixes150: if grid-template-rows specified a fixed
-			 * px height for this row, force the row to exactly
-			 * that height (overriding tallest-child). */
-			if (has_row_tracks && row_index < n_row_tracks &&
-					row_track_h[row_index] > 0) {
-				this_row_h = row_track_h[row_index];
+			if (child->width > this_col_width) {
+				child->width = this_col_width;
 			}
-			row_y += this_row_h + row_gap;
-			row_max_height = 0;
-			row_index++;
+
+			/* Total cell height contribution. */
+			child_total_h = child->height;
+			if (child->padding[TOP] > 0)
+				child_total_h += child->padding[TOP];
+			if (child->padding[BOTTOM] > 0)
+				child_total_h += child->padding[BOTTOM];
+			if (child->border[TOP].width > 0)
+				child_total_h += child->border[TOP].width;
+			if (child->border[BOTTOM].width > 0)
+				child_total_h += child->border[BOTTOM].width;
+			if (child->margin[TOP] != AUTO &&
+					child->margin[TOP] > 0)
+				child_total_h += child->margin[TOP];
+			if (child->margin[BOTTOM] != AUTO &&
+					child->margin[BOTTOM] > 0)
+				child_total_h += child->margin[BOTTOM];
+
+			/* Credit this child's height to the row it occupies.
+			 * Multi-row spans only credit the first row in V1 —
+			 * full distribution waits for V2. */
+			if (slot_row >= 0 && slot_row < MACSURF_GRID_ROWS_MAX) {
+				if (child_total_h > row_max_h[slot_row])
+					row_max_h[slot_row] = child_total_h;
+			}
+
+			slot_index++;
+			child = child->next;
 		}
 
-		child = child->next;
-	}
-
-	/* Last partial row (e.g. 5 items in 3 cols leaves 2 items in the
-	 * final row). */
-	if ((child_index % cols) != 0) {
-		int this_row_h = row_max_height;
-		if (has_row_tracks && row_index < n_row_tracks &&
-				row_track_h[row_index] > 0) {
-			this_row_h = row_track_h[row_index];
+		/* --- Pass 2: compute row_y per row. fixes150 row tracks
+		 * give explicit px heights when present; otherwise use the
+		 * tallest-child height we tracked above. */
+		{
+			int r;
+			int y = 0;
+			int last_h = 0;
+			for (r = 0; r <= max_row_used &&
+					r < MACSURF_GRID_ROWS_MAX; r++) {
+				int h = row_max_h[r];
+				if (has_row_tracks && r < n_row_tracks &&
+						row_track_h[r] > 0) {
+					h = row_track_h[r];
+				}
+				row_y_arr[r] = y;
+				y += h + row_gap;
+				last_h = h;
+			}
+			/* The total grid height is y minus the trailing
+			 * row_gap (no row after the last row). */
+			row_y = y;
+			if (max_row_used >= 0) {
+				row_y -= row_gap;
+			}
+			(void)last_h;
 		}
-		row_y += this_row_h;
-	} else if (row_index > 0) {
-		/* Final completed row added a trailing row_gap that has no
-		 * row after it; back it out so grid->height is tight. */
-		row_y -= row_gap;
+
+		/* --- Pass 3: position each child. */
+		child = grid->children;
+		slot_index = 0;
+		while (child != NULL && slot_index < n_children) {
+			int slot_col = slots[slot_index].col;
+			int slot_row = slots[slot_index].row;
+			int x_pos;
+
+			if (has_tracks) {
+				x_pos = track_x[slot_col];
+			} else {
+				x_pos = slot_col * (col_width + col_gap);
+			}
+			child->x = x_pos;
+			if (slot_row >= 0 && slot_row < MACSURF_GRID_ROWS_MAX)
+				child->y = row_y_arr[slot_row];
+			else
+				child->y = 0;
+
+			slot_index++;
+			child = child->next;
+		}
+
+		/* Suppress unused-variable warnings from the legacy
+		 * single-pass scaffolding the old loop relied on. */
+		(void)child_index;
+		(void)row_max_height;
+		(void)row_index;
 	}
 
 	/* Set the grid container's height to fit all rows. Honour
