@@ -170,6 +170,15 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 
 ---
 
+## Download
+
+Two StuffIt archives in [`builds/`](builds/) — pick what you need:
+
+- **[`builds/MacSurf.sit`](builds/MacSurf.sit)** &mdash; ready-to-run binary. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
+- **[`builds/MacSurf-BuildPack.sit`](builds/MacSurf-BuildPack.sit)** &mdash; full source + CodeWarrior 8 project file. Expand, open `MacSurf.mcp` in CodeWarrior, choose Build.
+
+---
+
 ## Getting started
 
 <table>

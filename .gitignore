@@ -12,6 +12,9 @@ GEMINI.md
 *.tgz
 *.sit
 *.hqx
+# Exceptions: the public build pack + ready-to-run binary live in builds/
+!builds/MacSurf-BuildPack.sit
+!builds/MacSurf.sit
 
 # Build artifacts
 MacSurf
@@ -46,7 +49,6 @@ clean_macsurf/
 flat_macsurf_sources/
 tree_macsurf/
 build/
-builds/
 for-gemini/
 
 # Misc scratch
