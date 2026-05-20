@@ -2150,36 +2150,6 @@ static bool html_redraw_box_children(const html_content *html, struct box *box,
 	x_off = x_parent + box->x - scrollbar_get_offset(box->scroll_x);
 	y_off = y_parent + box->y - scrollbar_get_offset(box->scroll_y);
 
-	/* fixes155 -- ONE line per html_redraw_box_children call: parent box
-	 * pointer + type + child-count + bbox/clip + first child pointer.
-	 * Caps at 16 calls per redraw so we get tree shape without flooding
-	 * the log. Resets per redraw via macos9_hrb_visits == 0 sentinel
-	 * (main.c zeroes it before each bw_redraw). */
-	{
-		extern long macos9_hrb_visits;
-		static long hrbc_call_count = 0;
-		if (macos9_hrb_visits <= 1) hrbc_call_count = 0;
-		if (hrbc_call_count < 16) {
-			int child_count = 0;
-			struct box *cc;
-			for (cc = box->children; cc; cc = cc->next) child_count++;
-			macsurf_debug_log_writef(
-			    "hrbc: box=%p type=%d children=%d "
-			    "x=%d y=%d w=%d h=%d "
-			    "dxy0=(%d,%d) dxy1=(%d,%d) "
-			    "clip=(%d,%d,%d,%d) first=%p",
-			    (void *)box, (int)box->type, child_count,
-			    (int)box->x, (int)box->y,
-			    (int)box->width, (int)box->height,
-			    (int)box->descendant_x0, (int)box->descendant_y0,
-			    (int)box->descendant_x1, (int)box->descendant_y1,
-			    (int)clip->x0, (int)clip->y0,
-			    (int)clip->x1, (int)clip->y1,
-			    (void *)box->children);
-			hrbc_call_count++;
-		}
-	}
-
 	/* Pass 1: classify all non-float children into four buckets.
 	 * Defer all paint so negative-z paints first per CSS 2.1 (b). */
 	for (c = box->children; c; c = c->next) {
@@ -2348,12 +2318,22 @@ bool html_redraw_box(const html_content *html, struct box *box,
 	/* Defensive sanity clamp: layout / CSS engine can leave box fields
 	 * with garbage values when computed style is incompletely initialised.
 	 * Those garbage values trick the clip test into skipping real content.
-	 * Observed: box->x = 30728, box->descendant_y0 = -39845888 on macos9. */
+	 * Observed garbage: box->x = 30728, box->descendant_y0 = -39845888
+	 * on macos9. The original clamps used ±10000 across the board, which
+	 * worked when advanced.html was shorter — but once probe cards FF1–FF5
+	 * (fixes154), C1–C5, R1–R5, V1–V4, A1–A4, ZS1–ZS6 etc. pushed total
+	 * page height past 10000 px (current c_h = 10035), the root box's
+	 * height + descendant_y1 got reset to 0 EVERY redraw, and the walker
+	 * collapsed at the first child's clip intersection. fixes156:
+	 * heights/y-coords clamped at ±200000 (catches the -39845888 garbage
+	 * with 4 orders of magnitude headroom, allows up to 200000 px tall
+	 * real content); x-coords / widths stay at ±10000 (no real page goes
+	 * wider). */
 	{
 		if (box->x < -10000 || box->x > 10000) box->x = 0;
-		if (box->y < -10000 || box->y > 10000) box->y = 0;
+		if (box->y < -200000 || box->y > 200000) box->y = 0;
 		if (box->width < 0 || box->width > 10000) box->width = 0;
-		if (box->height < 0 || box->height > 10000) box->height = 0;
+		if (box->height < 0 || box->height > 200000) box->height = 0;
 		if (box->padding[LEFT] < 0 || box->padding[LEFT] > 10000) box->padding[LEFT] = 0;
 		if (box->padding[TOP] < 0 || box->padding[TOP] > 10000) box->padding[TOP] = 0;
 		if (box->padding[RIGHT] < 0 || box->padding[RIGHT] > 10000) box->padding[RIGHT] = 0;
@@ -2363,15 +2343,15 @@ bool html_redraw_box(const html_content *html, struct box *box,
 		if (box->border[RIGHT].width < 0 || box->border[RIGHT].width > 1000) box->border[RIGHT].width = 0;
 		if (box->border[BOTTOM].width < 0 || box->border[BOTTOM].width > 1000) box->border[BOTTOM].width = 0;
 		if (box->descendant_x0 < -10000 || box->descendant_x0 > 10000) box->descendant_x0 = 0;
-		if (box->descendant_y0 < -10000 || box->descendant_y0 > 10000) box->descendant_y0 = 0;
+		if (box->descendant_y0 < -200000 || box->descendant_y0 > 200000) box->descendant_y0 = 0;
 		if (box->descendant_x1 < -10000 || box->descendant_x1 > 10000) box->descendant_x1 = box->width;
-		if (box->descendant_y1 < -10000 || box->descendant_y1 > 10000) box->descendant_y1 = box->height;
+		if (box->descendant_y1 < -200000 || box->descendant_y1 > 200000) box->descendant_y1 = box->height;
 		/* Expand descendants if collapsed — happens when layout hasn't
 		 * fully run but the box has real text children. */
 		if (box->descendant_x1 <= box->descendant_x0)
 			box->descendant_x1 = box->descendant_x0 + 10000;
 		if (box->descendant_y1 <= box->descendant_y0)
-			box->descendant_y1 = box->descendant_y0 + 10000;
+			box->descendant_y1 = box->descendant_y0 + 200000;
 	}
 
 	/* avoid trivial FP maths */
