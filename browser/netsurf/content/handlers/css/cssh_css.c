@@ -860,24 +860,264 @@ macsurf__rewrite_grid_template_rows(const char *data, size_t size)
 }
 
 
-/* fixes151 — rewrite each `grid-column: VALUE` declaration to
- * `-macsurf-grid-col-span: N`. Unlike the in-place columns/rows
- * rewriters, the new property name is LONGER than the source
- * (`grid-column` 11 chars -> `-macsurf-grid-col-span` 22), so this
- * pass allocates a growable output buffer (input_size + 64 bytes per
- * potential occurrence, capped at 2x input) and returns the result via
- * out parameters.
+/* fixes158 — grid placement rewriter.
  *
- * Supported value forms:
- *   span N            -> col-span N
- *   A / B (ints>0)    -> col-span (B-A)
- *   A / span N        -> col-span N
- *   A / -1            -> col-span 255 (sentinel "fill row")
- *   1 / -1            -> col-span 255
- * Anything else (auto, named lines, calc) -> declaration left alone;
- * libcss rejects the unknown property and falls back to single-cell. */
+ * Replaces the fixes151 column-only rewriter. Walks `{ ... }` blocks
+ * looking for any of:
+ *   grid-column        : A | A/B | A/-1 | span N | A/span N
+ *   grid-row           : same forms
+ *   grid-column-start  : positive integer
+ *   grid-column-end    : positive integer (or -1)
+ *   grid-row-start     : positive integer
+ *   grid-row-end       : positive integer (or -1)
+ *
+ * All recognised declarations within a single brace-depth-1 block are
+ * combined into one packed `-macsurf-grid-col-span: <int32>` emitted at
+ * the closing `}`. The int packs four 8-bit fields:
+ *   bits  0..7  col_span    1..254 / 255 = fill
+ *   bits  8..15 col_start   1..254 = explicit line, 0 = auto
+ *   bits 16..23 row_start   same
+ *   bits 24..31 row_span    same as col_span
+ *
+ * Original declarations are stripped from the output. Unrecognised
+ * value forms (named lines, negative starts, calc(), keywords) leave
+ * that specific declaration in the output untouched and don't update
+ * the accumulator — libcss will then drop them as unknown properties.
+ *
+ * V1 limitations (documented, not bugs):
+ *   - only positive integer line numbers are recognised in the
+ *     longhand `-end` declarations; we don't carry around the matching
+ *     `-start` to do A/B math across non-contiguous declarations
+ *   - `grid-column-end: -1` is honoured as the "fill" sentinel only
+ *     if `grid-column-start` has been seen earlier in the same block
+ *   - `grid-area` is NOT parsed
+ *   - named grid lines, calc(), and `auto` are deferred to V2
+ *
+ * Brace tracking uses a small stack so nested rules (e.g. inside
+ * @media) accumulate per-innermost-block. Max nesting depth 8 is
+ * enough for any real-world CSS.
+ */
+
+#define MACSURF_GRID_PLACEMENT_MAX_DEPTH 8
+
+struct macsurf_grid_placement {
+	bool any;
+	uint8_t col_start;
+	uint8_t col_span;
+	uint8_t row_start;
+	uint8_t row_span;
+};
+
+/* Parse a positive integer at *p, return value (1..254 clamped) or
+ * 0 if no digits. Advance *p past the digits. Returns 255 if the
+ * value is -1 (the "fill" sentinel). */
+static int
+macsurf__grid_parse_int_or_minus1(const char **p, const char *end)
+{
+	const char *q = *p;
+	int n = 0;
+
+	while (q < end && (*q == ' ' || *q == '\t')) q++;
+	if (q < end && *q == '-') {
+		q++;
+		if (q < end && *q == '1') {
+			q++;
+			*p = q;
+			return 255; /* `-1` sentinel = fill */
+		}
+		return 0; /* anything else negative is unsupported */
+	}
+	while (q < end && *q >= '0' && *q <= '9') {
+		n = n * 10 + (*q - '0');
+		q++;
+	}
+	*p = q;
+	if (n < 1) return 0;
+	if (n > 254) n = 254;
+	return n;
+}
+
+/* Try to parse "span N" at *p. Returns N (1..254) on success and
+ * advances *p; returns 0 on failure leaving *p unchanged. */
+static int
+macsurf__grid_parse_span(const char **p, const char *end)
+{
+	const char *q = *p;
+
+	while (q < end && (*q == ' ' || *q == '\t')) q++;
+	if ((end - q) < 4) return 0;
+	if (!((q[0] == 's' || q[0] == 'S') &&
+			(q[1] == 'p' || q[1] == 'P') &&
+			(q[2] == 'a' || q[2] == 'A') &&
+			(q[3] == 'n' || q[3] == 'N'))) {
+		return 0;
+	}
+	if ((end - q) > 4) {
+		char c = q[4];
+		if (c != ' ' && c != '\t') return 0;
+	} else {
+		return 0;
+	}
+	q += 4;
+	while (q < end && (*q == ' ' || *q == '\t')) q++;
+	{
+		int n = 0;
+		while (q < end && *q >= '0' && *q <= '9') {
+			n = n * 10 + (*q - '0');
+			q++;
+		}
+		if (n < 1) return 0;
+		if (n > 254) n = 254;
+		*p = q;
+		return n;
+	}
+}
+
+/* Parse a `grid-column` / `grid-row` value. Writes into *start_out
+ * and *span_out (0 = leave alone). Returns true if anything was
+ * parsed. */
+static bool
+macsurf__grid_parse_axis_value(const char *p, const char *end,
+		uint8_t *start_out, uint8_t *span_out)
+{
+	int span;
+	int a;
+	const char *cursor = p;
+
+	*start_out = 0;
+	*span_out = 0;
+
+	while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+		cursor++;
+	if (cursor >= end) return false;
+
+	/* span N (alone) */
+	span = macsurf__grid_parse_span(&cursor, end);
+	if (span > 0) {
+		*span_out = (uint8_t)span;
+		return true;
+	}
+
+	/* leading positive integer */
+	if (*cursor >= '0' && *cursor <= '9') {
+		a = macsurf__grid_parse_int_or_minus1(&cursor, end);
+		if (a < 1 || a == 255) return false; /* lone -1 unsupported */
+		*start_out = (uint8_t)a;
+		while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+			cursor++;
+		if (cursor >= end || *cursor != '/') {
+			/* Just "A" — start only, span 1 implicit. */
+			*span_out = 1;
+			return true;
+		}
+		cursor++;
+		while (cursor < end && (*cursor == ' ' || *cursor == '\t'))
+			cursor++;
+		/* `A / span N` */
+		span = macsurf__grid_parse_span(&cursor, end);
+		if (span > 0) {
+			*span_out = (uint8_t)span;
+			return true;
+		}
+		/* `A / B` or `A / -1` */
+		{
+			int b = macsurf__grid_parse_int_or_minus1(&cursor,
+					end);
+			if (b == 255) {
+				*span_out = 255; /* fill row */
+				return true;
+			}
+			if (b > a) {
+				int s = b - a;
+				if (s > 254) s = 254;
+				*span_out = (uint8_t)s;
+				return true;
+			}
+			/* B <= A or 0 — unsupported, drop */
+			*start_out = 0;
+			return false;
+		}
+	}
+
+	return false;
+}
+
+/* Match a property name at buf[pos..] case-insensitively, with a
+ * boundary check after (must be followed by `:` or whitespace). */
+static bool
+macsurf__grid_match_name(const char *buf, size_t len, size_t pos,
+		const char *name, size_t name_len)
+{
+	size_t i;
+	char next;
+	if (!macsurf__match_prop_name(buf, len, pos, name, name_len))
+		return false;
+	i = pos + name_len;
+	if (i >= len) return false;
+	next = buf[i];
+	if (next == ':' || next == ' ' || next == '\t' || next == '\n' ||
+			next == '\r')
+		return true;
+	return false;
+}
+
+/* Emit a packed `-macsurf-grid-col-span: <col_span> <col_start>
+ * <row_start> <row_span>;` declaration into out at pos. Grows the
+ * buffer as needed.
+ *
+ * Four space-separated unsigned integers (each 0..255) — avoids the
+ * css_fixed Q22.10 range limit a single packed int32 would hit.
+ * Leading `;` guards against the previous declaration lacking its
+ * own terminator (legal in CSS for the last decl before `}`). */
+static bool
+macsurf__grid_emit_packed(char **out_p, size_t *cap_p, size_t *pos_p,
+		const struct macsurf_grid_placement *acc)
+{
+	char tmp[64];
+	int n;
+	size_t need;
+
+	n = sprintf(tmp, "; -macsurf-grid-col-span: %u %u %u %u;",
+			(unsigned)acc->col_span,
+			(unsigned)acc->col_start,
+			(unsigned)acc->row_start,
+			(unsigned)acc->row_span);
+	if (n <= 0) return false;
+
+	need = *pos_p + (size_t)n + 1;
+	while (need >= *cap_p) {
+		size_t newcap = *cap_p * 2;
+		char *neu = (char *)realloc(*out_p, newcap);
+		if (neu == NULL) return false;
+		*out_p = neu;
+		*cap_p = newcap;
+	}
+	memcpy(*out_p + *pos_p, tmp, (size_t)n);
+	*pos_p += (size_t)n;
+	return true;
+}
+
+
+/* Stub of the legacy fixes151 entry point — preserved so any direct
+ * callers in older code paths still compile, but it now just calls
+ * the unified placement rewriter below. */
+static char *
+macsurf__rewrite_grid_placement(const char *data, size_t in_size,
+		size_t *out_size_p);
+
 static char *
 macsurf__rewrite_grid_column(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	return macsurf__rewrite_grid_placement(data, in_size, out_size_p);
+}
+
+
+/* Old single-property column rewriter, retained inline-disabled for
+ * reference. The new unified rewriter is below. */
+#if 0
+static char *
+macsurf__rewrite_grid_column_legacy(const char *data, size_t in_size,
 		size_t *out_size_p)
 {
 	static const char NEEDLE[] = "grid-column";
@@ -1064,6 +1304,234 @@ macsurf__rewrite_grid_column(const char *data, size_t in_size,
 			pos += span_bytes;
 			i = val_end;
 		}
+	}
+
+	*out_size_p = pos;
+	return out;
+}
+#endif  /* legacy column rewriter */
+
+
+/* fixes158 unified grid-placement rewriter. Walks brace-tracked
+ * declarations and rolls all six grid placement properties into a
+ * single packed `-macsurf-grid-col-span: <int32>` declaration at the
+ * close of each innermost block. */
+static char *
+macsurf__rewrite_grid_placement(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	struct macsurf_grid_placement stack[MACSURF_GRID_PLACEMENT_MAX_DEPTH];
+	int depth = 0;
+	size_t cap;
+	size_t pos = 0;
+	char *out;
+	size_t i = 0;
+	int k;
+
+	for (k = 0; k < MACSURF_GRID_PLACEMENT_MAX_DEPTH; k++) {
+		stack[k].any = false;
+		stack[k].col_start = 0;
+		stack[k].col_span = 0;
+		stack[k].row_start = 0;
+		stack[k].row_span = 0;
+	}
+
+	cap = in_size + 256;
+	if (cap < in_size * 2) cap = in_size * 2;
+	if (cap < 1024) cap = 1024;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		char c = data[i];
+
+		/* Attempt to match a placement declaration if we're inside
+		 * a block and the byte could start one. */
+		if (depth >= 1 && depth <= MACSURF_GRID_PLACEMENT_MAX_DEPTH &&
+				(c == 'g' || c == 'G')) {
+			static const char N_GC[]   = "grid-column";
+			static const char N_GR[]   = "grid-row";
+			static const char N_GCS[]  = "grid-column-start";
+			static const char N_GCE[]  = "grid-column-end";
+			static const char N_GRS[]  = "grid-row-start";
+			static const char N_GRE[]  = "grid-row-end";
+			size_t name_len = 0;
+			int prop = 0; /* 1=GC 2=GR 3=GCS 4=GCE 5=GRS 6=GRE */
+
+			/* Check longer names first to avoid GC matching
+			 * the prefix of GCS/GCE. */
+			if (macsurf__grid_match_name(data, in_size, i,
+					N_GCS, sizeof(N_GCS) - 1)) {
+				prop = 3; name_len = sizeof(N_GCS) - 1;
+			} else if (macsurf__grid_match_name(data, in_size, i,
+					N_GCE, sizeof(N_GCE) - 1)) {
+				prop = 4; name_len = sizeof(N_GCE) - 1;
+			} else if (macsurf__grid_match_name(data, in_size, i,
+					N_GRS, sizeof(N_GRS) - 1)) {
+				prop = 5; name_len = sizeof(N_GRS) - 1;
+			} else if (macsurf__grid_match_name(data, in_size, i,
+					N_GRE, sizeof(N_GRE) - 1)) {
+				prop = 6; name_len = sizeof(N_GRE) - 1;
+			} else if (macsurf__grid_match_name(data, in_size, i,
+					N_GC, sizeof(N_GC) - 1)) {
+				prop = 1; name_len = sizeof(N_GC) - 1;
+			} else if (macsurf__grid_match_name(data, in_size, i,
+					N_GR, sizeof(N_GR) - 1)) {
+				prop = 2; name_len = sizeof(N_GR) - 1;
+			}
+
+			if (prop != 0) {
+				size_t j = i + name_len;
+				size_t val_start;
+				size_t val_end;
+				const char *p;
+				const char *end;
+				struct macsurf_grid_placement *acc =
+						&stack[depth - 1];
+				uint8_t s = 0;
+				uint8_t sp = 0;
+				int v;
+
+				while (j < in_size && (data[j] == ' ' ||
+						data[j] == '\t' ||
+						data[j] == '\n' ||
+						data[j] == '\r')) j++;
+				if (j >= in_size || data[j] != ':') {
+					/* Not actually a declaration. */
+					goto not_grid;
+				}
+				val_start = j + 1;
+				while (val_start < in_size &&
+						(data[val_start] == ' ' ||
+						data[val_start] == '\t'))
+					val_start++;
+				val_end = val_start;
+				while (val_end < in_size) {
+					char vc = data[val_end];
+					if (vc == ';' || vc == '}' ||
+							vc == '!') break;
+					val_end++;
+				}
+
+				p = data + val_start;
+				end = data + val_end;
+
+				if (prop == 1) {
+					/* grid-column */
+					if (macsurf__grid_parse_axis_value(
+							p, end, &s, &sp)) {
+						if (s != 0) acc->col_start = s;
+						if (sp != 0) acc->col_span = sp;
+						acc->any = true;
+					}
+				} else if (prop == 2) {
+					/* grid-row */
+					if (macsurf__grid_parse_axis_value(
+							p, end, &s, &sp)) {
+						if (s != 0) acc->row_start = s;
+						if (sp != 0) acc->row_span = sp;
+						acc->any = true;
+					}
+				} else if (prop == 3) {
+					/* grid-column-start */
+					v = macsurf__grid_parse_int_or_minus1(
+							&p, end);
+					if (v >= 1 && v <= 254) {
+						acc->col_start = (uint8_t)v;
+						acc->any = true;
+					}
+				} else if (prop == 4) {
+					/* grid-column-end */
+					v = macsurf__grid_parse_int_or_minus1(
+							&p, end);
+					if (v == 255 && acc->col_start > 0) {
+						acc->col_span = 255;
+						acc->any = true;
+					} else if (v >= 1 && v <= 254 &&
+							acc->col_start > 0 &&
+							v > acc->col_start) {
+						int sp2 = v - acc->col_start;
+						if (sp2 > 254) sp2 = 254;
+						acc->col_span = (uint8_t)sp2;
+						acc->any = true;
+					}
+				} else if (prop == 5) {
+					/* grid-row-start */
+					v = macsurf__grid_parse_int_or_minus1(
+							&p, end);
+					if (v >= 1 && v <= 254) {
+						acc->row_start = (uint8_t)v;
+						acc->any = true;
+					}
+				} else if (prop == 6) {
+					/* grid-row-end */
+					v = macsurf__grid_parse_int_or_minus1(
+							&p, end);
+					if (v == 255 && acc->row_start > 0) {
+						acc->row_span = 255;
+						acc->any = true;
+					} else if (v >= 1 && v <= 254 &&
+							acc->row_start > 0 &&
+							v > acc->row_start) {
+						int sp2 = v - acc->row_start;
+						if (sp2 > 254) sp2 = 254;
+						acc->row_span = (uint8_t)sp2;
+						acc->any = true;
+					}
+				}
+
+				/* Skip the declaration in the input (including
+				 * the trailing `;` if present). The closing `}`
+				 * stays in the input — we don't eat it. */
+				i = val_end;
+				if (i < in_size && data[i] == ';') i++;
+				goto next_iter;
+			}
+not_grid:
+			;
+		}
+
+		if (c == '{') {
+			if (depth < MACSURF_GRID_PLACEMENT_MAX_DEPTH) {
+				stack[depth].any = false;
+				stack[depth].col_start = 0;
+				stack[depth].col_span = 0;
+				stack[depth].row_start = 0;
+				stack[depth].row_span = 0;
+			}
+			depth++;
+		} else if (c == '}') {
+			/* Before emitting `}`, emit any accumulated
+			 * placement for the innermost block. */
+			if (depth >= 1 && depth <=
+					MACSURF_GRID_PLACEMENT_MAX_DEPTH &&
+					stack[depth - 1].any) {
+				if (!macsurf__grid_emit_packed(&out, &cap, &pos,
+						&stack[depth - 1])) {
+					free(out);
+					return NULL;
+				}
+				stack[depth - 1].any = false;
+			}
+			if (depth > 0) depth--;
+		}
+
+		/* Emit the current byte. */
+		{
+			size_t need = pos + 2;
+			while (need >= cap) {
+				size_t newcap = cap * 2;
+				char *neu = (char *)realloc(out, newcap);
+				if (neu == NULL) { free(out); return NULL; }
+				out = neu;
+				cap = newcap;
+			}
+		}
+		out[pos++] = c;
+		i++;
+
+next_iter:
+		;
 	}
 
 	*out_size_p = pos;

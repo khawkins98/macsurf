@@ -277,9 +277,22 @@ struct css_computed_style_i {
 	/* fixes75: -macsurf-grid: cols (bits 31..16) and rows (bits 15..0).
 	 * rows == 0 means auto-rows. */
 	int32_t macsurf_grid;
-	/* fixes151: -macsurf-grid-col-span. 0 = unset (treat as 1 in
-	 * layout). 1..254 = literal span. 255 = sentinel "fill remainder
-	 * of row" (from `grid-column: 1 / -1` preprocessor rewrite).
+	/* fixes151 / fixes158: packed grid placement, int32. Originally
+	 * (fixes151) just held col-span as a uint8 in the low byte;
+	 * fixes158 extends the upper 24 bits to encode start lines and
+	 * row-span without adding new libcss properties.
+	 *
+	 *   bits  0..7  col_span    — 0=unset (treat as 1), 1..254 literal,
+	 *                             255 = "fill the rest of the row"
+	 *                             sentinel from `grid-column: 1 / -1`
+	 *   bits  8..15 col_start   — 0 = auto, 1..254 = explicit line
+	 *   bits 16..23 row_start   — 0 = auto, 1..254 = explicit line
+	 *   bits 24..31 row_span    — 0 = unset (treat as 1), 1..254 literal,
+	 *                             255 = "fill" sentinel
+	 *
+	 * Backwards compat: existing CSS that emitted just a 1..255 span
+	 * value lands in the low byte with all upper bytes zero (= auto
+	 * start, single row), which preserves fixes151 behaviour exactly.
 	 *
 	 * fixes151b: stored as int32_t (not uint8_t) to avoid the
 	 * struct-padding trap. A uint8_t between two int32_t fields
@@ -288,8 +301,8 @@ struct css_computed_style_i {
 	 * then flags logically-equal styles as different, the intern
 	 * table fills with duplicates, and css_computed_style_destroy
 	 * eventually walks a freed pointer (same failure mode as
-	 * fixes117's inline track array). Using int32_t makes the
-	 * field self-aligning. */
+	 * fixes117's inline track array). Using int32_t is self-aligning
+	 * and now exactly the size we need for the packed layout. */
 	int32_t macsurf_grid_col_span;
 	/* fixes152: aspect-ratio.
 	 *   bits 31..16: numerator (1..65535)
