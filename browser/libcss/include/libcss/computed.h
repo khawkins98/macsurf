@@ -229,6 +229,13 @@ const int32_t *css_computed_macsurf_grid_row_tracks(
 uint8_t css_computed_macsurf_grid_col_span(
 		const css_computed_style *style);
 
+/* fixes152: aspect-ratio packed as (num << 16) | denom.
+ * 0 = unset (no aspect-ratio constraint). Layout uses width = h * num
+ * / denom and height = w * denom / num to derive the missing
+ * dimension when one of width/height is set and the other is auto. */
+int32_t css_computed_aspect_ratio(
+		const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

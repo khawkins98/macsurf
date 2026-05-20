@@ -291,6 +291,12 @@ struct css_computed_style_i {
 	 * fixes117's inline track array). Using int32_t makes the
 	 * field self-aligning. */
 	int32_t macsurf_grid_col_span;
+	/* fixes152: aspect-ratio.
+	 *   bits 31..16: numerator (1..65535)
+	 *   bits 15..0:  denominator (1..65535)
+	 *   0 = unset / no aspect-ratio constraint
+	 * int32 storage is self-aligning (fixes151b padding lesson). */
+	int32_t aspect_ratio;
 	/* fixes76: -macsurf-animation-opacity.
 	 * bits 31..16: duration_ms (uint16, full from->to->from cycle).
 	 * bits 15..8:  to_opacity (uint8 0..255).
