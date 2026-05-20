@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="docs/release-notes/MacSurf-0.1a1.md"><img alt="version" src="https://img.shields.io/badge/version-0.1a1%20%E2%80%94%20alpha-orange"></a>
   <a href="docs/status.md"><img alt="status" src="https://img.shields.io/badge/status-active%20development-brightgreen"></a>
   <img alt="platform" src="https://img.shields.io/badge/platform-Mac%20OS%209.1%E2%80%939.2.2-blue">
   <img alt="arch" src="https://img.shields.io/badge/arch-PowerPC%20G3%20%2F%20G4-orange">
@@ -20,6 +21,17 @@
   <img alt="js" src="https://img.shields.io/badge/JavaScript-Duktape%20ES5-lightgrey">
   <img alt="license" src="https://img.shields.io/badge/license-GPLv2-blue">
 </p>
+
+---
+
+> [!WARNING]
+> **MacSurf 0.1a1 is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3 — but **most websites in 2026 will not work** in it. Expect: crashes on heavy SPAs, broken layouts on sites that lean on modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
+>
+> **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it — bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too** — there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
+>
+> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, mactrove.com, a respectable subset of the CSS Grid spec, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
+>
+> Released **2026-05-20** as the first numbered version. Release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
 
 ---
 
