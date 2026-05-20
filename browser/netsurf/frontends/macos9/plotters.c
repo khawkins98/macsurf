@@ -103,20 +103,30 @@ long macos9_plot_rect_count = 0;
  *   stacking. The vmetric data showed mixed-family lines at CSS
  *   line-height >= 1.3 (the normal default) accommodate all OS 9
  *   families. The line-height: 1 edge case is rare on real pages. */
-/* fixes154c: hardware-rejected fixes154 + fixes154b — page rendered
- * empty on G3 regardless of whether MACSURF_FONT_FAMILY_ALIASES was 1
- * (fixes154) or 0 (fixes154b). The fixes154b revert kept its diagnostic
- * block compiled in but on the Mac the gated MACSURF_FONT_ALIAS_DIAG
- * macro change didn't propagate to macos9_font.c's stale .o (CW8 misses
- * header-only changes), so the per-call FONTDIAG measure logging was
- * still firing — hundreds of file writes + FlushVol per layout pass.
- * Suspect that I/O load (or whatever else the diagnostic block
- * inadvertently changed) is what broke layout/redraw, not the alias
- * dispatch itself. fixes154c strips the FONTDIAG block from BOTH
- * plotters.c and macos9_font.c so a clean rebuild eliminates the
- * diagnostic as a variable, and reships both files plus macos9.h so
- * the CW8 dependency mismatch can't recur. Alias gate stays at 0. */
-#define MACSURF_FONT_FAMILY_ALIASES 0
+/* fixes154/154b/154c (rejected): all three attempted alias-related
+ * changes when the actual culprit was the defensive-clamp threshold
+ * (fixed at fixes156). The "empty render" symptom we kept seeing was
+ * the page crossing 10000 px tall and tripping the clamp on the root
+ * box. Now that fixes156 raised the y/height clamp to ±200000, the
+ * alias dispatch has clean ground to be re-tested on.
+ *
+ * fixes157: re-enable alias dispatch, post-clamp-fix. Per-call FONTDIAG
+ * logging gated on MACSURF_FONT_ALIAS_DIAG in macos9.h, and further
+ * narrowed by MACSURF_FONT_ALIAS_DIAG_SMART which skips the SANS_SERIF
+ * (Helvetica-default) firehose. The remaining log lines are non-default
+ * family dispatches — exactly the cases where the width-vs-paint
+ * divergence would matter. width and paint share macos9_font_id_from_style
+ * as the dispatch entry point (verified at macos9_font_measure:163 and
+ * plot_text:1311), so by construction they cannot disagree on a single
+ * fstyle — but any inline-layout drift between segments will show as
+ * adjacent-line family/size/face mismatches in the log.
+ *
+ * Acceptance criteria for this round: FF1-FF5 render visibly distinct
+ * fonts; MacTrove home + advanced.html + DuckDuckGo still render past
+ * 10000 px without empty-redraw regression; no horizontal scrambling
+ * on multi-family inline lines. If scrambling reproduces, compare
+ * width-vs-paint dispatch in the FONTDIAG log before reverting. */
+#define MACSURF_FONT_FAMILY_ALIASES 1
 
 /* fixes74b: counters incremented by redraw.c when it detects
  * CSS_MACSURF_GRADIENT_SET. Lets us see whether the cascade returned
@@ -1362,6 +1372,41 @@ macos9_plot_text(const struct redraw_context *ctx,
 
 		mac_len = macos9_utf8_to_macroman(text, length, mac_buf,
 				sizeof(mac_buf));
+
+#if MACSURF_FONT_ALIAS_DIAG
+		/* fixes157: log paint-side dispatch for the comparison against
+		 * macos9_font_measure's matching line. SMART filter (in macos9.h)
+		 * skips PLOT_FONT_FAMILY_SANS_SERIF so the Helvetica-path
+		 * firehose stays out of the log; non-default families (SERIF /
+		 * MONOSPACE / CURSIVE / FANTASY) and NULL fstyle still log. */
+		{
+			int log_this = 1;
+#if MACSURF_FONT_ALIAS_DIAG_SMART
+			if (fstyle != NULL &&
+			    fstyle->family == PLOT_FONT_FAMILY_SANS_SERIF) {
+				log_this = 0;
+			}
+#endif
+			if (log_this) {
+				char dpv[24];
+				size_t pn = (mac_len < 16) ? mac_len : 16;
+				size_t pk;
+				for (pk = 0; pk < pn; pk++) {
+					char c = mac_buf[pk];
+					dpv[pk] = (c >= 0x20 && c < 0x7f) ? c : '.';
+				}
+				dpv[pn] = '\0';
+				macsurf_debug_log_writef(
+				    "[FONTDIAG] op=paint   fam=%d id=%d sz=%d face=%d "
+				    "ls=%d ws=%d mac=%d xy=(%d,%d) str=\"%s\"",
+				    (int)(fstyle ? fstyle->family : -1),
+				    (int)font_id, (int)size, (int)face,
+				    (int)(fstyle ? fstyle->letter_spacing : 0),
+				    (int)(fstyle ? fstyle->word_spacing : 0),
+				    (int)mac_len, (int)x, (int)y, dpv);
+			}
+		}
+#endif
 
 		saved_clip = macos9_push_clip();
 		ls = (fstyle != NULL) ? fstyle->letter_spacing : 0;
