@@ -32,6 +32,23 @@
  *   - row-span > 1 reserves the row visually but row heights are
  *     still per-row tallest-child for V1 (no vertical merging)
  *
+ * fixes159: align-items / justify-items / align-self / justify-self.
+ *   - container-level defaults via `align-items` (libcss native) and
+ *     `justify-items` (vendor `-macsurf-justify` low nibble; cssh_css
+ *     preprocessor handles the rewrite)
+ *   - per-item overrides via `align-self` (libcss native) and
+ *     `justify-self` (vendor `-macsurf-justify` high nibble)
+ *   - values: start | end | center | stretch
+ *   - V1 limitation: when a non-stretch alignment is requested on an
+ *     item with `width: auto` (or `height: auto`), the item still
+ *     stretches to fill the cell on that axis. To honour the non-
+ *     stretch offset, the item needs an explicit width/height in CSS.
+ *     Without an intrinsic-content pass we can't size the item
+ *     smaller than the cell at this layer.
+ *   - V1 limitation: `place-items` / `place-self` shorthands, baseline
+ *     alignment, safe / unsafe modifiers, writing-mode interactions,
+ *     and left/right logical alignment are deferred.
+ *
  * Out of V1 scope (deferred to V2+):
  *   - grid-template-columns / grid-template-rows full grammar
  *     (fr units, repeat(), auto, minmax)
@@ -42,7 +59,6 @@
  *   - grid-template-areas
  *   - grid-auto-flow column/dense
  *   - subgrid
- *   - align-items / justify-items per-cell alignment
  *   - row-gap independent of column-gap (shares column-gap storage)
  *
  * This V1 covers the most common real-world pattern of "N equal columns,
@@ -184,6 +200,43 @@ struct macsurf_grid_slot {
 	int col_span;
 	int row_span;
 };
+
+/* fixes159: 4-value encoding for alignment fields.
+ *   0 = unset / inherit
+ *   1 = start
+ *   2 = end
+ *   3 = center
+ *   4 = stretch (the V1 default, fills the cell on that axis)
+ */
+#define MACSURF_ALIGN_UNSET   0
+#define MACSURF_ALIGN_START   1
+#define MACSURF_ALIGN_END     2
+#define MACSURF_ALIGN_CENTER  3
+#define MACSURF_ALIGN_STRETCH 4
+
+/* Map libcss CSS_ALIGN_ITEMS_* enum -> internal 1..4 encoding. */
+static int macsurf_grid_map_align(uint8_t libcss_value)
+{
+	switch (libcss_value) {
+	case CSS_ALIGN_ITEMS_STRETCH:    return MACSURF_ALIGN_STRETCH;
+	case CSS_ALIGN_ITEMS_FLEX_START: return MACSURF_ALIGN_START;
+	case CSS_ALIGN_ITEMS_FLEX_END:   return MACSURF_ALIGN_END;
+	case CSS_ALIGN_ITEMS_CENTER:     return MACSURF_ALIGN_CENTER;
+	/* CSS_ALIGN_ITEMS_INHERIT, BASELINE, AUTO and anything else
+	 * fall through as unset; layout treats unset as stretch via
+	 * the container/item resolution path. */
+	default:                         return MACSURF_ALIGN_UNSET;
+	}
+}
+
+/* Resolve effective alignment for a single child on one axis.
+ * Falls back from item value -> container value -> stretch. */
+static int macsurf_grid_effective_align(int item_value, int container_value)
+{
+	if (item_value != MACSURF_ALIGN_UNSET) return item_value;
+	if (container_value != MACSURF_ALIGN_UNSET) return container_value;
+	return MACSURF_ALIGN_STRETCH;
+}
 
 /* fixes158a: bit-packed per-row occupancy. One uint8 per row, bit (1 << col)
  * set if that cell is occupied. cols caps at MACSURF_GRID_TRACK_MAX = 8, which
@@ -472,9 +525,25 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		int max_row_used = -1;
 		int slot_index;
 
+		/* fixes159: container-level alignment defaults.
+		 * justify-items comes from the packed -macsurf-justify low
+		 * nibble; align-items comes from libcss directly. Either may
+		 * be UNSET, in which case items fall back to stretch. */
+		int container_justify_items = MACSURF_ALIGN_UNSET;
+		int container_align_items = MACSURF_ALIGN_UNSET;
+
 		memset(row_max_h, 0, sizeof(row_max_h));
 		memset(row_y_arr, 0, sizeof(row_y_arr));
 		memset(occupancy, 0, sizeof(occupancy));
+
+		if (grid->style != NULL) {
+			int32_t cj = css_computed_macsurf_justify(grid->style);
+			int ji = (int)((uint32_t)cj & 0xFu);
+			if (ji >= MACSURF_ALIGN_START && ji <= MACSURF_ALIGN_STRETCH)
+				container_justify_items = ji;
+			container_align_items = macsurf_grid_map_align(
+					css_computed_align_items(grid->style));
+		}
 
 		/* --- Pass 0: reserve cells for explicit-both placements.
 		 * We only pre-reserve when BOTH axes are explicit because
@@ -771,24 +840,103 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			(void)last_h;
 		}
 
-		/* --- Pass 3: position each child. */
+		/* --- Pass 3: position each child, applying alignment
+		 * offsets from fixes159's justify/align resolution. */
 		child = grid->children;
 		slot_index = 0;
 		while (child != NULL && slot_index < n_children) {
 			int slot_col = slots[slot_index].col;
 			int slot_row = slots[slot_index].row;
+			int slot_col_span = slots[slot_index].col_span;
 			int x_pos;
+			int y_pos;
+			int cell_w;
+			int cell_h;
+			int k;
+			int eff_justify = MACSURF_ALIGN_STRETCH;
+			int eff_align = MACSURF_ALIGN_STRETCH;
+			int item_justify_self = MACSURF_ALIGN_UNSET;
+			int item_align_self = MACSURF_ALIGN_UNSET;
 
+			/* Cell origin and dimensions. */
 			if (has_tracks) {
 				x_pos = track_x[slot_col];
+				cell_w = track_widths[slot_col];
+				for (k = slot_col + 1;
+						k < slot_col + slot_col_span &&
+						k < cols; k++) {
+					cell_w += col_gap + track_widths[k];
+				}
 			} else {
 				x_pos = slot_col * (col_width + col_gap);
+				cell_w = col_width;
+				for (k = 1; k < slot_col_span; k++) {
+					cell_w += col_gap + col_width;
+				}
 			}
+			if (slot_row >= 0 && slot_row < MACSURF_GRID_ROWS_MAX) {
+				y_pos = row_y_arr[slot_row];
+				cell_h = row_max_h[slot_row];
+				if (has_row_tracks && slot_row < n_row_tracks &&
+						row_track_h[slot_row] > 0) {
+					cell_h = row_track_h[slot_row];
+				}
+			} else {
+				y_pos = 0;
+				cell_h = 0;
+			}
+
+			/* fixes159: resolve effective alignment per axis.
+			 * item -self overrides container -items; UNSET on
+			 * both falls back to stretch. */
+			if (child->style != NULL) {
+				int32_t cj = css_computed_macsurf_justify(
+						child->style);
+				int js = (int)(((uint32_t)cj >> 4) & 0xFu);
+				if (js >= MACSURF_ALIGN_START &&
+						js <= MACSURF_ALIGN_STRETCH)
+					item_justify_self = js;
+				item_align_self = macsurf_grid_map_align(
+						css_computed_align_self(
+							child->style));
+			}
+			eff_justify = macsurf_grid_effective_align(
+					item_justify_self,
+					container_justify_items);
+			eff_align = macsurf_grid_effective_align(
+					item_align_self,
+					container_align_items);
+
+			/* Horizontal offset. Only applied when the child is
+			 * narrower than the cell (i.e. has an explicit
+			 * width). Stretch keeps the laid-out width unchanged
+			 * (pass 1b already filled the cell width for AUTO
+			 * children). */
+			if (eff_justify != MACSURF_ALIGN_STRETCH &&
+					child->width < cell_w) {
+				int dx = 0;
+				if (eff_justify == MACSURF_ALIGN_END)
+					dx = cell_w - child->width;
+				else if (eff_justify == MACSURF_ALIGN_CENTER)
+					dx = (cell_w - child->width) / 2;
+				if (dx < 0) dx = 0;
+				x_pos += dx;
+			}
+
+			/* Vertical offset. */
+			if (eff_align != MACSURF_ALIGN_STRETCH &&
+					child->height < cell_h) {
+				int dy = 0;
+				if (eff_align == MACSURF_ALIGN_END)
+					dy = cell_h - child->height;
+				else if (eff_align == MACSURF_ALIGN_CENTER)
+					dy = (cell_h - child->height) / 2;
+				if (dy < 0) dy = 0;
+				y_pos += dy;
+			}
+
 			child->x = x_pos;
-			if (slot_row >= 0 && slot_row < MACSURF_GRID_ROWS_MAX)
-				child->y = row_y_arr[slot_row];
-			else
-				child->y = 0;
+			child->y = y_pos;
 
 			slot_index++;
 			child = child->next;
