@@ -222,6 +222,13 @@ const int32_t *css_computed_macsurf_grid_tracks(
 const int32_t *css_computed_macsurf_grid_row_tracks(
 		const css_computed_style *style);
 
+/* fixes151: -macsurf-grid-col-span as a uint8_t. 0 = unset (caller
+ * treats as 1). 1..254 = literal span count. 255 = "fill the
+ * remainder of the row" sentinel (from `grid-column: 1 / -1`-style
+ * preprocessor rewrites). */
+uint8_t css_computed_macsurf_grid_col_span(
+		const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

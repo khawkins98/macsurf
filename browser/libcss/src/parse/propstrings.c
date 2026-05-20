@@ -249,6 +249,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("overflow-wrap"),
 	SMAP("word-wrap"),
 	SMAP("-macsurf-grid-rows"),
+	SMAP("-macsurf-grid-col-span"),
 
 	SMAP("inherit"),
 	SMAP("unset"),

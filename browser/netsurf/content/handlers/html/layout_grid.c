@@ -380,6 +380,41 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		int this_col_width;
 		int child_total_h;
 		int saved_grid_width;
+		int col_span = 1;
+		int span_advance = 1;
+		int end_col;
+		int k;
+
+		/* fixes151 -- read -macsurf-grid-col-span. 0 = unset
+		 * (single cell), 1..254 = literal span, 255 = "fill the
+		 * remainder of the row" sentinel from `grid-column: 1 / -1`
+		 * preprocessor rewrites. */
+		if (child->style != NULL) {
+			uint8_t s = css_computed_macsurf_grid_col_span(
+					child->style);
+			if (s == 255) {
+				col_span = cols - (child_index % cols);
+			} else if (s > 0) {
+				col_span = (int)s;
+			}
+		}
+		if (col_span < 1) col_span = 1;
+		if (col_span > cols) col_span = cols;
+
+		/* If the cell wouldn't fit on the current row, wrap to the
+		 * next row before placing it (CSS Grid auto-placement). */
+		if ((child_index % cols) + col_span > cols) {
+			int filler = cols - (child_index % cols);
+			int this_row_h = row_max_height;
+			if (has_row_tracks && row_index < n_row_tracks &&
+					row_track_h[row_index] > 0) {
+				this_row_h = row_track_h[row_index];
+			}
+			row_y += this_row_h + row_gap;
+			row_max_height = 0;
+			row_index++;
+			child_index += filler;
+		}
 
 		col = child_index % cols;
 		if (has_tracks) {
@@ -389,6 +424,18 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			this_col_width = col_width;
 			x_pos = col * (col_width + col_gap);
 		}
+
+		/* Widen the cell to span across additional columns. */
+		end_col = col + col_span;
+		if (end_col > cols) end_col = cols;
+		for (k = col + 1; k < end_col; k++) {
+			if (has_tracks) {
+				this_col_width += col_gap + track_widths[k];
+			} else {
+				this_col_width += col_gap + col_width;
+			}
+		}
+		span_advance = end_col - col;
 
 		/* fixes75a: Temporarily narrow the grid container's width to
 		 * this_col_width while laying out the child. layout_block_context
@@ -437,7 +484,9 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			row_max_height = child_total_h;
 		}
 
-		child_index++;
+		/* fixes151: a spanning cell consumes `span_advance` slots
+		 * in the row, not just one. */
+		child_index += span_advance;
 
 		/* End of row — advance row_y by the tallest cell height
 		 * plus the row gap. */

@@ -64,6 +64,7 @@ PROPERTY_FUNCS(text_overflow);
 PROPERTY_FUNCS(word_break);
 PROPERTY_FUNCS(overflow_wrap);
 PROPERTY_FUNCS(macsurf_grid_rows);
+PROPERTY_FUNCS(macsurf_grid_col_span);
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
 PROPERTY_FUNCS(break_after);
