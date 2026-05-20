@@ -304,16 +304,6 @@ struct css_computed_style_i {
 	 * fixes117's inline track array). Using int32_t is self-aligning
 	 * and now exactly the size we need for the packed layout. */
 	int32_t macsurf_grid_col_span;
-	/* fixes159: -macsurf-justify packed grid alignment, int32.
-	 *   bits 0..3  justify_items (0=unset, 1=start, 2=end, 3=center, 4=stretch)
-	 *   bits 4..7  justify_self  (same encoding; overrides container's
-	 *                             justify_items for the item)
-	 *   bits 8..31 reserved
-	 * align_items / align_self read directly via the standard libcss
-	 * getters; only the justify axis needs vendor storage since libcss
-	 * lacks justify-items / justify-self (flexbox-only enum).
-	 * int32 storage is self-aligning (fixes151b padding lesson). */
-	int32_t macsurf_justify;
 	/* fixes152: aspect-ratio.
 	 *   bits 31..16: numerator (1..65535)
 	 *   bits 15..0:  denominator (1..65535)
@@ -354,6 +344,25 @@ struct css_computed_style_i {
 	css_fixed_or_calc width;
 	css_fixed word_spacing;
 	int32_t z_index;
+	/* fixes159: -macsurf-justify packed grid alignment, int32.
+	 *   bits 0..3  justify_items (0=unset, 1=start, 2=end, 3=center, 4=stretch)
+	 *   bits 4..7  justify_self  (same encoding; overrides container's
+	 *                             justify_items for the item)
+	 *   bits 8..31 reserved
+	 * align_items / align_self read directly via the standard libcss
+	 * getters; only the justify axis needs vendor storage since libcss
+	 * lacks justify-items / justify-self (flexbox-only enum).
+	 *
+	 * fixes159a — placed at END OF STRUCT (post-z_index) so no
+	 * other field's offset shifts. fixes159's mid-struct insertion
+	 * before aspect_ratio crashed CW8 because libcss .o files
+	 * compiled against the pre-fixes159 header had the old
+	 * offsets for aspect_ratio / opacity / margin / etc., and
+	 * one-file-recompile didn't trigger a libcss rebuild (the
+	 * CW8 misses-header-recompile gotcha). End-insertion is the
+	 * only safe pattern for adding fields to this struct without
+	 * a full libcss clean build. */
+	int32_t macsurf_justify;
 };
 
 struct css_computed_style {
