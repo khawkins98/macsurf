@@ -103,9 +103,22 @@ long macos9_plot_rect_count = 0;
  *   stacking. The vmetric data showed mixed-family lines at CSS
  *   line-height >= 1.3 (the normal default) accommodate all OS 9
  *   families. The line-height: 1 edge case is rare on real pages. */
-#define MACSURF_FONT_FAMILY_ALIASES 1
+/* fixes154b: hardware-rejected. Re-enable produced an empty render —
+ * box-tree walker visited only 1-2 blocks after reformat despite layout
+ * producing 1002 boxes (c_h=10051). No [FONTDIAG] op=paint entries
+ * appeared in the log, confirming the walker never reached text/inline
+ * nodes. Width/paint font_id dispatch itself was correct in the
+ * captured measure logs (Helvetica=21, Times=20, Monaco=4 all resolved
+ * to expected ids). The empty-render symptom is downstream of the alias
+ * enable — likely the same mixed-family inline-width-vs-segment-width
+ * drift class as fixes145, manifesting as bbox-out-of-clip rather than
+ * horizontal scramble on this content. Pinning the alias gate back to
+ * 0 returns to the fixes153 (force-Helvetica) baseline that renders
+ * cleanly. Path forward remains gui_layout_table per-font metrics. */
+#define MACSURF_FONT_FAMILY_ALIASES 0
 /* MACSURF_FONT_ALIAS_DIAG lives in macos9.h so macos9_font.c sees it
- * too. Default ON for fixes154; set to 0 in macos9.h to silence. */
+ * too. Default OFF after fixes154b; the diagnostic block stays in
+ * place for the next probe round. */
 
 /* fixes74b: counters incremented by redraw.c when it detects
  * CSS_MACSURF_GRADIENT_SET. Lets us see whether the cascade returned
