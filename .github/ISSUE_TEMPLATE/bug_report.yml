@@ -1,0 +1,98 @@
+name: Bug report
+description: Report a crash, rendering error, or other defect in MacSurf
+title: "[bug] "
+labels: ["bug", "needs-repro"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more reproducible the report, the faster it can be fixed.
+
+        If your machine crashes when MacSurf does, **set the application partition to at least 96 MB** in the Finder's Get Info window before retrying — partition pressure is the #1 source of false-positive crash reports.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear, specific description of the failure. One symptom per issue, please.
+      placeholder: e.g. "Browser quietly quits after loading apple.com; no error dialog. Reproduces on every load."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably trigger the issue.
+      placeholder: |
+        1. Launch MacSurf from a 96 MB partition
+        2. Paste https://example.com/foo into the address bar
+        3. Press Enter
+        4. Wait ~10 seconds
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-vs-actual
+    attributes:
+      label: Expected vs actual behavior
+      description: What you expected, and what you saw instead.
+      placeholder: |
+        Expected: page renders with images and text.
+        Actual: browser quits silently after the layout pass completes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os-version
+    attributes:
+      label: Mac OS version
+      options:
+        - "9.0"
+        - "9.0.4"
+        - "9.1"
+        - "9.2.1"
+        - "9.2.2"
+        - "Other (specify in Hardware)"
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Model, CPU, RAM. Real hardware and emulator both welcome — say which.
+      placeholder: e.g. "iMac G3 (Bondi), 333 MHz PPC 750, 256 MB RAM" or "SheepShaver, host: macOS 14"
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: MacSurf version / build
+      description: Either a release tag (e.g. v0.1a1) or the most recent fixesNN you applied.
+      placeholder: e.g. "v0.1a1 + fixes161b"
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: URL or test case
+      description: If the bug only reproduces on a specific page, paste the URL.
+      placeholder: https://apple.com/
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: |
+        Paste the relevant tail of `macsurf_debug.log` (or `MacSurf.log`) and/or attach screenshots.
+        Drag screenshots into the box; GitHub uploads them automatically.
+      placeholder: |
+        [http_setup] url=https://apple.com/ class=DOC active=0/2 ...
+        SITE host=apple.com img=12/4 css=8/2 ...
+    validations:
+      required: false
