@@ -45,6 +45,11 @@ long macsurf__site_box_text = 0;
 long macsurf__site_box_other = 0;
 long macsurf__site_img_ok = 0;
 long macsurf__site_img_fail = 0;
+/* fixes160d — CSS oversize-gate counters. ok = sheet small enough,
+ * parsed and added to cascade; skip = sheet over MACOS9_CSS_MAX_BYTES,
+ * dropped before libcss saw it. */
+long macsurf__site_css_ok = 0;
+long macsurf__site_css_skip = 0;
 
 #ifdef MACSURF_DEBUG
 

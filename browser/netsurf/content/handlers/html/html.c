@@ -689,6 +689,8 @@ html_create(const content_handler *handler,
 		extern void macsurf_debug_log_writef(const char *fmt, ...);
 		extern long macsurf__site_img_ok;
 		extern long macsurf__site_img_fail;
+		extern long macsurf__site_css_ok;
+		extern long macsurf__site_css_skip;
 		extern long macsurf__site_box_total;
 		extern long macsurf__site_box_blk;
 		extern long macsurf__site_box_inlinec;
@@ -698,9 +700,12 @@ html_create(const content_handler *handler,
 		macsurf_debug_log_writef("html_create: entered");
 		/* fixes160a: reset SITE per-page counters at the top of every
 		 * new HTML content so the summary line emitted at reformat
-		 * reflects this page only, not session-cumulative. */
+		 * reflects this page only, not session-cumulative.
+		 * fixes160d: extended with css_ok / css_skip counters. */
 		macsurf__site_img_ok = 0;
 		macsurf__site_img_fail = 0;
+		macsurf__site_css_ok = 0;
+		macsurf__site_css_skip = 0;
 		macsurf__site_box_total = 0;
 		macsurf__site_box_blk = 0;
 		macsurf__site_box_inlinec = 0;
@@ -1263,20 +1268,23 @@ static void html_reformat(struct content *c, int width, int height)
 		extern long macsurf__site_box_other;
 		extern long macsurf__site_img_ok;
 		extern long macsurf__site_img_fail;
+		extern long macsurf__site_css_ok;
+		extern long macsurf__site_css_skip;
 		nsurl *u = content_get_url(&htmlc->base);
 		const char *url = (u != NULL) ? nsurl_access(u) : "(null)";
 		macsurf_debug_log_writef(
 			"SITE url=\"%s\" "
 			"boxes=%ld blk=%ld inlinec=%ld inline=%ld text=%ld other=%ld "
 			"in_w=%d in_h=%d c_w=%d c_h=%d "
-			"img_ok=%ld img_fail=%ld",
+			"img_ok=%ld img_fail=%ld css_ok=%ld css_skip=%ld",
 			url,
 			macsurf__site_box_total,
 			macsurf__site_box_blk, macsurf__site_box_inlinec,
 			macsurf__site_box_inline, macsurf__site_box_text,
 			macsurf__site_box_other,
 			width, height, (int)c->width, (int)c->height,
-			macsurf__site_img_ok, macsurf__site_img_fail);
+			macsurf__site_img_ok, macsurf__site_img_fail,
+			macsurf__site_css_ok, macsurf__site_css_skip);
 	}
 
 	selection_reinit(htmlc->sel);
