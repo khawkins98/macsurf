@@ -58,6 +58,14 @@ static int32_t macsurf_justify__read_int(const parserutils_vector *vector,
 	return val;
 }
 
+/* fixes159f: bounded probe at the parser entry. If JPARS never fires
+ * but JEMIT does, libcss isn't dispatching to us (name-lookup or
+ * property_handlers indexing is wrong). If JPARS fires but JCASC
+ * doesn't, the crash is between parser-emits-bytecode and cascade.
+ * Logger only supports %d/%ld/%p/%s — see project memory. */
+extern void macsurf_debug_log_writef(const char *fmt, ...);
+static int macsurf__justify_parse_count = 0;
+
 css_error css__parse_macsurf_justify(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result)
@@ -69,19 +77,38 @@ css_error css__parse_macsurf_justify(css_language *c,
 	int32_t justify_items;
 	int32_t justify_self;
 	int32_t packed;
+	int log_this = 0;
+
+	if (macsurf__justify_parse_count < 16) {
+		log_this = 1;
+		macsurf_debug_log_writef(
+			"JPARS[%d] enter ctx=%ld",
+			macsurf__justify_parse_count,
+			(long)*ctx);
+		macsurf__justify_parse_count++;
+	}
 
 	token = parserutils_vector_peek(vector, *ctx);
-	if (token == NULL) return CSS_INVALID;
+	if (token == NULL) {
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  early null-token");
+		return CSS_INVALID;
+	}
 
 	flag_value = get_css_flag_value(c, token);
 	if (flag_value != FLAG_VALUE__NONE) {
 		parserutils_vector_iterate(vector, ctx);
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  flag-value path flag=%d",
+			(int)flag_value);
 		return css_stylesheet_style_flag_value(result, flag_value,
 				CSS_PROP_MACSURF_JUSTIFY);
 	}
 
 	justify_items = macsurf_justify__read_int(vector, ctx);
 	if (justify_items < 0) {
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  ji read failed");
 		*ctx = orig_ctx;
 		return CSS_INVALID;
 	}
@@ -89,9 +116,8 @@ css_error css__parse_macsurf_justify(css_language *c,
 	if (justify_self < 0) justify_self = 0;
 
 	if (justify_items == 0 && justify_self == 0) {
-		/* Both unset — preprocessor only emits this when at least one
-		 * source decl was recognised; treat all-zero as invalid so
-		 * libcss drops the decl cleanly. */
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  both zero -> drop");
 		*ctx = orig_ctx;
 		return CSS_INVALID;
 	}
@@ -99,18 +125,34 @@ css_error css__parse_macsurf_justify(css_language *c,
 	packed = ((int32_t)((uint32_t)justify_self  & 0xFu) << 4) |
 	         ((int32_t)((uint32_t)justify_items & 0xFu));
 
+	if (log_this) macsurf_debug_log_writef(
+		"JPARS  ji=%d js=%d packed=%d before appendOPV",
+		(int)justify_items, (int)justify_self, (int)packed);
+
 	error = css__stylesheet_style_appendOPV(result,
 			CSS_PROP_MACSURF_JUSTIFY, 0, 0x0080 /* SET */);
 	if (error != CSS_OK) {
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  appendOPV err=%d",
+			(int)error);
 		*ctx = orig_ctx;
 		return error;
 	}
 
+	if (log_this) macsurf_debug_log_writef(
+		"JPARS  after appendOPV before vappend");
+
 	error = css__stylesheet_style_vappend(result, 1, (css_fixed)packed);
 	if (error != CSS_OK) {
+		if (log_this) macsurf_debug_log_writef(
+			"JPARS  vappend err=%d",
+			(int)error);
 		*ctx = orig_ctx;
 		return error;
 	}
+
+	if (log_this) macsurf_debug_log_writef(
+		"JPARS  done OK");
 
 	return CSS_OK;
 }
