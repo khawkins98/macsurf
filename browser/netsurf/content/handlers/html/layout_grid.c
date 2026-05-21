@@ -61,6 +61,10 @@
 #include "html/private.h"
 #include "html/layout_internal.h"
 
+/* fixes161d — diagnostic-only macsurf_debug_log_writef for the
+ * LAYOUTPHASE grid marker. Compiles to a no-op in release builds. */
+#include "macsurf_debug.h"
+
 #include "css/utils.h"
 
 
@@ -256,6 +260,19 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	int n_row_tracks = 0;
 	bool has_row_tracks = false;
 	int i;
+
+	/* fixes161d — LAYOUTPHASE grid marker. Every 25th call. Placed
+	 * after declarations to stay C89-clean. */
+	{
+		static long macsurf_grid_calls = 0;
+		macsurf_grid_calls++;
+		if ((macsurf_grid_calls % 25) == 1) {
+			macsurf_debug_log_writef(
+				"LAYOUTPHASE grid #%ld box=%p w=%d",
+				macsurf_grid_calls, (void *)grid,
+				(int)available_width);
+		}
+	}
 
 	for (i = 0; i < MACSURF_GRID_TRACK_MAX; i++) {
 		track_widths[i] = 0;

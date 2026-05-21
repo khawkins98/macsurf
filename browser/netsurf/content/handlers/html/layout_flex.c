@@ -42,6 +42,10 @@
 #include "html/box_inspect.h"
 #include "html/layout_internal.h"
 
+/* fixes161d — diagnostic-only macsurf_debug_log_writef for the
+ * LAYOUTPHASE flex marker. Compiles to a no-op in release builds. */
+#include "macsurf_debug.h"
+
 /**
  * Flex item data
  */
@@ -1302,6 +1306,18 @@ bool layout_flex(struct box *flex, int available_width,
 	int max_height, min_height;
 	struct flex_ctx *ctx;
 	bool success = false;
+
+	/* fixes161d — LAYOUTPHASE flex marker. Every 25th call. */
+	{
+		static long macsurf_flex_calls = 0;
+		macsurf_flex_calls++;
+		if ((macsurf_flex_calls % 25) == 1) {
+			macsurf_debug_log_writef(
+				"LAYOUTPHASE flex #%ld box=%p w=%d h=%d",
+				macsurf_flex_calls, (void *)flex,
+				(int)flex->width, (int)flex->height);
+		}
+	}
 
 	ctx = layout_flex_ctx__create(content, flex);
 	if (ctx == NULL) {

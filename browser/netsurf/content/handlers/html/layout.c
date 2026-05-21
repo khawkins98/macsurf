@@ -1669,6 +1669,20 @@ bool layout_table(
 	css_fixed value = 0;
 	css_unit unit = CSS_UNIT_PX;
 
+	/* fixes161d — LAYOUTPHASE table marker. Tables are rarer than
+	 * blocks so we log every 25th call. Placed after declarations to
+	 * stay C89-clean. */
+	{
+		static long macsurf_table_calls = 0;
+		macsurf_table_calls++;
+		if ((macsurf_table_calls % 25) == 1) {
+			macsurf_debug_log_writef(
+				"LAYOUTPHASE table #%ld box=%p w=%d cols=%u",
+				macsurf_table_calls, (void *)table,
+				(int)available_width, (unsigned)columns);
+		}
+	}
+
 	assert(table->type == BOX_TABLE);
 	assert(style);
 	assert(table->children && table->children->children);
@@ -3584,6 +3598,21 @@ bool layout_block_context(
 	bool in_margin = false;
 	css_fixed gadget_size;
 	css_unit gadget_unit; /* Checkbox / radio buttons */
+	/* fixes161d — sparse call-counter probe. block_context is the
+	 * main layout recursion; one log per 100 calls leaves a sparse
+	 * trail without flooding. The last LAYOUTPHASE block line in the
+	 * truncated log tells us roughly where in the tree we died. */
+	{
+		static long macsurf_lbc_calls = 0;
+		macsurf_lbc_calls++;
+		if ((macsurf_lbc_calls % 100) == 1) {
+			macsurf_debug_log_writef(
+				"LAYOUTPHASE block #%ld box=%p type=%d w=%d h=%d",
+				macsurf_lbc_calls, (void *)block,
+				(int)block->type,
+				(int)block->width, (int)block->height);
+		}
+	}
 
 	assert(block->type == BOX_BLOCK ||
 			block->type == BOX_INLINE_BLOCK ||
@@ -5566,6 +5595,17 @@ bool layout_document(html_content *content, int width, int height)
 			width, height, nsurl_access(content_get_url(
 					&content->base)));
 
+	/* fixes161d — LAYOUTPHASE markers. apple/huffpost truncate the
+	 * log between html_reformat's "pre-layout_document" and any
+	 * post-layout entry; this round subdivides layout_document so
+	 * the last LAYOUTPHASE line names the function that died. The
+	 * per-100/per-25 counters on the inner routines accumulate
+	 * across reformats within one launch; the trailing tail is what
+	 * we read. No behavior changes, log-only. */
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE document entry w=%d h=%d doc=%p",
+		width, height, (void *)doc);
+
 	layout_minmax_block(doc, font_func, content);
 
 	layout_block_find_dimensions(&content->unit_len_ctx,
@@ -5605,6 +5645,11 @@ bool layout_document(html_content *content, int width, int height)
 	layout_position_relative(&content->unit_len_ctx, doc, doc, 0, 0);
 
 	layout_calculate_descendant_bboxes(&content->unit_len_ctx, doc);
+
+	/* fixes161d — see entry probe. */
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE document exit ret=%d c_w=%d c_h=%d",
+		(int)ret, (int)doc->width, (int)doc->height);
 
 	return ret;
 }
