@@ -184,10 +184,12 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 
 ## Download
 
-Two StuffIt archives in [`builds/`](builds/) — pick what you need:
+Latest release: **[MacSurf 0.1a1](https://github.com/mplsllc/macsurf/releases/tag/v0.1a1)** (alpha, 2026-05-20).
 
-- **[`builds/MacSurf.sit`](builds/MacSurf.sit)** &mdash; ready-to-run binary. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
-- **[`builds/MacSurf-BuildPack.sit`](builds/MacSurf-BuildPack.sit)** &mdash; full source + CodeWarrior 8 project file. Expand, open `MacSurf.mcp` in CodeWarrior, choose Build.
+- **[MacSurf.sit](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf.sit)** (581 KB) &mdash; ready-to-run binary. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
+- **[MacSurf-BuildPack.sit](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf-BuildPack.sit)** (4 MB) &mdash; full source + CodeWarrior 8 project file. Expand, open `MacSurf.mcp` in CodeWarrior, choose Build.
+
+Full release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md). All releases: [github.com/mplsllc/macsurf/releases](https://github.com/mplsllc/macsurf/releases).
 
 ---
 

@@ -121,20 +121,20 @@ Not yet tested:
 ## Build & install
 
 ### Pre-built binary
-1. Download [`builds/MacSurf.sit`](../../builds/MacSurf.sit).
+1. Download [**MacSurf.sit**](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf.sit) (581 KB).
 2. Expand with StuffIt Expander on Mac OS 9.
 3. Drop the resulting `MacSurf` application anywhere on disk.
 4. Double-click to launch.
 
 ### Build from source
-1. Download [`builds/MacSurf-BuildPack.sit`](../../builds/MacSurf-BuildPack.sit).
+1. Download [**MacSurf-BuildPack.sit**](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf-BuildPack.sit) (4 MB).
 2. Expand on Mac OS 9.
 3. Open `MacSurf.mcp` in CodeWarrior 8 Pro.
 4. Make sure the 8.3 update is applied.
 5. **Build → Build**.
 6. The resulting application drops into the same folder.
 
-See [`../codewarrior-setup.md`](../codewarrior-setup.md) for the full setup walkthrough including required CarbonLib SDK paths.
+See the [CodeWarrior setup guide](https://github.com/mplsllc/macsurf/blob/master/docs/codewarrior-setup.md) for the full setup walkthrough including required CarbonLib SDK paths.
 
 ---
 
