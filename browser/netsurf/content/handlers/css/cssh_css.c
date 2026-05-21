@@ -1635,6 +1635,11 @@ macsurf__justify_parse_keyword(const char **p, const char *end)
 	return 0;
 }
 
+/* fixes159d: forward-decl for the bounded diagnostic logger. The
+ * preprocessor lives outside the netsurf frontend module that owns the
+ * implementation, so we declare the extern here. */
+extern void macsurf_debug_log_writef(const char *fmt, ...);
+
 static bool
 macsurf__justify_emit(char **out_p, size_t *cap_p, size_t *pos_p,
 		const struct macsurf_justify_accum *acc)
@@ -1642,10 +1647,20 @@ macsurf__justify_emit(char **out_p, size_t *cap_p, size_t *pos_p,
 	char tmp[64];
 	int n;
 	size_t need;
+	static int macsurf__justify_emit_count = 0;
 
 	n = sprintf(tmp, "; -macsurf-justify: %u %u;",
 			(unsigned)acc->justify_items,
 			(unsigned)acc->justify_self);
+	if (macsurf__justify_emit_count < 16) {
+		macsurf_debug_log_writef(
+			"JEMIT[%d] ji=%u js=%u bytes=\"%s\"",
+			macsurf__justify_emit_count,
+			(unsigned)acc->justify_items,
+			(unsigned)acc->justify_self,
+			tmp);
+		macsurf__justify_emit_count++;
+	}
 	if (n <= 0) return false;
 	need = *pos_p + (size_t)n + 1;
 	while (need >= *cap_p) {
