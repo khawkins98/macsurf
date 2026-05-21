@@ -29,6 +29,23 @@
 #include <string.h>
 #include <stdarg.h>
 
+/* fixes160a — SITE diagnostic counters. Defined at the top level
+ * (outside MACSURF_DEBUG guards) so that html.c's extern references
+ * still link in release builds, even though the log itself becomes
+ * a no-op. Updated cross-module by image decode (img_ok / img_fail),
+ * HTTP fetcher (http_body / http_status / http_proxy), and box-
+ * convert in html.c (box_* set). Read once per reformat by the SITE
+ * summary line. Globals because pages don't overlap on this
+ * single-threaded cooperative app. */
+long macsurf__site_box_total = 0;
+long macsurf__site_box_blk = 0;
+long macsurf__site_box_inlinec = 0;
+long macsurf__site_box_inline = 0;
+long macsurf__site_box_text = 0;
+long macsurf__site_box_other = 0;
+long macsurf__site_img_ok = 0;
+long macsurf__site_img_fail = 0;
+
 #ifdef MACSURF_DEBUG
 
 #ifdef __MACOS9__

@@ -281,6 +281,25 @@ static void html_box_convert_done(html_content *c, bool success)
 		macsurf_debug_log_writef(
 			"box convert: layout=%p total=%ld blk=%ld ic=%ld in=%ld txt=%ld oth=%ld",
 			(void *)c->layout, total, blk, ic, in_, txt, oth);
+		/* fixes160a: stash box-convert counters so the SITE summary
+		 * line at reformat-end can include them. Globals (not per-
+		 * content) because we only need the most-recent page; the
+		 * SITE line is emitted before any concurrent page could
+		 * arrive. */
+		{
+			extern long macsurf__site_box_total;
+			extern long macsurf__site_box_blk;
+			extern long macsurf__site_box_inlinec;
+			extern long macsurf__site_box_inline;
+			extern long macsurf__site_box_text;
+			extern long macsurf__site_box_other;
+			macsurf__site_box_total   = total;
+			macsurf__site_box_blk     = blk;
+			macsurf__site_box_inlinec = ic;
+			macsurf__site_box_inline  = in_;
+			macsurf__site_box_text    = txt;
+			macsurf__site_box_other   = oth;
+		}
 	}
 
 	exc = dom_document_get_document_element(c->document, (void *) &html);
@@ -668,7 +687,26 @@ html_create(const content_handler *handler,
 #ifdef __MACOS9__
 	{
 		extern void macsurf_debug_log_writef(const char *fmt, ...);
+		extern long macsurf__site_img_ok;
+		extern long macsurf__site_img_fail;
+		extern long macsurf__site_box_total;
+		extern long macsurf__site_box_blk;
+		extern long macsurf__site_box_inlinec;
+		extern long macsurf__site_box_inline;
+		extern long macsurf__site_box_text;
+		extern long macsurf__site_box_other;
 		macsurf_debug_log_writef("html_create: entered");
+		/* fixes160a: reset SITE per-page counters at the top of every
+		 * new HTML content so the summary line emitted at reformat
+		 * reflects this page only, not session-cumulative. */
+		macsurf__site_img_ok = 0;
+		macsurf__site_img_fail = 0;
+		macsurf__site_box_total = 0;
+		macsurf__site_box_blk = 0;
+		macsurf__site_box_inlinec = 0;
+		macsurf__site_box_inline = 0;
+		macsurf__site_box_text = 0;
+		macsurf__site_box_other = 0;
 	}
 #endif
 	html = calloc(1, sizeof(html_content));
@@ -1206,6 +1244,40 @@ static void html_reformat(struct content *c, int width, int height)
 		(int)layout->descendant_x1, (int)layout->descendant_y1,
 		(int)layout->x, (int)layout->y,
 		(int)layout->width, (int)layout->height);
+
+	/* fixes160a — SITE summary line. Emits one compact, grep-friendly
+	 * line per page reformat with the box-tree counters stashed at
+	 * box_convert time plus the just-computed content dimensions and
+	 * image success/fail counts. Used by the modern-site gauntlet
+	 * (tests/sites/modern_gauntlet.md). HTTP status/bytes/proxy live
+	 * in the `http: done ...` line earlier in the log against the
+	 * matching URL — not folded in here because there are many fetches
+	 * per page (HTML, CSS, images) and we'd need URL-matching to pick
+	 * the right one. */
+	{
+		extern long macsurf__site_box_total;
+		extern long macsurf__site_box_blk;
+		extern long macsurf__site_box_inlinec;
+		extern long macsurf__site_box_inline;
+		extern long macsurf__site_box_text;
+		extern long macsurf__site_box_other;
+		extern long macsurf__site_img_ok;
+		extern long macsurf__site_img_fail;
+		nsurl *u = content_get_url(&htmlc->base);
+		const char *url = (u != NULL) ? nsurl_access(u) : "(null)";
+		macsurf_debug_log_writef(
+			"SITE url=\"%s\" "
+			"boxes=%ld blk=%ld inlinec=%ld inline=%ld text=%ld other=%ld "
+			"in_w=%d in_h=%d c_w=%d c_h=%d "
+			"img_ok=%ld img_fail=%ld",
+			url,
+			macsurf__site_box_total,
+			macsurf__site_box_blk, macsurf__site_box_inlinec,
+			macsurf__site_box_inline, macsurf__site_box_text,
+			macsurf__site_box_other,
+			width, height, (int)c->width, (int)c->height,
+			macsurf__site_img_ok, macsurf__site_img_fail);
+	}
 
 	selection_reinit(htmlc->sel);
 
