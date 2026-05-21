@@ -251,6 +251,13 @@ static void nscss_dom_user_data_handler(dom_node_operation operation,
  * \return Pointer to selection results (containing computed styles),
  *         or NULL on failure
  */
+/* fixes161c — one-shot cascade-entry probe. html_reformat arms this
+ * before kicking layout; the first nscss_get_style call after that
+ * logs a stage marker (proves the cascade dispatcher was reached on
+ * the post-reformat path), then the flag clears. Cross-file global
+ * referenced via extern int from html.c. */
+int macsurf__cascade_probe_armed = 0;
+
 css_select_results *nscss_get_style(nscss_select_ctx *ctx, dom_node *n,
 		const css_media *media,
 		const css_unit_ctx *unit_len_ctx,
@@ -260,6 +267,13 @@ css_select_results *nscss_get_style(nscss_select_ctx *ctx, dom_node *n,
 	css_select_results *styles;
 	int pseudo_element;
 	css_error error;
+
+	if (macsurf__cascade_probe_armed) {
+		macsurf_debug_log_writef(
+			"nscss_get_style: armed-probe ctx=%p node=%p",
+			(void *)ctx, (void *)n);
+		macsurf__cascade_probe_armed = 0;
+	}
 
 	/* Select style for node */
 	error = css_select_style(ctx->ctx, n, unit_len_ctx, media, inline_style,
