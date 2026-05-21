@@ -26,11 +26,20 @@
 #include "select/properties/properties.h"
 #include "select/properties/helpers.h"
 
+/* fixes159d: bounded log probe so we can see whether libcss is actually
+ * invoking the cascade for `-macsurf-justify` at all. If the
+ * preprocessor emits but this log never fires, the property-name
+ * lookup or dispatch is broken. If both emit AND cascade fire but the
+ * field still reads 0, the issue is on the compose / arena side. */
+extern void macsurf_debug_log_writef(const char *fmt, ...);
+static int macsurf__justify_cascade_count = 0;
+
 css_error css__cascade_macsurf_justify(uint32_t opv,
 		css_style *style, css_select_state *state)
 {
 	int32_t v = 0;
 	bool is_set = false;
+	int outranks_int = 0;
 
 	if (hasFlagValue(opv) == false) {
 		if (getValue(opv) == 0x0080) { /* SET */
@@ -41,9 +50,24 @@ css_error css__cascade_macsurf_justify(uint32_t opv,
 		}
 	}
 
-	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
-			getFlagValue(opv))) {
+	outranks_int = css__outranks_existing(getOpcode(opv),
+			isImportant(opv), state, getFlagValue(opv)) ? 1 : 0;
+	if (outranks_int != 0) {
 		state->computed->i.macsurf_justify = is_set ? v : 0;
+	}
+
+	if (macsurf__justify_cascade_count < 16) {
+		macsurf_debug_log_writef(
+			"JCASC[%d] opv=0x%lx val=0x%x flag=%d is_set=%d v=%ld outranks=%d field_after=%ld",
+			macsurf__justify_cascade_count,
+			(unsigned long)opv,
+			(unsigned)getValue(opv),
+			(int)hasFlagValue(opv),
+			(int)is_set,
+			(long)v,
+			outranks_int,
+			(long)state->computed->i.macsurf_justify);
+		macsurf__justify_cascade_count++;
 	}
 
 	return CSS_OK;
