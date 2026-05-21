@@ -518,6 +518,10 @@ macos9_qt_image_convert(struct content *c)
 		qti->compressed = NULL;
 		if (err != NSERROR_OK || qti->bitmap == NULL) {
 			MS_LOG("img convert: lodepng FAIL");
+			{
+				extern long macsurf__site_img_fail;
+				macsurf__site_img_fail++;
+			}
 			content_broadcast_error(c, err, NULL);
 			return false;
 		}
@@ -587,6 +591,10 @@ macos9_qt_image_convert(struct content *c)
 
 	if (err != NSERROR_OK || qti->bitmap == NULL) {
 		MS_LOG("img convert: decode FAIL");
+		{
+			extern long macsurf__site_img_fail;
+			macsurf__site_img_fail++;
+		}
 		content_broadcast_error(c, err, NULL);
 		return false;
 	}
@@ -595,6 +603,11 @@ macos9_qt_image_convert(struct content *c)
 	c->height = bh;
 
 	MS_LOG("img decoded to bitmap");
+	/* fixes160a: tick the SITE summary counter for a successful decode. */
+	{
+		extern long macsurf__site_img_ok;
+		macsurf__site_img_ok++;
+	}
 	content_set_ready(c);
 	content_set_done(c);
 	content_set_status(c, "");
