@@ -56,7 +56,26 @@ typedef struct macos9_qt_image_content {
 	struct content base;     /* MUST be first */
 	Handle compressed;       /* raw bytes, grown by process_data */
 	void *bitmap;            /* struct macos9_bitmap (RGBA pixels) */
+	/* fixes161b — tracked decoded bytes for this content. Set when the
+	 * bitmap was successfully decoded; cleared on destroy. Used to
+	 * decrement macsurf__decoded_img_bytes_current symmetrically. */
+	long decoded_bytes;
 } macos9_qt_image_content;
+
+/* fixes161b — global decoded image memory budget. Each successful
+ * decode (lodepng or QT path) adds width*height*4 to a global running
+ * counter; on bitmap destroy the count is decremented. Decode is
+ * REFUSED before allocation when the running total + this image's
+ * decoded bytes would exceed the cap, even if the per-image fixes160b
+ * gate would have allowed it. This stops Apple-class pages with ~10
+ * mid-sized images decoded at once from blowing past several MB of
+ * RGBA buffers in aggregate.
+ *
+ * 4 MB total decoded image RAM is generous on a 194 MB partition
+ * (gives room for ~5 large hero images or ~20 medium thumbnails) but
+ * keeps the bitmap-cache from being the dominant memory consumer
+ * during heavy modern-site loads. */
+#define MACOS9_DECODED_IMG_MAX_BYTES (4L * 1024L * 1024L)
 
 /* fixes160b — pre-decode size gate. The Carbon 16 MB application
  * partition cannot hold an arbitrarily large decoded RGBA buffer, and
@@ -589,6 +608,38 @@ macos9_qt_image_convert(struct content *c)
 			content_broadcast_error(c, NSERROR_NOMEM, NULL);
 			return false;
 		}
+		/* fixes161b — global decoded-budget gate (PNG path). The
+		 * per-image fixes160b gate said this image fits individually;
+		 * verify the SUM of all live decoded bitmaps + this one
+		 * stays within budget. Apple's promo strip plus the home
+		 * gallery thumbnails can each pass the 1 MB single-image
+		 * cap but blow past 4 MB together. */
+		{
+			extern long macsurf__decoded_img_bytes_current;
+			extern long macsurf__site_decoded_img_skip_budget;
+			long png_bytes = (long)gate_w * (long)gate_h * 4L;
+			if (macsurf__decoded_img_bytes_current + png_bytes >
+					MACOS9_DECODED_IMG_MAX_BYTES) {
+				macsurf_debug_log_writef(
+					"img skip: budget png %dx%d "
+					"bytes=%ld cur=%ld cap=%ld",
+					gate_w, gate_h, png_bytes,
+					macsurf__decoded_img_bytes_current,
+					(long)MACOS9_DECODED_IMG_MAX_BYTES);
+				HUnlock(qti->compressed);
+				DisposeHandle(qti->compressed);
+				qti->compressed = NULL;
+				c->width = gate_w;
+				c->height = gate_h;
+				macsurf__site_decoded_img_skip_budget++;
+				{
+					extern long macsurf__site_img_fail;
+					macsurf__site_img_fail++;
+				}
+				content_broadcast_error(c, NSERROR_NOMEM, NULL);
+				return false;
+			}
+		}
 		bw = 0;
 		bh = 0;
 		err = macos9_png_decode_to_bitmap(src_bytes,
@@ -607,6 +658,18 @@ macos9_qt_image_convert(struct content *c)
 		}
 		c->width = bw;
 		c->height = bh;
+		/* fixes161b — record decoded bytes for symmetric decrement. */
+		{
+			extern long macsurf__decoded_img_bytes_current;
+			extern long macsurf__site_decoded_img_bytes_peak;
+			qti->decoded_bytes = (long)bw * (long)bh * 4L;
+			macsurf__decoded_img_bytes_current += qti->decoded_bytes;
+			if (macsurf__decoded_img_bytes_current >
+					macsurf__site_decoded_img_bytes_peak) {
+				macsurf__site_decoded_img_bytes_peak =
+					macsurf__decoded_img_bytes_current;
+			}
+		}
 		macsurf_debug_log_writef("img decoded via lodepng %dx%d",
 				bw, bh);
 		content_set_ready(c);
@@ -679,6 +742,34 @@ macos9_qt_image_convert(struct content *c)
 		content_broadcast_error(c, NSERROR_NOMEM, NULL);
 		return false;
 	}
+	/* fixes161b — global decoded-budget gate (QT path). Same logic as
+	 * the PNG branch: refuse when this image's bytes would push the
+	 * running sum past MACOS9_DECODED_IMG_MAX_BYTES, regardless of
+	 * the per-image gate. */
+	{
+		extern long macsurf__decoded_img_bytes_current;
+		extern long macsurf__site_decoded_img_skip_budget;
+		long qt_bytes = (long)bw * (long)bh * 4L;
+		if (macsurf__decoded_img_bytes_current + qt_bytes >
+				MACOS9_DECODED_IMG_MAX_BYTES) {
+			macsurf_debug_log_writef(
+				"img skip: budget qt %dx%d "
+				"bytes=%ld cur=%ld cap=%ld",
+				bw, bh, qt_bytes,
+				macsurf__decoded_img_bytes_current,
+				(long)MACOS9_DECODED_IMG_MAX_BYTES);
+			CloseComponent(importer);
+			c->width = bw;
+			c->height = bh;
+			macsurf__site_decoded_img_skip_budget++;
+			{
+				extern long macsurf__site_img_fail;
+				macsurf__site_img_fail++;
+			}
+			content_broadcast_error(c, NSERROR_NOMEM, NULL);
+			return false;
+		}
+	}
 	macsurf_debug_log_writef("img convert: %dx%d %s, decoding",
 			bw, bh, wants_alpha ? "alpha" : "opaque");
 
@@ -708,6 +799,18 @@ macos9_qt_image_convert(struct content *c)
 	{
 		extern long macsurf__site_img_ok;
 		macsurf__site_img_ok++;
+	}
+	/* fixes161b — record decoded bytes for symmetric decrement on destroy. */
+	{
+		extern long macsurf__decoded_img_bytes_current;
+		extern long macsurf__site_decoded_img_bytes_peak;
+		qti->decoded_bytes = (long)bw * (long)bh * 4L;
+		macsurf__decoded_img_bytes_current += qti->decoded_bytes;
+		if (macsurf__decoded_img_bytes_current >
+				macsurf__site_decoded_img_bytes_peak) {
+			macsurf__site_decoded_img_bytes_peak =
+				macsurf__decoded_img_bytes_current;
+		}
 	}
 	content_set_ready(c);
 	content_set_done(c);
@@ -812,6 +915,17 @@ macos9_qt_image_destroy(struct content *c)
 			guit->bitmap->destroy(qti->bitmap);
 		}
 		qti->bitmap = NULL;
+		/* fixes161b — symmetric decrement of the global decoded-bytes
+		 * counter. Skipped images never incremented decoded_bytes (it
+		 * stays 0 from calloc), so this is safe to always run. */
+		if (qti->decoded_bytes > 0) {
+			extern long macsurf__decoded_img_bytes_current;
+			macsurf__decoded_img_bytes_current -= qti->decoded_bytes;
+			if (macsurf__decoded_img_bytes_current < 0) {
+				macsurf__decoded_img_bytes_current = 0;
+			}
+			qti->decoded_bytes = 0;
+		}
 	}
 	if (qti->compressed != NULL) {
 		DisposeHandle(qti->compressed);

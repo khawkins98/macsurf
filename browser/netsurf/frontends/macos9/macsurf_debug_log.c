@@ -66,6 +66,19 @@ long macsurf__site_rgov_skip_other = 0;
 long macsurf__site_fetch_active_peak = 0;
 long macsurf__site_fetch_slot_fail = 0;
 long macsurf__site_heavy = 0;
+/* fixes161b — global decoded image memory budget.
+ * decoded_img_bytes_current is a running sum of width*height*4 across
+ * every live decoded bitmap. Incremented at decode time, decremented
+ * in macos9_qt_image_destroy. decoded_img_bytes_peak tracks the
+ * high-water mark across the page load. decoded_img_skip_budget counts
+ * images we refused to decode because doing so would have exceeded
+ * MACOS9_DECODED_IMG_MAX_BYTES — these surface as placeholders
+ * alongside the per-image oversize gate. These counters are global
+ * (process-wide), not per-page, so the decrement matches the increment
+ * even across navigations. */
+long macsurf__decoded_img_bytes_current = 0;
+long macsurf__site_decoded_img_bytes_peak = 0;
+long macsurf__site_decoded_img_skip_budget = 0;
 
 #ifdef MACSURF_DEBUG
 

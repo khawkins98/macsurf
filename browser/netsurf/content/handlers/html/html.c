@@ -700,6 +700,8 @@ html_create(const content_handler *handler,
 		extern long macsurf__site_fetch_active_peak;
 		extern long macsurf__site_fetch_slot_fail;
 		extern long macsurf__site_heavy;
+		extern long macsurf__site_decoded_img_bytes_peak;
+		extern long macsurf__site_decoded_img_skip_budget;
 		extern long macsurf__site_box_total;
 		extern long macsurf__site_box_blk;
 		extern long macsurf__site_box_inlinec;
@@ -711,7 +713,10 @@ html_create(const content_handler *handler,
 		 * new HTML content so the summary line emitted at reformat
 		 * reflects this page only, not session-cumulative.
 		 * fixes160d: extended with css_ok / css_skip counters.
-		 * fixes161a: extended with resource-governor counters. */
+		 * fixes161a: extended with resource-governor counters.
+		 * fixes161b: peak + skip_budget reset per page; the
+		 * current decoded-bytes counter is NOT reset because it
+		 * tracks live process-wide bitmaps across navigations. */
 		macsurf__site_img_ok = 0;
 		macsurf__site_img_fail = 0;
 		macsurf__site_css_ok = 0;
@@ -725,6 +730,8 @@ html_create(const content_handler *handler,
 		macsurf__site_fetch_active_peak = 0;
 		macsurf__site_fetch_slot_fail = 0;
 		macsurf__site_heavy = 0;
+		macsurf__site_decoded_img_bytes_peak = 0;
+		macsurf__site_decoded_img_skip_budget = 0;
 		macsurf__site_box_total = 0;
 		macsurf__site_box_blk = 0;
 		macsurf__site_box_inlinec = 0;
@@ -1298,6 +1305,9 @@ static void html_reformat(struct content *c, int width, int height)
 		extern long macsurf__site_fetch_active_peak;
 		extern long macsurf__site_fetch_slot_fail;
 		extern long macsurf__site_heavy;
+		extern long macsurf__decoded_img_bytes_current;
+		extern long macsurf__site_decoded_img_bytes_peak;
+		extern long macsurf__site_decoded_img_skip_budget;
 		nsurl *u = content_get_url(&htmlc->base);
 		const char *url = (u != NULL) ? nsurl_access(u) : "(null)";
 		macsurf_debug_log_writef(
@@ -1306,7 +1316,8 @@ static void html_reformat(struct content *c, int width, int height)
 			"in_w=%d in_h=%d c_w=%d c_h=%d "
 			"img_ok=%ld img_fail=%ld css_ok=%ld css_skip=%ld "
 			"rgov_skip=doc/%ld,css/%ld,img/%ld,scr/%ld,fnt/%ld,oth/%ld "
-			"fetch_peak=%ld fetch_slot_fail=%ld",
+			"fetch_peak=%ld fetch_slot_fail=%ld "
+			"decoded_img=cur/%ld,peak/%ld,skip/%ld",
 			url, macsurf__site_heavy,
 			macsurf__site_box_total,
 			macsurf__site_box_blk, macsurf__site_box_inlinec,
@@ -1319,7 +1330,10 @@ static void html_reformat(struct content *c, int width, int height)
 			macsurf__site_rgov_skip_img, macsurf__site_rgov_skip_script,
 			macsurf__site_rgov_skip_font, macsurf__site_rgov_skip_other,
 			macsurf__site_fetch_active_peak,
-			macsurf__site_fetch_slot_fail);
+			macsurf__site_fetch_slot_fail,
+			macsurf__decoded_img_bytes_current,
+			macsurf__site_decoded_img_bytes_peak,
+			macsurf__site_decoded_img_skip_budget);
 	}
 
 	selection_reinit(htmlc->sel);
