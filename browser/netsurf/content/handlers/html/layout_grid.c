@@ -261,12 +261,18 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 	bool has_row_tracks = false;
 	int i;
 
-	/* fixes161d — LAYOUTPHASE grid marker. Every 25th call. Placed
-	 * after declarations to stay C89-clean. */
+	/* fixes161e — per-call GRID marker capped at first 100 calls per
+	 * redraw. Counter resets when macsurf_layout_seq changes. */
 	{
+		extern long macsurf_layout_seq;
 		static long macsurf_grid_calls = 0;
+		static long macsurf_grid_seq = -1;
+		if (macsurf_grid_seq != macsurf_layout_seq) {
+			macsurf_grid_calls = 0;
+			macsurf_grid_seq = macsurf_layout_seq;
+		}
 		macsurf_grid_calls++;
-		if ((macsurf_grid_calls % 25) == 1) {
+		if (macsurf_grid_calls <= 100) {
 			macsurf_debug_log_writef(
 				"LAYOUTPHASE grid #%ld box=%p w=%d",
 				macsurf_grid_calls, (void *)grid,
