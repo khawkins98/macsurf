@@ -79,7 +79,25 @@ typedef struct nscss_content
 	struct content base;		/**< Underlying content object */
 
 	struct content_css_data data;	/**< CSS data */
+
+	/* fixes160d — per-sheet byte accumulator and skip latch for the
+	 * oversize CSS gate. total_bytes sums the size arguments of every
+	 * nscss_process_data call for this content; when it passes the cap,
+	 * the skip latch is set and all further data is rejected and the
+	 * sheet is dropped from the cascade. The latch matches the image
+	 * oversize-gate pattern from fixes160b. */
+	unsigned long total_bytes;
+	int skipped;
 } nscss_content;
+
+/* fixes160d — per-stylesheet byte cap. Apple.com ships four CSS files
+ * in the 200-256 KB range; each one expands into libcss's struct form
+ * to several times its source size. With 20 sheets attached to the
+ * cascade context, selector matching across 1000+ boxes blows past
+ * what the post-layout path survives even on a 194 MB Carbon partition.
+ * 128 KB drops the four heaviest Apple sheets, halves the cascade
+ * workload, and leaves the small utility sheets in place. */
+#define MACOS9_CSS_MAX_BYTES (128UL * 1024UL)
 
 /**
  * Context for import fetches
@@ -1553,6 +1571,26 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 
 	MS_LOG("nscss process data");
 
+	/* fixes160d — oversize CSS gate. Accumulate bytes per sheet; when
+	 * past MACOS9_CSS_MAX_BYTES, latch the skip flag, broadcast a CSS
+	 * error so NetSurf drops this sheet from the cascade, and refuse
+	 * further data without feeding it to libcss. Subsequent calls
+	 * exit on the latch alone (no further log spam, no double-count). */
+	if (css->skipped) {
+		return false;
+	}
+	css->total_bytes += (unsigned long)size;
+	if (css->total_bytes > MACOS9_CSS_MAX_BYTES) {
+		extern long macsurf__site_css_skip;
+		css->skipped = 1;
+		macsurf__site_css_skip++;
+		macsurf_debug_log_writef(
+			"css skip: oversize bytes=%ld cap=%ld - sheet dropped",
+			(long)css->total_bytes, (long)MACOS9_CSS_MAX_BYTES);
+		content_broadcast_error(c, NSERROR_CSS, NULL);
+		return false;
+	}
+
 	/* fixes115 — pre-process the CSS bytes to convert
 	 * `grid-template-columns: ...` declarations to `-macsurf-grid: N`
 	 * so the existing -macsurf-grid select/layout path picks up
@@ -1631,10 +1669,22 @@ bool nscss_convert(struct content *c)
 
 	MS_LOG("nscss convert");
 
+	/* fixes160d — sheets dropped by the oversize gate already broadcast
+	 * an error in nscss_process_data; bail without trying to convert
+	 * (the libcss sheet was never fed any data after the latch). */
+	if (css->skipped) {
+		return false;
+	}
+
 	error = nscss_convert_css_data(&css->data);
 	if (error != CSS_OK) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
 		return false;
+	}
+
+	{
+		extern long macsurf__site_css_ok;
+		macsurf__site_css_ok++;
 	}
 
 	return true;
