@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest an enhancement or new capability for MacSurf
+title: "[enhancement] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. MacSurf is a hobby-grade port to a 25-year-old OS, so feasibility constraints are tight — but interesting ideas are always welcome.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the proposed change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / use case
+      description: Why is this worth doing? What does it unlock? Cite a real site or workflow if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: How would you implement this? Pointers to NetSurf, libcss, Carbon, OpenTransport, etc. are welcome.
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How do we know it's done? List concrete behaviors or test sites.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - network
+        - rendering
+        - ui
+        - build
+        - js-engine
+        - css
+        - other
+    validations:
+      required: true
