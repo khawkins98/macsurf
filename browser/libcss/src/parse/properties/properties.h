@@ -139,9 +139,6 @@ css_error css__parse_macsurf_grid_col_span(css_language *c,
 css_error css__parse_aspect_ratio(css_language *c,
                 const parserutils_vector *vector, int32_t *ctx,
                 css_style *result);
-css_error css__parse_macsurf_justify(css_language *c,
-                const parserutils_vector *vector, int32_t *ctx,
-                css_style *result);
 css_error css__parse_border_right(css_language *c,		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result);
 css_error css__parse_border_right_color(css_language *c,

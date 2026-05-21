@@ -66,7 +66,6 @@ PROPERTY_FUNCS(overflow_wrap);
 PROPERTY_FUNCS(macsurf_grid_rows);
 PROPERTY_FUNCS(macsurf_grid_col_span);
 PROPERTY_FUNCS(aspect_ratio);
-PROPERTY_FUNCS(macsurf_justify);
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
 PROPERTY_FUNCS(break_after);

@@ -240,14 +240,6 @@ uint8_t css_computed_macsurf_grid_col_span(
 int32_t css_computed_macsurf_grid_placement(
 		const css_computed_style *style);
 
-/* fixes159: -macsurf-justify packed grid alignment.
- *   bits 0..3 justify_items (0=unset, 1=start, 2=end, 3=center, 4=stretch)
- *   bits 4..7 justify_self  (same encoding; per-item override)
- * Returns 0 if no rule set it (caller treats as "inherit container
- * default at layout time"). */
-int32_t css_computed_macsurf_justify(
-		const css_computed_style *style);
-
 /* fixes152: aspect-ratio packed as (num << 16) | denom.
  * 0 = unset (no aspect-ratio constraint). Layout uses width = h * num
  * / denom and height = w * denom / num to derive the missing

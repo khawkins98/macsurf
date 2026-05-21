@@ -251,7 +251,6 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("-macsurf-grid-rows"),
 	SMAP("-macsurf-grid-col-span"),
 	SMAP("aspect-ratio"),
-	SMAP("-macsurf-justify"),
 
 	SMAP("inherit"),
 	SMAP("unset"),
