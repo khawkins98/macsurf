@@ -1307,15 +1307,36 @@ bool layout_flex(struct box *flex, int available_width,
 	struct flex_ctx *ctx;
 	bool success = false;
 
-	/* fixes161d — LAYOUTPHASE flex marker. Every 25th call. */
+	/* fixes161e — per-call FLEX marker capped at first 200 calls per
+	 * redraw. Counter resets when macsurf_layout_seq changes
+	 * (incremented in layout_document). Child count walks flex->children
+	 * once; capped at 999 as a safety. Prime suspect for both apple and
+	 * huffpost; per-call granularity will pin the exact box. */
 	{
+		extern long macsurf_layout_seq;
 		static long macsurf_flex_calls = 0;
+		static long macsurf_flex_seq = -1;
+		int macsurf_flex_children = 0;
+		struct box *macsurf_flex_c;
+		if (macsurf_flex_seq != macsurf_layout_seq) {
+			macsurf_flex_calls = 0;
+			macsurf_flex_seq = macsurf_layout_seq;
+		}
 		macsurf_flex_calls++;
-		if ((macsurf_flex_calls % 25) == 1) {
+		if (macsurf_flex_calls <= 200) {
+			for (macsurf_flex_c = flex->children;
+			     macsurf_flex_c != NULL;
+			     macsurf_flex_c = macsurf_flex_c->next) {
+				macsurf_flex_children++;
+				if (macsurf_flex_children > 999)
+					break;
+			}
 			macsurf_debug_log_writef(
-				"LAYOUTPHASE flex #%ld box=%p w=%d h=%d",
+				"LAYOUTPHASE flex #%ld box=%p type=%d w=%d h=%d children=%d",
 				macsurf_flex_calls, (void *)flex,
-				(int)flex->width, (int)flex->height);
+				(int)flex->type,
+				(int)flex->width, (int)flex->height,
+				macsurf_flex_children);
 		}
 	}
 

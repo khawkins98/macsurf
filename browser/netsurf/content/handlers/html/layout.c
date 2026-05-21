@@ -74,6 +74,12 @@
 #include "html/layout_internal.h"
 #include "html/table.h"
 
+/* fixes161e — per-redraw call counter generation. Bumped at the top of
+ * layout_document(). Each LAYOUTPHASE probe site captures its own static
+ * counter + last-seen seq, resets when seq changes. Lets us cap probes
+ * per-redraw without resetting state from layout_document itself. */
+long macsurf_layout_seq = 0;
+
 /** Array of per-side access functions for computed style margins. */
 const css_len_func margin_funcs[4] = {
 	[TOP]    = css_computed_margin_top,
@@ -1669,17 +1675,22 @@ bool layout_table(
 	css_fixed value = 0;
 	css_unit unit = CSS_UNIT_PX;
 
-	/* fixes161d — LAYOUTPHASE table marker. Tables are rarer than
-	 * blocks so we log every 25th call. Placed after declarations to
-	 * stay C89-clean. */
+	/* fixes161e — per-call TABLE marker capped at first 100 calls
+	 * per redraw. fixes161d used %u which the writef formatter does
+	 * not support (printed literally as "cols=%u"); fixed to %d. */
 	{
 		static long macsurf_table_calls = 0;
+		static long macsurf_table_seq = -1;
+		if (macsurf_table_seq != macsurf_layout_seq) {
+			macsurf_table_calls = 0;
+			macsurf_table_seq = macsurf_layout_seq;
+		}
 		macsurf_table_calls++;
-		if ((macsurf_table_calls % 25) == 1) {
+		if (macsurf_table_calls <= 100) {
 			macsurf_debug_log_writef(
-				"LAYOUTPHASE table #%ld box=%p w=%d cols=%u",
+				"LAYOUTPHASE table #%ld box=%p w=%d cols=%d",
 				macsurf_table_calls, (void *)table,
-				(int)available_width, (unsigned)columns);
+				(int)available_width, (int)columns);
 		}
 	}
 
@@ -3598,14 +3609,20 @@ bool layout_block_context(
 	bool in_margin = false;
 	css_fixed gadget_size;
 	css_unit gadget_unit; /* Checkbox / radio buttons */
-	/* fixes161d — sparse call-counter probe. block_context is the
-	 * main layout recursion; one log per 100 calls leaves a sparse
-	 * trail without flooding. The last LAYOUTPHASE block line in the
-	 * truncated log tells us roughly where in the tree we died. */
+	/* fixes161e — per-call BLOCK marker capped at first 200 calls
+	 * per redraw. Counter resets when macsurf_layout_seq changes
+	 * (incremented in layout_document). The last LAYOUTPHASE block
+	 * line in the truncated apple/huffpost log will name the exact
+	 * box where layout_block_context died. */
 	{
 		static long macsurf_lbc_calls = 0;
+		static long macsurf_lbc_seq = -1;
+		if (macsurf_lbc_seq != macsurf_layout_seq) {
+			macsurf_lbc_calls = 0;
+			macsurf_lbc_seq = macsurf_layout_seq;
+		}
 		macsurf_lbc_calls++;
-		if ((macsurf_lbc_calls % 100) == 1) {
+		if (macsurf_lbc_calls <= 200) {
 			macsurf_debug_log_writef(
 				"LAYOUTPHASE block #%ld box=%p type=%d w=%d h=%d",
 				macsurf_lbc_calls, (void *)block,
@@ -5595,13 +5612,14 @@ bool layout_document(html_content *content, int width, int height)
 			width, height, nsurl_access(content_get_url(
 					&content->base)));
 
-	/* fixes161d — LAYOUTPHASE markers. apple/huffpost truncate the
-	 * log between html_reformat's "pre-layout_document" and any
-	 * post-layout entry; this round subdivides layout_document so
-	 * the last LAYOUTPHASE line names the function that died. The
-	 * per-100/per-25 counters on the inner routines accumulate
-	 * across reformats within one launch; the trailing tail is what
-	 * we read. No behavior changes, log-only. */
+	/* fixes161e — precise layout crash locator. Bump the redraw seq
+	 * first so all inner probes reset their per-redraw counters.
+	 * [DOC pre-block] / [DOC post-block] bracket the root call into
+	 * layout_block_context so apple's crash signature (entry then
+	 * nothing) can be split: pre-block missing → setup bug; pre-block
+	 * but no post-block → block recursion bug; both present → tail
+	 * fixup chain (layout_lists/absolute/relative/bboxes). */
+	macsurf_layout_seq++;
 	macsurf_debug_log_writef(
 		"LAYOUTPHASE document entry w=%d h=%d doc=%p",
 		width, height, (void *)doc);
@@ -5620,7 +5638,14 @@ bool layout_document(html_content *content, int width, int height)
 	}
 	doc->width = width;
 
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE doc pre-block doc=%p w=%d h=%d",
+		(void *)doc, (int)doc->width, (int)height);
 	ret = layout_block_context(doc, height, content);
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE doc post-block ret=%d doc=%p w=%d h=%d",
+		(int)ret, (void *)doc,
+		(int)doc->width, (int)doc->height);
 
 	/* make <html> and <body> fill available height */
 	if (doc->y + doc->padding[TOP] + doc->height + doc->padding[BOTTOM] +
