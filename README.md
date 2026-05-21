@@ -53,6 +53,14 @@ It is, as far as we can find, the first serious [NetSurf](https://www.netsurf-br
 
 ---
 
+## Built with AI assistance
+
+MacSurf was built with heavy use of AI coding assistants — primarily [Claude Code](https://www.anthropic.com/claude-code), plus other tools where they helped. Hundreds of hours of human direction, architectural decisions, hardware testing, and debugging on a real beige G3 went into it; an LLM does not write a NetSurf port to CodeWarrior 8 on its own. But the keystroke-level work — typing the C, writing the libcss patches, drafting the cssh_css preprocessors, iterating on plotters and image decoders — was a human-and-AI collaboration from day one. The repo includes [CLAUDE.md](CLAUDE.md) (the working assistant directives accumulated over the project) and [docs/claude-code-tasks.md](docs/claude-code-tasks.md) (the original task list that bootstrapped the port) so you can see how the work actually happened.
+
+If "vibe-coded" is your objection, it's a fair label and not one I'm hiding from. The output is a real C89 codebase that builds in CodeWarrior 8 and runs on a 25-year-old Mac. Judge it by what it does.
+
+---
+
 ## The progression
 
 Each shot below is a real milestone, captured on a Power Macintosh G3 running Mac OS 9. The fix-number annotations match this repo's commit history.
