@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PROBE: list-style-type extensions (fixes202)</title>
+<style>
+body { font-family: sans-serif; font-size: 12px; margin: 8px; }
+h2 { font-size: 13px; color: #003366; margin: 10px 0 2px 0; }
+p.exp { font-size: 11px; color: #555; margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h2>PROBE LT1 — decimal (baseline)</h2>
+<p class="exp">Expected: 1. 2. 3.</p>
+<ol style="list-style-type: decimal;"><li>alpha</li><li>bravo</li><li>charlie</li></ol>
+
+<h2>PROBE LT2 — decimal-leading-zero</h2>
+<p class="exp">Expected: 01. 02. 03.</p>
+<ol style="list-style-type: decimal-leading-zero;"><li>alpha</li><li>bravo</li><li>charlie</li></ol>
+
+<h2>PROBE LT3 — lower-alpha</h2>
+<p class="exp">Expected: a. b. c.</p>
+<ol style="list-style-type: lower-alpha;"><li>alpha</li><li>bravo</li><li>charlie</li></ol>
+
+<h2>PROBE LT4 — upper-alpha</h2>
+<p class="exp">Expected: A. B. C.</p>
+<ol style="list-style-type: upper-alpha;"><li>alpha</li><li>bravo</li><li>charlie</li></ol>
+
+<h2>PROBE LT5 — lower-roman</h2>
+<p class="exp">Expected: i. ii. iii. iv. v.</p>
+<ol style="list-style-type: lower-roman;"><li>one</li><li>two</li><li>three</li><li>four</li><li>five</li></ol>
+
+<h2>PROBE LT6 — upper-roman</h2>
+<p class="exp">Expected: I. II. III. IV. V.</p>
+<ol style="list-style-type: upper-roman;"><li>one</li><li>two</li><li>three</li><li>four</li><li>five</li></ol>
+
+<h2>PROBE LT7 — disc / circle / square regression</h2>
+<p class="exp">Expected: bullets render the same as before fixes202.</p>
+<ul style="list-style-type: disc;"><li>disc</li></ul>
+<ul style="list-style-type: circle;"><li>circle</li></ul>
+<ul style="list-style-type: square;"><li>square</li></ul>
+
+</body>
+</html>

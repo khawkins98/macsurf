@@ -3416,6 +3416,48 @@ layout_line(struct box *first,
 					 x1 - x0 - x - space_before,
 					 &split,
 					 &w);
+
+			/* fixes202: word-break: break-all / overflow-wrap:
+			 * break-word|anywhere — when no whitespace break
+			 * fits the available width, fall back to a
+			 * character-level break. position() returns the
+			 * char offset where the cursor crosses x, which is
+			 * the largest prefix that fits.
+			 *
+			 * We only fire when split is at the start of the
+			 * string (split == 0) or at the very end (no break
+			 * opportunity within width). overflow-wrap: anywhere
+			 * also fires when the available width is small but
+			 * the line is non-empty (left/right floats or
+			 * earlier inline siblings already placed). */
+			if (split == 0 && split_box->length > 1) {
+				enum css_word_break_e wb =
+					css_computed_word_break(split_box->style);
+				enum css_overflow_wrap_e ow =
+					css_computed_overflow_wrap(split_box->style);
+				bool char_break =
+					(wb == CSS_WORD_BREAK_BREAK_ALL) ||
+					(ow == CSS_OVERFLOW_WRAP_BREAK_WORD) ||
+					(ow == CSS_OVERFLOW_WRAP_ANYWHERE);
+				if (char_break) {
+					size_t char_off = 0;
+					int char_x = 0;
+					int avail = x1 - x0 - x - space_before;
+					if (avail < 0)
+						avail = 0;
+					font_func->position(&fstyle,
+							 split_box->text,
+							 split_box->length,
+							 avail,
+							 &char_off,
+							 &char_x);
+					if (char_off > 0 &&
+					    char_off < split_box->length) {
+						split = char_off;
+						w = char_x;
+					}
+				}
+			}
 		}
 
 		/* split == 0 implies that text can't be split */

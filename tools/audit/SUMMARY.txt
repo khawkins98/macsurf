@@ -1,8 +1,8 @@
-=== CSS audit: 2026-05-22T17:27:25Z ===
+=== CSS audit: 2026-05-22T17:37:52Z ===
 parsers:            192
 computed accessors: 131
-consumed:           110
-parsed-not-consumed:21
+consumed:           112
+parsed-not-consumed:19
 macsurf vendor:     11
 at-rules:           6
 pseudos:            30
