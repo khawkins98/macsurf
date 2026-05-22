@@ -60,12 +60,128 @@
 #include "html/html.h"
 #include "html/private.h"
 #include "html/layout_internal.h"
+/* fixes168 — shared layout-wide dimension sanitizers. Replaces what
+ * used to be flex-only safety helpers. */
+#include "html/layout_safe.h"
 
 /* fixes161d — diagnostic-only macsurf_debug_log_writef for the
  * LAYOUTPHASE grid marker. Compiles to a no-op in release builds. */
 #include "macsurf_debug.h"
 
 #include "css/utils.h"
+
+
+/* fixes168b — Grid local fallback. When a grid container hits an
+ * unsafe input (AUTO/INT_MIN propagated through a parent, child
+ * count overflow, layout failure in a child) we stack its in-flow
+ * children vertically as plain block flow rather than failing the
+ * whole document. The original DOM and CSS tree still render —
+ * only the unsupported layout mode degrades locally, exactly the
+ * same shape fixes167's flex fallback uses.
+ *
+ * Returns true once the subtree has positions. Per-child layout
+ * failures are tolerated (the child gets a minimal-height box and
+ * continues). */
+static bool layout_grid_fallback_block(struct box *grid, int available_width,
+		html_content *content)
+{
+	struct box *c;
+	int y;
+	int avail;
+	int n;
+
+	if (grid == NULL) return false;
+
+	avail = layout_dim_sanitize_width(available_width,
+			LAYOUT_SAFE_MAX);
+	if (avail <= 0) avail = 0;
+	if (layout_dim_is_auto_or_bad(grid->width) ||
+			grid->width > LAYOUT_SAFE_MAX) {
+		grid->width = avail;
+	}
+
+	macsurf_debug_log_writef(
+		"GRIDFALLBACK box=%p w=%d avail=%d",
+		(void *)grid, (int)grid->width, (int)avail);
+
+	y = 0;
+	n = 0;
+	for (c = grid->children; c != NULL; c = c->next) {
+		int child_avail;
+		bool ok;
+
+		if (n >= LAYOUT_MAX_CHILDREN) break;
+		n++;
+
+		child_avail = grid->width;
+		if (child_avail <= 0) child_avail = avail;
+		if (child_avail > LAYOUT_SAFE_MAX)
+			child_avail = LAYOUT_SAFE_MAX;
+
+		/* Per-child layout. If the child cannot lay out cleanly
+		 * we give it a minimal-height slot and continue — never
+		 * crash the whole grid because one child is too modern. */
+		ok = false;
+		switch (c->type) {
+		case BOX_BLOCK:
+		case BOX_INLINE_BLOCK:
+			ok = layout_block_context(c, -1, content);
+			break;
+		case BOX_TABLE:
+			c->float_container = c->parent;
+			ok = layout_table(c, child_avail, content);
+			c->float_container = NULL;
+			break;
+		case BOX_FLEX:
+		case BOX_INLINE_FLEX:
+			c->float_container = c->parent;
+			ok = layout_flex(c, child_avail, content);
+			c->float_container = NULL;
+			break;
+		case BOX_GRID:
+		case BOX_INLINE_GRID:
+			/* Nested grid: recurse through the real grid
+			 * entry point; if it fallback-degrades, fine. */
+			c->float_container = c->parent;
+			ok = layout_grid(c, child_avail, content);
+			c->float_container = NULL;
+			break;
+		default:
+			/* Unsupported child type — give it a zero-height
+			 * slot and keep walking. The DOM stays intact. */
+			c->height = 0;
+			ok = true;
+			break;
+		}
+
+		if (!ok) {
+			/* Minimal-height continuation. Real-world impact
+			 * is "this card renders as a short empty box"
+			 * which is far better than crashing the page. */
+			c->height = 0;
+		}
+
+		if (layout_dim_is_auto_or_bad(c->height)) c->height = 0;
+		if (c->height > LAYOUT_SAFE_MAX) c->height = LAYOUT_SAFE_MAX;
+		if (layout_dim_is_auto_or_bad(c->width) ||
+				c->width > LAYOUT_SAFE_MAX) {
+			c->width = child_avail;
+		}
+
+		c->x = 0;
+		c->y = y;
+		y = layout_dim_add_safe(y, c->height);
+		if (y > LAYOUT_SAFE_MAX) y = LAYOUT_SAFE_MAX;
+	}
+
+	grid->height = layout_dim_clamp(y);
+	if (grid->height > LAYOUT_SAFE_MAX) grid->height = LAYOUT_SAFE_MAX;
+
+	macsurf_debug_log_writef(
+		"GRIDFALLBACK done box=%p children=%d h=%d",
+		(void *)grid, n, (int)grid->height);
+	return true;
+}
 
 
 
@@ -286,7 +402,23 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		row_track_h[i] = 0;
 	}
 
-	if (grid == NULL || grid->style == NULL) return false;
+	if (grid == NULL) return false;
+	if (grid->style == NULL) {
+		/* fixes168b — no style means we can't compute tracks. Fall
+		 * back to block flow so the children still get positions
+		 * instead of failing the whole document. */
+		return layout_grid_fallback_block(grid, available_width,
+				content);
+	}
+
+	/* fixes168a — sanitize available_width at the entry boundary so
+	 * no AUTO/INT_MIN/absurd value reaches grid track sizing. */
+	if (layout_dim_is_auto_or_bad(available_width)) {
+		macsurf_debug_log_writef(
+			"GRIDSAFE entry avail=AUTO box=%p -> fallback",
+			(void *)grid);
+		return layout_grid_fallback_block(grid, 0, content);
+	}
 
 	unit_len_ctx = &content->unit_len_ctx;
 
@@ -314,6 +446,17 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 		container_width = available_width;
 		grid->width = available_width;
 	}
+	/* fixes168a — container_width must be a real pixel value before
+	 * it feeds track sizing. AUTO/INT_MIN here would propagate into
+	 * (container_width - total_gap) / cols below and produce
+	 * INT_MIN-sized cells. */
+	if (layout_dim_is_auto_or_bad(container_width)) {
+		container_width = layout_dim_sanitize_width(
+				available_width, LAYOUT_SAFE_MAX);
+		grid->width = container_width;
+	}
+	if (container_width > LAYOUT_SAFE_MAX)
+		container_width = LAYOUT_SAFE_MAX;
 
 	/* column-gap applies between adjacent columns. fixes148 already
 	 * wired -macsurf-column-gap as the storage; reuse it here. */
@@ -728,11 +871,30 @@ bool layout_grid(struct box *grid, int available_width, html_content *content)
 			grid->width = this_col_width;
 
 			if (!layout_grid_item(child, this_col_width, content)) {
-				grid->width = saved_grid_width;
-				return false;
+				/* fixes168b — child layout failed. Don't abort
+				 * the whole grid (which would then abort the
+				 * whole document); give this child a zero-height
+				 * slot and keep walking. Other children in the
+				 * grid still get positions. */
+				macsurf_debug_log_writef(
+					"GRIDSAFE child fail box=%p type=%d "
+					"-> zero-height slot",
+					(void *)child, (int)child->type);
+				child->height = 0;
+				if (layout_dim_is_auto_or_bad(child->width) ||
+				    child->width > LAYOUT_SAFE_MAX) {
+					child->width = this_col_width;
+				}
 			}
 
 			grid->width = saved_grid_width;
+
+			/* Sanitize what the child layout produced before it
+			 * propagates into row-height tracking. */
+			if (layout_dim_is_auto_or_bad(child->height))
+				child->height = 0;
+			if (child->height > LAYOUT_SAFE_MAX)
+				child->height = LAYOUT_SAFE_MAX;
 
 			if (child->width > this_col_width) {
 				child->width = this_col_width;
