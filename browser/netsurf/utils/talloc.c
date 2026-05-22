@@ -80,10 +80,26 @@
 #define TALLOC_FLAG_LOOP 0x02
 #define TALLOC_MAGIC_REFERENCE ((const char *)1)
 
-/* by default we abort when given a bad pointer (such as when talloc_free() is called 
+/* by default we abort when given a bad pointer (such as when talloc_free() is called
    on a pointer that came from malloc() */
 #ifndef TALLOC_ABORT
+#ifdef __MACOS9__
+/* fixes161f -- talloc abort goes to MSL's exit-cleanly path on Carbon, not
+ * MacsBug. Apple/huffpost crashes were diagnosed as silent process exits
+ * (log truncates, new session begins, MacsBug never fires). Log the reason
+ * before aborting so the next apple/huffpost reproduction tells us which
+ * site died (double-free vs corruption) and on what pointer. */
+#include "macsurf_debug.h"
+#define TALLOC_ABORT(reason) \
+	do { \
+		macsurf_debug_log_writef( \
+			"TALLOC_ABORT reason=%s ptr=%p", \
+			(reason), (void *)ptr); \
+		abort(); \
+	} while (0)
+#else
 #define TALLOC_ABORT(reason) abort()
+#endif
 #endif
 
 #ifndef discard_const_p
