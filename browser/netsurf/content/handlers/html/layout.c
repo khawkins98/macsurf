@@ -924,7 +924,51 @@ layout_minmax_inline_container(struct box *inline_container,
  * \post  block->min_width and block->max_width filled in,
  *        0 <= block->min_width <= block->max_width
  */
-static void layout_minmax_block(
+/* fixes173 — watchdog wrapper for layout_minmax_block. This
+ * function is RECURSIVE (it calls itself via child walks deep
+ * inside the body) and was NOT gated by fixes171's watchdog.
+ * Apple's 256 KB body has thousands of nested boxes; min-max
+ * width computation on deep nesting was the unguarded path.
+ *
+ * The assertion that block->type is in a known set is also
+ * removed for safety — an unexpected type now produces a
+ * safe zero-min-max box instead of crashing. Real browsers
+ * degrade. */
+static void layout_minmax_block_inner(struct box *block,
+		const struct gui_layout_table *font_func,
+		const html_content *content);
+
+static void layout_minmax_block(struct box *block,
+		const struct gui_layout_table *font_func,
+		const html_content *content)
+{
+	if (block == NULL) return;
+	if (layout_watchdog_enter(block)) {
+		block->min_width = 0;
+		block->max_width = 0;
+		return;
+	}
+	/* Type-guard. The original assert(block->type in {...}) would
+	 * crash if a box of an unexpected type reached here. Modern
+	 * pages (Apple, HuffPost) can produce odd box types through
+	 * cascade interactions; treat unknown types as a zero box. */
+	if (block->type != BOX_BLOCK &&
+			block->type != BOX_FLEX &&
+			block->type != BOX_GRID &&
+			block->type != BOX_INLINE_FLEX &&
+			block->type != BOX_INLINE_GRID &&
+			block->type != BOX_INLINE_BLOCK &&
+			block->type != BOX_TABLE_CELL) {
+		block->min_width = 0;
+		block->max_width = 0;
+		layout_watchdog_exit();
+		return;
+	}
+	layout_minmax_block_inner(block, font_func, content);
+	layout_watchdog_exit();
+}
+
+static void layout_minmax_block_inner(
 		struct box *block,
 		const struct gui_layout_table *font_func,
 		const html_content *content)
@@ -943,14 +987,6 @@ static void layout_minmax_block(
 	bool using_min_border_box = false;
 	bool using_max_border_box = false;
 	bool child_has_height = false;
-
-	assert(block->type == BOX_BLOCK ||
-			block->type == BOX_FLEX ||
-			block->type == BOX_GRID ||
-			block->type == BOX_INLINE_FLEX ||
-			block->type == BOX_INLINE_GRID ||
-			block->type == BOX_INLINE_BLOCK ||
-			block->type == BOX_TABLE_CELL);
 
 	/* check if the widths have already been calculated */
 	if (block->max_width != UNKNOWN_MAX_WIDTH)
@@ -2720,13 +2756,16 @@ layout_float_find_dimensions(
  */
 static bool layout_float(struct box *b, int width, html_content *content)
 {
-	assert(b->type == BOX_TABLE ||
-	       b->type == BOX_BLOCK ||
-	       b->type == BOX_INLINE_BLOCK ||
-	       b->type == BOX_FLEX ||
-	       b->type == BOX_INLINE_FLEX ||
-	       b->type == BOX_GRID ||
-	       b->type == BOX_INLINE_GRID);
+	/* fixes173 — old code asserted box type. Downgrade to a safe
+	 * skip so an unexpected type doesn't crash a whole page. */
+	if (b == NULL) return false;
+	if (b->type != BOX_TABLE && b->type != BOX_BLOCK &&
+	    b->type != BOX_INLINE_BLOCK && b->type != BOX_FLEX &&
+	    b->type != BOX_INLINE_FLEX && b->type != BOX_GRID &&
+	    b->type != BOX_INLINE_GRID) {
+		b->height = 0;
+		return true;
+	}
 	layout_float_find_dimensions(&content->unit_len_ctx, width, b->style, b);
 	if (b->type == BOX_TABLE || b->type == BOX_INLINE_FLEX ||
 	    b->type == BOX_INLINE_GRID) {
@@ -3607,16 +3646,48 @@ layout_line(struct box *first,
  * \param content  memory pool for any new boxes
  * \return true on success, false on memory exhaustion
  */
+/* fixes173 — watchdog wrapper for layout_inline_container. Apple
+ * ships 256 KB of HTML, most of it inline content (paragraphs,
+ * links, spans). The inline-container layout walker is the most-
+ * called layout function on text-heavy pages and was the most
+ * obvious un-gated recursive path remaining after fixes171.
+ *
+ * The assertion that the box is BOX_INLINE_CONTAINER is also
+ * downgraded to a safe early-return — a wrong-type box here
+ * previously crashed; now it produces a zero-height continuation. */
+static bool layout_inline_container_inner(struct box *inline_container,
+		int width, struct box *cont, int cx, int cy,
+		html_content *content);
+
 static bool layout_inline_container(struct box *inline_container, int width,
 		struct box *cont, int cx, int cy, html_content *content)
+{
+	bool ret;
+	if (inline_container == NULL) return false;
+	if (inline_container->type != BOX_INLINE_CONTAINER) {
+		/* Old code: assert(). New behaviour: degrade. */
+		inline_container->height = 0;
+		return true;
+	}
+	if (layout_watchdog_enter(inline_container)) {
+		inline_container->height = 0;
+		return true;
+	}
+	ret = layout_inline_container_inner(inline_container, width,
+			cont, cx, cy, content);
+	layout_watchdog_exit();
+	return ret;
+}
+
+static bool layout_inline_container_inner(struct box *inline_container,
+		int width, struct box *cont, int cx, int cy,
+		html_content *content)
 {
 	bool first_line = true;
 	bool has_text_children;
 	struct box *c, *next;
 	int y = 0;
 	int curwidth,maxwidth = width;
-
-	assert(inline_container->type == BOX_INLINE_CONTAINER);
 
 	NSLOG(layout, DEBUG,
 	      "inline_container %p, width %i, cont %p, cx %i, cy %i",

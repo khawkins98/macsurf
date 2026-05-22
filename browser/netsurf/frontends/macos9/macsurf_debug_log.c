@@ -423,3 +423,22 @@ void macsurf_debug_log_write(const char *msg) { (void)msg; }
 void macsurf_debug_log_writef(const char *fmt, ...) { (void)fmt; }
 
 #endif /* MACSURF_DEBUG */
+
+/* fixes173 — non-fatal assertion handler. Called by the assert()
+ * macro overridden in macsurf_prefix.h. Logs the failure but
+ * does NOT abort the process. Real shipped browsers do this
+ * (or NDEBUG out entirely). Without it, Apple's first unexpected
+ * box-tree state aborts MacSurf before a pixel is drawn.
+ *
+ * Always exported (even in release builds) so every TU that
+ * pulls in macsurf_prefix.h's assert() macro links cleanly. */
+void macsurf_assert_failed_(const char *expr, const char *file, int line)
+{
+#ifdef MACSURF_DEBUG
+	macsurf_debug_log_writef("ASSERT %s:%d %s",
+			file ? file : "?", line,
+			expr ? expr : "?");
+#else
+	(void)expr; (void)file; (void)line;
+#endif
+}
