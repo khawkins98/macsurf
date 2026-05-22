@@ -5794,16 +5794,24 @@ bool layout_document(html_content *content, int width, int height)
 		macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-rel");
 		layout_position_relative(&content->unit_len_ctx, doc, doc, 0, 0);
 		macsurf_debug_log_writef("LAYOUTPHASE doc tail post-rel");
+
+		macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-bbox");
+		layout_calculate_descendant_bboxes(&content->unit_len_ctx, doc);
+		macsurf_debug_log_writef("LAYOUTPHASE doc tail post-bbox");
 	} else {
 		macsurf_debug_log_writef(
 			"LAYOUTPHASE doc tail partial-layout: "
-			"ret=%d doc_h_pre_fill=%d - skipping abs/rel",
+			"ret=%d doc_h_pre_fill=%d - skipping abs/rel/bbox",
 			(int)ret, doc_h_after_block);
+		/* fixes165 — bbox recursion asserts box->height != AUTO and the
+		 * tree has dangling h=AUTO children when block layout returned
+		 * h=0. Set doc's own bbox to its border-edge bounds so redraw
+		 * has a valid root rect; skip descendant recursion entirely. */
+		doc->descendant_x0 = 0;
+		doc->descendant_y0 = 0;
+		doc->descendant_x1 = doc->width;
+		doc->descendant_y1 = doc->height;
 	}
-
-	macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-bbox");
-	layout_calculate_descendant_bboxes(&content->unit_len_ctx, doc);
-	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-bbox");
 
 	/* fixes161d — see entry probe. */
 	macsurf_debug_log_writef(
