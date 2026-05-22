@@ -129,7 +129,7 @@ Covered above.
 | Property | Status |
 |---|---|
 | `list-style-type: disc / circle / square / decimal / none` | FULL |
-| `list-style-type: lower-alpha / upper-alpha / lower-roman / upper-roman / decimal-leading-zero` | PARSED_NOT_CONSUMED — marker formatter only emits disc/circle/square/decimal/none. **Fast-lane.** |
+| `list-style-type: lower-alpha / upper-alpha / lower-roman / upper-roman / decimal-leading-zero / lower-latin / upper-latin / lower-greek` | FULL (verified fixes202) — libcss `css_computed_format_list_style` already handles all of these; `layout__set_numerical_marker_text` invokes it for any non-disc/circle/square/none type. Non-ASCII glyph types (Greek, CJK, Armenian, Hebrew, etc.) round-trip to `?` through MacRoman; ASCII-result types render correctly. |
 | `list-style-position: inside / outside` | PARTIAL — `inside` placement not honoured |
 | `list-style-image` | PARTIAL — fetches but doesn't render image marker |
 
@@ -190,15 +190,15 @@ Covered above.
 | `text-indent` | FULL |
 | `text-transform: uppercase/lowercase/capitalize/none` | FULL |
 | `text-decoration: underline/overline/line-through` | FULL |
-| `text-decoration-color` | PARSED_NOT_CONSUMED — drawn in text colour. **Fast-lane.** |
+| `text-decoration-color` | MISSING_PARSER (re-classified fixes202) — libcss doesn't parse the longhand. Decoration uses `color`. Deferred behind a new-property round. |
 | `text-decoration-style` (`solid/dotted/dashed/wavy/double`) | MISSING_PARSER — only solid |
 | `text-decoration-thickness` | MISSING_PARSER |
 | `text-shadow` (standard) | FULL (fixes175 preprocessor → `-macsurf-text-shadow`) |
 | `text-shadow` with blur radius | PARTIAL — blur silently dropped to 0 |
 | `text-overflow: ellipsis` | FULL (fixes135a/c) |
 | `white-space: normal/pre/nowrap/pre-wrap/pre-line` | FULL |
-| `word-break: normal/break-all/keep-all` | PARSED_NOT_CONSUMED — engine character-breaks long unbreakable runs anyway. **Fast-lane.** |
-| `overflow-wrap` / `word-wrap: normal/break-word/anywhere` | PARSED_NOT_CONSUMED. **Fast-lane.** |
+| `word-break: normal/break-all/keep-all` | PARTIAL (fixes202) — `break-all` triggers char-level break when no whitespace break fits; `keep-all` not differentiated from `normal` (CJK detection unavailable on MacRoman) |
+| `overflow-wrap` / `word-wrap: normal/break-word/anywhere` | FULL (fixes202) — `break-word` and `anywhere` both invoke char-level fallback when whitespace split returns 0 |
 | `hyphens` | MISSING_PARSER |
 | `direction: ltr / rtl` | PARTIAL — `rtl` text reads LTR (no bidi) |
 | `unicode-bidi` | PARSED_NOT_CONSUMED |
@@ -221,7 +221,7 @@ Covered above.
 | Property | Status |
 |---|---|
 | `cursor` | FULL — set_pointer in window.c (fixes131) |
-| `pointer-events: auto/none` | PARSED_NOT_CONSUMED. **Fast-lane.** |
+| `pointer-events: auto/none` | MISSING_PARSER (re-classified fixes202) — no libcss parser, no public accessor. Would need a new property, which is the trap zone; deferred until a Track-H sized round. |
 | `user-select` | MISSING_PARSER — selection model is platform-defined |
 | `caret-color` | MISSING_PARSER |
 | `appearance` | MISSING_PARSER |
@@ -244,7 +244,7 @@ Covered above.
 
 | Property | Status |
 |---|---|
-| `page-break-*`, `break-*`, `orphans`, `widows` | PARSED_NOT_CONSUMED. **Fast-lane (no-op safe).** |
+| `page-break-*`, `break-*`, `orphans`, `widows` | QUICKDRAW_FALLBACK (fixes202) — parsed and silently dropped. Reason: no paged-output path on a screen-only browser; only relevant when print or multicol pagination ships. Track E will read `break-*` for multicol. |
 | `@page` | INTENTIONALLY_UNSUPPORTED |
 
 ### A.15 Aural CSS
@@ -397,7 +397,7 @@ INTENTIONALLY_UNSUPPORTED across the module — declared above.
 
 ### B.17 SVG presentation properties
 
-| `fill`, `stroke`, `fill-opacity`, `stroke-opacity` | PARSED_NOT_CONSUMED |
+| `fill`, `stroke`, `fill-opacity`, `stroke-opacity` | INTENTIONALLY_UNSUPPORTED (fixes202) until SVG content handler exists — parsed by libcss for forward-compat but no SVG renderer to consume them |
 | Full SVG rendering | NEEDS_FRONTEND — depends on SVG content handler |
 
 ---

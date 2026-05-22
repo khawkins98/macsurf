@@ -82,6 +82,7 @@ css_computed_order
 css_computed_outline_color
 css_computed_outline_style
 css_computed_outline_width
+css_computed_overflow_wrap
 css_computed_overflow_x
 css_computed_overflow_y
 css_computed_padding_bottom
@@ -106,5 +107,6 @@ css_computed_visibility
 css_computed_white_space
 css_computed_width
 css_computed_width_px
+css_computed_word_break
 css_computed_word_spacing
 css_computed_z_index
