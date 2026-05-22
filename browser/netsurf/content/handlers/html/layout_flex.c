@@ -1370,7 +1370,43 @@ bool layout_flex(struct box *flex, int available_width,
 	NSLOG(flex, DEEPDEBUG, "box %p: available_cross: %i",
 			flex, ctx->available_cross);
 
+	/* fixes166 -- shared FLEXPHASE probes capped at first 200 flex calls
+	 * per redraw (same cap as the entry-FLEX marker). Tags each phase
+	 * with the flex box pointer so apple's crash site can be localized. */
+	{
+		extern long macsurf_layout_seq;
+		static long macsurf_flexphase_seq = -1;
+		static long macsurf_flexphase_calls = 0;
+		if (macsurf_flexphase_seq != macsurf_layout_seq) {
+			macsurf_flexphase_calls = 0;
+			macsurf_flexphase_seq = macsurf_layout_seq;
+		}
+		macsurf_flexphase_calls++;
+		if (macsurf_flexphase_calls <= 200) {
+			macsurf_debug_log_writef(
+				"FLEXPHASE box=%p pre-populate avail_main=%d cross=%d",
+				(void *)flex, (int)ctx->available_main,
+				(int)ctx->available_cross);
+		}
+	}
+
 	layout_flex_ctx__populate_item_data(ctx, flex, available_width);
+
+	{
+		extern long macsurf_layout_seq;
+		static long macsurf_flexphase2_seq = -1;
+		static long macsurf_flexphase2_calls = 0;
+		if (macsurf_flexphase2_seq != macsurf_layout_seq) {
+			macsurf_flexphase2_calls = 0;
+			macsurf_flexphase2_seq = macsurf_layout_seq;
+		}
+		macsurf_flexphase2_calls++;
+		if (macsurf_flexphase2_calls <= 200) {
+			macsurf_debug_log_writef(
+				"FLEXPHASE box=%p post-populate items=%d",
+				(void *)flex, (int)ctx->item.count);
+		}
+	}
 
 	/* fixes41 -- re-order items by computed `order` before they go
 	 * onto lines. Stable so equal-order items keep DOM order. */
@@ -1382,7 +1418,41 @@ bool layout_flex(struct box *flex, int available_width,
 		goto cleanup;
 	}
 
+	{
+		extern long macsurf_layout_seq;
+		static long macsurf_flexphase3_seq = -1;
+		static long macsurf_flexphase3_calls = 0;
+		if (macsurf_flexphase3_seq != macsurf_layout_seq) {
+			macsurf_flexphase3_calls = 0;
+			macsurf_flexphase3_seq = macsurf_layout_seq;
+		}
+		macsurf_flexphase3_calls++;
+		if (macsurf_flexphase3_calls <= 200) {
+			macsurf_debug_log_writef(
+				"FLEXPHASE box=%p post-collect lines=%d main=%d cross=%d",
+				(void *)flex, (int)ctx->line.count,
+				(int)ctx->main_size, (int)ctx->cross_size);
+		}
+	}
+
 	layout_flex__place_lines(ctx);
+
+	{
+		extern long macsurf_layout_seq;
+		static long macsurf_flexphase4_seq = -1;
+		static long macsurf_flexphase4_calls = 0;
+		if (macsurf_flexphase4_seq != macsurf_layout_seq) {
+			macsurf_flexphase4_calls = 0;
+			macsurf_flexphase4_seq = macsurf_layout_seq;
+		}
+		macsurf_flexphase4_calls++;
+		if (macsurf_flexphase4_calls <= 200) {
+			macsurf_debug_log_writef(
+				"FLEXPHASE box=%p post-place main=%d cross=%d h=%d",
+				(void *)flex, (int)ctx->main_size,
+				(int)ctx->cross_size, (int)flex->height);
+		}
+	}
 
 	if (flex->height == AUTO) {
 		flex->height = ctx->horizontal ?
@@ -1402,6 +1472,22 @@ bool layout_flex(struct box *flex, int available_width,
 	success = true;
 
 cleanup:
+	{
+		extern long macsurf_layout_seq;
+		static long macsurf_flexphase5_seq = -1;
+		static long macsurf_flexphase5_calls = 0;
+		if (macsurf_flexphase5_seq != macsurf_layout_seq) {
+			macsurf_flexphase5_calls = 0;
+			macsurf_flexphase5_seq = macsurf_layout_seq;
+		}
+		macsurf_flexphase5_calls++;
+		if (macsurf_flexphase5_calls <= 200) {
+			macsurf_debug_log_writef(
+				"FLEXPHASE box=%p exit success=%d w=%d h=%d",
+				(void *)flex, (int)success,
+				(int)flex->width, (int)flex->height);
+		}
+	}
 	layout_flex_ctx__destroy(ctx);
 
 	NSLOG(flex, DEEPDEBUG, "box %p: %s: w: %i, h: %i", flex,
