@@ -304,6 +304,7 @@ static bool layout_flex_item(
 
 	switch (b->type) {
 	case BOX_BLOCK:
+	case BOX_INLINE_BLOCK:
 		success = layout_block_context(b, -1, ctx->content);
 		break;
 	case BOX_TABLE:
@@ -312,13 +313,28 @@ static bool layout_flex_item(
 		b->float_container = NULL;
 		break;
 	case BOX_FLEX:
+	case BOX_INLINE_FLEX:
 		b->float_container = b->parent;
 		success = layout_flex(b, available_width, ctx->content);
 		b->float_container = NULL;
 		break;
+	case BOX_GRID:
+	case BOX_INLINE_GRID:
+		/* fixes174 — grid children of flex containers are real.
+		 * Apple's homepage uses flex > grid > flex/card constantly.
+		 * Previously this fell into the default branch and aborted
+		 * the whole flex subtree, collapsing the page. Dispatch
+		 * into layout_grid (which has its own fallback). */
+		b->float_container = b->parent;
+		success = layout_grid(b, available_width, ctx->content);
+		b->float_container = NULL;
+		break;
 	default:
-		assert(0 && "Bad flex item back type");
-		success = false;
+		/* fixes174 — degrade unknown types to zero-height. The
+		 * old assert(0) crashed; the new behaviour matches every
+		 * other layout function in the engine. */
+		b->height = 0;
+		success = true;
 		break;
 	}
 
@@ -472,11 +488,24 @@ static bool layout_flex_ctx__populate_item_data(
 		if (b->type != BOX_BLOCK && b->type != BOX_TABLE &&
 				b->type != BOX_FLEX &&
 				b->type != BOX_INLINE_BLOCK &&
-				b->type != BOX_INLINE_FLEX) {
+				b->type != BOX_INLINE_FLEX &&
+				b->type != BOX_GRID &&
+				b->type != BOX_INLINE_GRID) {
+			/* fixes174 — was rejecting BOX_GRID/INLINE_GRID and
+			 * collapsing every Apple-style flex>grid container.
+			 * Now we accept grid types and dispatch them through
+			 * layout_grid in layout_flex_item_layout. Anything
+			 * still here is genuinely unknown — degrade to a
+			 * zero-height slot rather than failing the parent. */
 			macsurf_debug_log_writef(
-				"FLEXSAFE unsupported child type=%d flex=%p",
+				"FLEXSAFE unsupported child type=%d flex=%p"
+				" -> zero-height slot",
 				(int)b->type, (void *)flex);
-			return false;
+			b->height = 0;
+			/* continue past this item without populating it
+			 * into the flex item array. fall through to the
+			 * next iteration. */
+			continue;
 		}
 
 		item = &ctx->item.data[i++];
