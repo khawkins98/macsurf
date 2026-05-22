@@ -3609,26 +3609,26 @@ bool layout_block_context(
 	bool in_margin = false;
 	css_fixed gadget_size;
 	css_unit gadget_unit; /* Checkbox / radio buttons */
-	/* fixes161e — per-call BLOCK marker capped at first 200 calls
-	 * per redraw. Counter resets when macsurf_layout_seq changes
-	 * (incremented in layout_document). The last LAYOUTPHASE block
-	 * line in the truncated apple/huffpost log will name the exact
-	 * box where layout_block_context died. */
-	{
-		static long macsurf_lbc_calls = 0;
-		static long macsurf_lbc_seq = -1;
-		if (macsurf_lbc_seq != macsurf_layout_seq) {
-			macsurf_lbc_calls = 0;
-			macsurf_lbc_seq = macsurf_layout_seq;
-		}
-		macsurf_lbc_calls++;
-		if (macsurf_lbc_calls <= 200) {
-			macsurf_debug_log_writef(
-				"LAYOUTPHASE block #%ld box=%p type=%d w=%d h=%d",
-				macsurf_lbc_calls, (void *)block,
-				(int)block->type,
-				(int)block->width, (int)block->height);
-		}
+	/* fixes161f — function-scope phase counters shared by all
+	 * LAYOUTPHASE markers in this function. Entry/pre-loop/per-child/
+	 * exit markers all use macsurf_lbc_calls so we can correlate
+	 * "block #N entry" with "block #N pre-loop" etc. in the log. */
+	static long macsurf_lbc_calls = 0;
+	static long macsurf_lbc_seq = -1;
+	if (macsurf_lbc_seq != macsurf_layout_seq) {
+		macsurf_lbc_calls = 0;
+		macsurf_lbc_seq = macsurf_layout_seq;
+	}
+	macsurf_lbc_calls++;
+	if (macsurf_lbc_calls <= 200) {
+		/* fixes161e — entry probe. The last LAYOUTPHASE block line
+		 * in the truncated apple log will name the exact box where
+		 * layout_block_context died. */
+		macsurf_debug_log_writef(
+			"LAYOUTPHASE block #%ld box=%p type=%d w=%d h=%d",
+			macsurf_lbc_calls, (void *)block,
+			(int)block->type,
+			(int)block->width, (int)block->height);
 	}
 
 	assert(block->type == BOX_BLOCK ||
@@ -3750,6 +3750,16 @@ bool layout_block_context(
 	if (box)
 		box->y = block->padding[TOP];
 
+	/* fixes161f — pre-loop phase marker. Fires for the first 50 calls
+	 * per redraw. If "block #N entry" prints but "block #N pre-loop"
+	 * does not, apple crashes between entry and the while(box) loop
+	 * (object/gadget/replace_dim special cases). */
+	if (macsurf_lbc_calls <= 50) {
+		macsurf_debug_log_writef(
+			"LAYOUTPHASE block #%ld pre-loop first_child=%p",
+			macsurf_lbc_calls, (void *)box);
+	}
+
 	/* Step through the descendants of the block in depth-first order, but
 	 * not into the children of boxes which aren't blocks. For example, if
 	 * the tree passed to this function looks like this (box->type shown):
@@ -3782,6 +3792,30 @@ bool layout_block_context(
 				box->type == BOX_GRID ||
 				box->type == BOX_TABLE ||
 				box->type == BOX_INLINE_CONTAINER);
+
+		/* fixes161f — per-child marker inside the while(box) loop.
+		 * Capped at 30 total iterations per redraw so the log doesn't
+		 * blow up; combined with the 50-call cap on entry that's still
+		 * 30 leaf lines max. If "block #N pre-loop" fires and a few
+		 * "block #N child=..." fire but stop before block #M entry for
+		 * the descendant, apple's crash is in the dispatch code below
+		 * (find_sides / layout_block_find_dimensions / layout_table /
+		 *  layout_flex / inline_container dispatch). */
+		{
+			static long lbc_child_calls = 0;
+			static long lbc_child_seq = -1;
+			if (lbc_child_seq != macsurf_layout_seq) {
+				lbc_child_calls = 0;
+				lbc_child_seq = macsurf_layout_seq;
+			}
+			lbc_child_calls++;
+			if (lbc_child_calls <= 30) {
+				macsurf_debug_log_writef(
+					"LAYOUTPHASE block #%ld child=%p type=%d",
+					macsurf_lbc_calls,
+					(void *)box, (int)box->type);
+			}
+		}
 
 		/* Tables are laid out before being positioned, because the
 		 * position depends on the width which is calculated in
@@ -4193,6 +4227,16 @@ bool layout_block_context(
 				&fstyle, ta_width, ta_height,
 				block->padding[TOP], block->padding[RIGHT],
 				block->padding[BOTTOM], block->padding[LEFT]);
+	}
+
+	/* fixes161f — function-exit phase marker. If "block #N pre-loop"
+	 * prints but "block #N done" does not, apple crashes inside the
+	 * while(box) loop (which is most of the function body). The earlier
+	 * "block #N child=..." markers further narrow which child. */
+	if (macsurf_lbc_calls <= 50) {
+		macsurf_debug_log_writef(
+			"LAYOUTPHASE block #%ld done h=%d",
+			macsurf_lbc_calls, (int)block->height);
 	}
 
 	return true;
@@ -5647,6 +5691,13 @@ bool layout_document(html_content *content, int width, int height)
 		(int)ret, (void *)doc,
 		(int)doc->width, (int)doc->height);
 
+	/* fixes161f — tail-fixup pre/post markers. Huffpost's previous log
+	 * showed [doc post-block] firing then no [document exit], so the
+	 * crash is in one of the five tail steps below. Each is bracketed
+	 * so the next log identifies which step. */
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE doc tail pre-htmlbody doc_h=%d height=%d children=%p",
+		(int)doc->height, height, (void *)doc->children);
 	/* make <html> and <body> fill available height */
 	if (doc->y + doc->padding[TOP] + doc->height + doc->padding[BOTTOM] +
 			doc->border[BOTTOM].width + doc->margin[BOTTOM] <
@@ -5664,12 +5715,25 @@ bool layout_document(html_content *content, int width, int height)
 					 doc->children->border[BOTTOM].width +
 					 doc->children->margin[BOTTOM]);
 	}
+	macsurf_debug_log_writef(
+		"LAYOUTPHASE doc tail post-htmlbody doc_h=%d",
+		(int)doc->height);
 
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-lists");
 	layout_lists(content, doc);
-	layout_position_absolute(doc, doc, 0, 0, content);
-	layout_position_relative(&content->unit_len_ctx, doc, doc, 0, 0);
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-lists");
 
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-abs");
+	layout_position_absolute(doc, doc, 0, 0, content);
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-abs");
+
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-rel");
+	layout_position_relative(&content->unit_len_ctx, doc, doc, 0, 0);
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-rel");
+
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-bbox");
 	layout_calculate_descendant_bboxes(&content->unit_len_ctx, doc);
+	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-bbox");
 
 	/* fixes161d — see entry probe. */
 	macsurf_debug_log_writef(
