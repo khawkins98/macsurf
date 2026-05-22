@@ -46,6 +46,48 @@
  * LAYOUTPHASE flex marker. Compiles to a no-op in release builds. */
 #include "macsurf_debug.h"
 
+/* fixes167 — flex survival caps. Apple and HuffPost both reach the
+ * flex code with degenerate inputs: AUTO main availability on a
+ * nested column-direction container, child counts that exceed any
+ * realistic page (broken sub-resources), or items the engine cannot
+ * base-size cleanly. Spec flexbox is undefined on those inputs.
+ *
+ * Rather than crash mid-redraw or leave the box tree in a partial
+ * state that the document tail (abs/rel/bbox) walks into and crashes
+ * on, this round converts any unsafe flex container locally into
+ * block-flow: children stack top-to-bottom inside the container,
+ * heights resolve concretely, and layout_document continues with
+ * abs/rel/bbox running normally over the whole tree. Other (working)
+ * flex containers on the same page are untouched.
+ *
+ * FLEX_SAFE_MAX bounds any sanitized dimension to a value that
+ * cannot overflow the Mac32 signed coord space when summed with
+ * neighbours; FLEX_MAX_ITEMS / FLEX_MAX_LINES catch runaway counts
+ * from a broken DOM. */
+#define FLEX_SAFE_MAX  1000000
+#define FLEX_MAX_ITEMS 512
+#define FLEX_MAX_LINES 512
+
+/* fixes167a — finite-dimension sanitizer. Replace AUTO, negative,
+ * or absurdly large with the caller-supplied fallback. After this
+ * call the return value is in [0, FLEX_SAFE_MAX]. */
+static int flex_safe_dim(int v, int fallback)
+{
+	if (v == AUTO) return fallback;
+	if (v < 0) return fallback;
+	if (v > FLEX_SAFE_MAX) return fallback;
+	return v;
+}
+
+/* fixes167a — fallback that's known to be in range. Used when the
+ * caller has nothing better. */
+static int flex_safe_fallback_dim(int fallback)
+{
+	if (fallback < 0) return 0;
+	if (fallback > FLEX_SAFE_MAX) return FLEX_SAFE_MAX;
+	return fallback;
+}
+
 /**
  * Flex item data
  */
@@ -304,6 +346,21 @@ static inline bool layout_flex__base_and_main_sizes(
 	NSLOG(flex, DEEPDEBUG, "box %p: delta_outer_main: %i",
 			b, delta_outer_main);
 
+	/* fixes167b — defensive: caller passes a sanitized available_width
+	 * but min/max widths from a degenerate minmax pass can still be
+	 * AUTO or absurd. Clamp before they get folded into base_size. */
+	if (content_min_width == AUTO || content_min_width < 0 ||
+			content_min_width > FLEX_SAFE_MAX) {
+		content_min_width = 0;
+	}
+	if (content_max_width == AUTO || content_max_width < 0 ||
+			content_max_width > FLEX_SAFE_MAX) {
+		content_max_width = available_width;
+	}
+	if (delta_outer_main < 0 || delta_outer_main > FLEX_SAFE_MAX) {
+		delta_outer_main = 0;
+	}
+
 	if (item->basis == CSS_FLEX_BASIS_SET) {
 		if (item->basis_unit == CSS_UNIT_PCT) {
 			item->base_size = FPCT_OF_INT_TOINT(
@@ -373,8 +430,10 @@ static inline bool layout_flex__base_and_main_sizes(
  * \param[in] ctx              Flex layout context
  * \param[in] flex             Flex box
  * \param[in] available_width  Available width in pixels
+ * \return true on success, false if any child cannot be base-sized
+ *         (caller should fall back to block-flow). fixes167b.
  */
-static void layout_flex_ctx__populate_item_data(
+static bool layout_flex_ctx__populate_item_data(
 		const struct flex_ctx *ctx,
 		const struct box *flex,
 		int available_width)
@@ -382,12 +441,44 @@ static void layout_flex_ctx__populate_item_data(
 	size_t i = 0;
 	bool horizontal = ctx->horizontal;
 	struct box *b;
+	int safe_avail;
+
+	/* fixes167b — sanitize available_width once; it feeds every
+	 * child's base-size math and percentage flex-basis resolution.
+	 * AUTO would propagate as INT_MIN through arithmetic. */
+	safe_avail = flex_safe_dim(available_width, 0);
 
 	for (b = flex->children; b != NULL; b = b->next) {
-		struct flex_item_data *item = &ctx->item.data[i++];
+		struct flex_item_data *item;
+
+		/* fixes167b — cap; broken DOM with thousands of flex
+		 * children shouldn't bring down the redraw. */
+		if (i >= ctx->item.count) {
+			macsurf_debug_log_writef(
+				"FLEXSAFE child overflow flex=%p i=%d cap=%d",
+				(void *)flex, (int)i, (int)ctx->item.count);
+			return false;
+		}
+		if (i >= FLEX_MAX_ITEMS) {
+			macsurf_debug_log_writef(
+				"FLEXSAFE child cap-reached flex=%p i=%d",
+				(void *)flex, (int)i);
+			return false;
+		}
+		if (b->type != BOX_BLOCK && b->type != BOX_TABLE &&
+				b->type != BOX_FLEX &&
+				b->type != BOX_INLINE_BLOCK &&
+				b->type != BOX_INLINE_FLEX) {
+			macsurf_debug_log_writef(
+				"FLEXSAFE unsupported child type=%d flex=%p",
+				(int)b->type, (void *)flex);
+			return false;
+		}
+
+		item = &ctx->item.data[i++];
 
 		b->float_container = b->parent;
-		layout_find_dimensions(ctx->unit_len_ctx, available_width, -1,
+		layout_find_dimensions(ctx->unit_len_ctx, safe_avail, -1,
 				b, b->style, &b->width, &b->height,
 				horizontal ? &item->max_main : &item->max_cross,
 				horizontal ? &item->min_main : &item->min_cross,
@@ -427,8 +518,39 @@ static void layout_flex_ctx__populate_item_data(
 		css_computed_flex_shrink(b->style, &item->shrink);
 		css_computed_flex_grow(b->style, &item->grow);
 
-		layout_flex__base_and_main_sizes(ctx, item, available_width);
+		/* fixes167b — pass the sanitized available width. A
+		 * per-child base-size failure (return false from the
+		 * recursive layout_flex_item it kicks off for column
+		 * direction) is treated as a fallback signal for the
+		 * whole container; the caller will rebuild the children
+		 * as block flow. */
+		if (!layout_flex__base_and_main_sizes(ctx, item, safe_avail)) {
+			macsurf_debug_log_writef(
+				"FLEXSAFE base-size failed flex=%p item=%d box=%p",
+				(void *)flex, (int)(i - 1), (void *)b);
+			return false;
+		}
+
+		/* fixes167b — sanitize the per-item state that the line
+		 * collector reads. main_size and target_main_size feed
+		 * arithmetic against available_main; AUTO/negative would
+		 * propagate. */
+		if (item->base_size == AUTO || item->base_size < 0 ||
+				item->base_size > FLEX_SAFE_MAX) {
+			item->base_size = 0;
+		}
+		if (item->main_size == AUTO || item->main_size < 0 ||
+				item->main_size > FLEX_SAFE_MAX) {
+			item->main_size = item->base_size;
+		}
+		if (item->target_main_size == AUTO ||
+				item->target_main_size < 0 ||
+				item->target_main_size > FLEX_SAFE_MAX) {
+			item->target_main_size = item->main_size;
+		}
 	}
+
+	return true;
 }
 
 /**
@@ -1293,6 +1415,120 @@ static void layout_flex__place_lines(struct flex_ctx *ctx)
 }
 
 /**
+ * fixes167c — block-flow fallback for an unsafe flex container.
+ *
+ * Stacks the flex container's children top-to-bottom as a vertical
+ * block flow. Used when the spec flex algorithm cannot produce a
+ * valid layout (AUTO main-axis availability with content-dependent
+ * children, item-count overflow, mid-pass failure of a child's base
+ * size). Sets each child's x/y and the container's height so the
+ * tree is consistent and walkable by the document tail (abs/rel/bbox).
+ *
+ * Guaranteed not to dereference NULL boxes, not to recurse beyond
+ * FLEX_MAX_ITEMS children, not to assign a height larger than
+ * FLEX_SAFE_MAX. Per-child layout failures are tolerated; the child
+ * is left at height 0 and the next child stacks below.
+ *
+ * Returns true unconditionally (the caller should use the return
+ * value of layout_flex itself).
+ */
+static bool layout_flex_fallback_block(struct box *flex, int available_width,
+		html_content *content)
+{
+	struct box *c;
+	int y;
+	int avail;
+	int top_offset;
+	int n = 0;
+
+	if (flex == NULL) {
+		return false;
+	}
+
+	/* Sanitize the container's width so children don't inherit AUTO. */
+	avail = flex_safe_dim(available_width, 0);
+	if (flex->width == AUTO || flex->width <= 0 ||
+			flex->width > FLEX_SAFE_MAX) {
+		flex->width = avail;
+	}
+
+	top_offset = flex->padding[TOP] + flex->border[TOP].width;
+	y = top_offset;
+
+	for (c = flex->children; c != NULL; c = c->next) {
+		int child_avail;
+		bool ok = true;
+
+		n++;
+		if (n > FLEX_MAX_ITEMS) break;
+
+		/* Drop flex-item residue so the child is a plain block of
+		 * the flex container. */
+		c->float_container = NULL;
+
+		child_avail = flex->width;
+		if (child_avail < 0) child_avail = 0;
+		if (child_avail > FLEX_SAFE_MAX) child_avail = FLEX_SAFE_MAX;
+
+		if (c->width == AUTO || c->width < 0 ||
+				c->width > FLEX_SAFE_MAX) {
+			c->width = child_avail;
+		}
+
+		switch (c->type) {
+		case BOX_BLOCK:
+		case BOX_INLINE_BLOCK:
+			ok = layout_block_context(c, -1, content);
+			break;
+		case BOX_TABLE:
+			c->float_container = c->parent;
+			ok = layout_table(c, child_avail, content);
+			c->float_container = NULL;
+			break;
+		case BOX_FLEX:
+		case BOX_INLINE_FLEX:
+			c->float_container = c->parent;
+			ok = layout_flex(c, child_avail, content);
+			c->float_container = NULL;
+			break;
+		default:
+			ok = true;
+			break;
+		}
+		(void)ok;
+
+		if (c->height == AUTO || c->height < 0) c->height = 0;
+		if (c->height > FLEX_SAFE_MAX) c->height = FLEX_SAFE_MAX;
+		if (c->width == AUTO || c->width < 0) c->width = 0;
+		if (c->width > FLEX_SAFE_MAX) c->width = FLEX_SAFE_MAX;
+
+		c->x = flex->padding[LEFT] + flex->border[LEFT].width +
+				lh__non_auto_margin(c, LEFT) +
+				c->border[LEFT].width;
+		c->y = y + lh__non_auto_margin(c, TOP) +
+				c->border[TOP].width;
+
+		y = c->y + c->height + c->padding[BOTTOM] +
+				c->border[BOTTOM].width +
+				lh__non_auto_margin(c, BOTTOM);
+		if (y < 0) y = 0;
+		if (y > FLEX_SAFE_MAX) y = FLEX_SAFE_MAX;
+	}
+
+	if (flex->height == AUTO || flex->height < 0) {
+		flex->height = y - top_offset;
+		if (flex->height < 0) flex->height = 0;
+	}
+	if (flex->height > FLEX_SAFE_MAX) flex->height = FLEX_SAFE_MAX;
+
+	macsurf_debug_log_writef(
+		"FLEXSAFE fallback box=%p children=%d w=%d h=%d",
+		(void *)flex, n, (int)flex->width, (int)flex->height);
+
+	return true;
+}
+
+/**
  * Layout a flex container.
  *
  * \param[in] flex             table to layout
@@ -1365,10 +1601,53 @@ bool layout_flex(struct box *flex, int available_width,
 		ctx->available_cross = available_width;
 	}
 
+	/* fixes167a — sanitize available_main and available_cross before
+	 * they reach the base-size pass. Apple's nested column-direction
+	 * flex container reaches this point with available_main = AUTO
+	 * (INT_MIN); subsequent arithmetic against it overflows or
+	 * produces garbage offsets. A finite fallback derived from the
+	 * cross dimension and the containing block lets the pass
+	 * complete; if the spec layout still can't finish, the caller
+	 * routes to layout_flex_fallback_block. The 'AUTO' state itself
+	 * is still meaningful to layout_flex__build_line (it disables
+	 * wrap-test arithmetic), so we preserve it via a separate flag
+	 * only inside that function and not by mutating ctx here.
+	 *
+	 * We DO sanitize negatives and absurdly-large values eagerly;
+	 * AUTO is treated specially by the consumers and only converted
+	 * to a finite value at use sites where it cannot be tolerated
+	 * (base_size pass uses safe_avail). */
+	if (ctx->available_main != AUTO) {
+		if (ctx->available_main < 0 ||
+				ctx->available_main > FLEX_SAFE_MAX) {
+			ctx->available_main = flex_safe_fallback_dim(
+				available_width);
+		}
+	}
+	if (ctx->available_cross != AUTO) {
+		if (ctx->available_cross < 0 ||
+				ctx->available_cross > FLEX_SAFE_MAX) {
+			ctx->available_cross = flex_safe_fallback_dim(
+				available_width);
+		}
+	}
+
 	NSLOG(flex, DEEPDEBUG, "box %p: available_main: %i",
 			flex, ctx->available_main);
 	NSLOG(flex, DEEPDEBUG, "box %p: available_cross: %i",
 			flex, ctx->available_cross);
+
+	/* fixes167b — cap on per-container item count. If the DOM
+	 * produced more children than FLEX_MAX_ITEMS we cannot safely
+	 * base-size them all; fall back to block flow immediately. */
+	if (ctx->item.count > FLEX_MAX_ITEMS) {
+		macsurf_debug_log_writef(
+			"FLEXSAFE item-count over cap flex=%p count=%d",
+			(void *)flex, (int)ctx->item.count);
+		layout_flex_ctx__destroy(ctx);
+		return layout_flex_fallback_block(flex, available_width,
+				content);
+	}
 
 	/* fixes166 -- shared FLEXPHASE probes capped at first 200 flex calls
 	 * per redraw (same cap as the entry-FLEX marker). Tags each phase
@@ -1390,7 +1669,16 @@ bool layout_flex(struct box *flex, int available_width,
 		}
 	}
 
-	layout_flex_ctx__populate_item_data(ctx, flex, available_width);
+	/* fixes167b — populate now returns bool. A failing child kicks
+	 * the whole container into block-flow fallback. */
+	if (!layout_flex_ctx__populate_item_data(ctx, flex, available_width)) {
+		layout_flex_ctx__destroy(ctx);
+		macsurf_debug_log_writef(
+			"FLEXSAFE populate failed flex=%p -> block fallback",
+			(void *)flex);
+		return layout_flex_fallback_block(flex, available_width,
+				content);
+	}
 
 	{
 		extern long macsurf_layout_seq;
@@ -1415,7 +1703,25 @@ bool layout_flex(struct box *flex, int available_width,
 	/* Place items onto lines. */
 	success = layout_flex__collect_items_into_lines(ctx);
 	if (!success) {
-		goto cleanup;
+		layout_flex_ctx__destroy(ctx);
+		macsurf_debug_log_writef(
+			"FLEXSAFE collect failed flex=%p -> block fallback",
+			(void *)flex);
+		return layout_flex_fallback_block(flex, available_width,
+				content);
+	}
+
+	/* fixes167b — runaway line count guard. The collector is bounded
+	 * by item count, but a degenerate wrap pattern can still produce
+	 * one line per item. Cap at FLEX_MAX_LINES; over the cap, fall
+	 * back to block. */
+	if (ctx->line.count > FLEX_MAX_LINES) {
+		layout_flex_ctx__destroy(ctx);
+		macsurf_debug_log_writef(
+			"FLEXSAFE line-count over cap flex=%p lines=%d",
+			(void *)flex, (int)ctx->line.count);
+		return layout_flex_fallback_block(flex, available_width,
+				content);
 	}
 
 	{
@@ -1471,7 +1777,11 @@ bool layout_flex(struct box *flex, int available_width,
 
 	success = true;
 
-cleanup:
+	/* fixes167b — note: failure paths above destroy ctx and return
+	 * through layout_flex_fallback_block; control only reaches here
+	 * on the success path, so 'cleanup:' is no longer needed as a
+	 * label. The exit FLEXPHASE probe still fires for the success
+	 * case. */
 	{
 		extern long macsurf_layout_seq;
 		static long macsurf_flexphase5_seq = -1;

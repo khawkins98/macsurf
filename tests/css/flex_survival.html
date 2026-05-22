@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>flex survival test (fixes167)</title>
+<style>
+body { font-family: Geneva; margin: 8px; background: #fff; color: #000; }
+.label { font-size: 10pt; margin: 6px 0 2px 0; font-weight: bold; }
+.cell { background: #336; color: #fff; padding: 6px; margin: 2px; }
+.frame { background: #eee; border: 1px solid #999; margin-bottom: 10px; padding: 4px; }
+
+/* F1: row-direction flex with auto width. Common pattern; should spec-layout
+   cleanly and not trip the fallback. */
+.row-auto { display: flex; width: 100%; }
+.row-auto .cell { flex: 1; }
+
+/* F2: column-direction flex with no explicit height. This is the apple
+   crash signature: available_main = AUTO on a vertical container. Spec
+   says use max-content fallback; we previously crashed in the nested
+   case. With fixes167 it lays out cleanly or falls back to block-flow
+   (same visual result either way for a column flex). */
+.column-auto { display: flex; flex-direction: column; height: auto; }
+.column-auto .cell { background: #633; }
+
+/* F3: nested flex (outer row containing an inner column with no height).
+   Reproduces apple's exact crash signature. */
+.nested-flex .outer { display: flex; }
+.nested-flex .outer > div { flex: 1; padding: 4px; }
+.nested-flex .inner { display: flex; flex-direction: column; }
+.nested-flex .inner .cell { background: #363; }
+
+/* F4: aspect-ratio flex item. NetSurf's flex pass interacts with the
+   aspect-ratio shim; this used to squash logos to 1058x28. fixes119
+   addressed it; this card guards against regression. */
+.aspect-flex { display: flex; align-items: flex-start; }
+.aspect-flex .left {
+    background: #cce;
+    width: 96px;
+    height: 96px;
+    aspect-ratio: 1;
+    margin-right: 8px;
+}
+.aspect-flex .right { flex: 1; }
+</style>
+</head>
+<body>
+<h1>flex survival probes (fixes167)</h1>
+
+<div class="label">F1 row-auto: three equal cells across full width.</div>
+<div class="frame row-auto">
+  <span class="cell">F1-a</span>
+  <span class="cell">F1-b</span>
+  <span class="cell">F1-c</span>
+</div>
+
+<div class="label">F2 column-auto: three cells stacked vertically, container height auto.</div>
+<div class="frame column-auto">
+  <span class="cell">F2-a</span>
+  <span class="cell">F2-b</span>
+  <span class="cell">F2-c</span>
+</div>
+
+<div class="label">F3 nested-flex: outer row, each cell contains an inner column.</div>
+<div class="frame nested-flex">
+  <div class="outer">
+    <div>
+      <div class="inner">
+        <span class="cell">F3-a1</span>
+        <span class="cell">F3-a2</span>
+      </div>
+    </div>
+    <div>
+      <div class="inner">
+        <span class="cell">F3-b1</span>
+        <span class="cell">F3-b2</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="label">F4 aspect-flex: 96x96 square + flex-1 caption beside it.</div>
+<div class="frame aspect-flex">
+  <div class="left">img</div>
+  <div class="right">
+    Caption text grows to fill the remaining row width while the square
+    on the left keeps its aspect ratio.
+  </div>
+</div>
+
+<p>Acceptance: no crash on any of F1-F4. Visual fidelity may degrade in
+F2 / F3 to plain block-stack rendering; that is the intended fallback
+and is preferred over a partial-layout coordinate collapse.</p>
+
+</body>
+</html>
