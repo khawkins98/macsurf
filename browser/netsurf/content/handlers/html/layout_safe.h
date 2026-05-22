@@ -161,16 +161,15 @@ static int layout_dim_clamp(int v)
  * bail with the zero-height fallback BEFORE calling exit.
  * ============================================================ */
 
-/* CW8 partition is 16MB; deeply-nested modern HTML (Apple, BBC)
- * has been observed in the 60-80 range. 200 leaves comfortable
- * head-room and still catches genuine pathology. */
-#define MACSURF_LAYOUT_MAX_DEPTH 200
-
-/* One html_reformat traversal of a typical modern page (mactrove,
- * wikipedia) is in the 5_000-20_000 range. Apple is heavier but
- * realistic measurements top out under 100k. 300_000 is well
- * above that ceiling while still catching infinite cycles. */
-#define MACSURF_LAYOUT_MAX_CALLS 300000
+/* No depth cap, no call cap. A real browser loads whatever it
+ * is given; an artificial budget just converts "loads slowly"
+ * into "doesn't load". The wrapper machinery stays so the
+ * breadcrumb still fires on layout_document entry for crash
+ * forensics, but layout_watchdog_enter is a pure pass-through.
+ *
+ * If the platform's thread stack genuinely overflows, that's
+ * a real crash worth fixing at the recursion site, not papering
+ * over with a counter. */
 
 /* Globals defined in layout.c. Declared extern here so every
  * layout_*.c file can read/write them without circular includes. */
@@ -197,26 +196,12 @@ extern void macsurf_layout_breadcrumb(const char *phase, const void *box);
 static int layout_watchdog_enter(const void *box)
 {
 	(void)box;
+	/* Counters tracked so the breadcrumb / SITE log can report
+	 * peak depth and total call count for diagnostics, but the
+	 * function NEVER returns 1: there is no budget. The browser
+	 * loads whatever it is given. */
 	macsurf_layout_calls++;
-	if (macsurf_layout_calls > MACSURF_LAYOUT_MAX_CALLS) {
-		if (macsurf_layout_aborted == 0) {
-			macsurf_layout_aborted = 1;
-			/* one-shot log; subsequent trips stay silent
-			 * so the log file isn't flooded. */
-			macsurf_layout_breadcrumb("WATCHDOG calls", box);
-		}
-		return 1;
-	}
 	macsurf_layout_depth++;
-	if (macsurf_layout_depth > MACSURF_LAYOUT_MAX_DEPTH) {
-		if (macsurf_layout_aborted == 0) {
-			macsurf_layout_aborted = 1;
-			macsurf_layout_breadcrumb("WATCHDOG depth", box);
-		}
-		/* don't leave depth elevated — pop ourselves */
-		macsurf_layout_depth--;
-		return 1;
-	}
 	return 0;
 }
 

@@ -5,6 +5,51 @@
 #ifndef MACSURF_PREFIX_H
 #define MACSURF_PREFIX_H
 
+/* ============================================================
+ * fixes173 — Non-fatal assertions.
+ *
+ * NetSurf core ships with hundreds of assert(...) calls in
+ * layout, CSS cascade, libdom, hubbub, etc. With NDEBUG not
+ * defined, every one of them aborts the process on failure.
+ *
+ * On constrained classic Mac targets that means: any modern
+ * page whose DOM or CSS produces an unexpected-but-recoverable
+ * box-tree state (Apple, BBC, HuffPost, Pinterest) terminates
+ * MacSurf via abort() before a single pixel is drawn.
+ *
+ * Real shipped browsers (Mozilla, Chrome, WebKit, Classilla)
+ * compile assertions out in release builds or downgrade them
+ * to log-and-continue. MacSurf does the same here: override
+ * the C library assert() macro to write a one-line breadcrumb
+ * to the debug log instead of calling abort(). The browser
+ * continues; the offending subtree may render oddly; the
+ * page loads.
+ *
+ * Must be defined BEFORE any standard header includes <assert.h>
+ * so MSL's <assert.h> never installs its own macro.
+ *
+ * Tradeoff: assertions that detect actual memory corruption
+ * no longer halt execution. That's the same tradeoff every
+ * shipping browser makes. Diagnostic builds can re-enable the
+ * real assert by defining MACSURF_REAL_ASSERTS=1. */
+#ifndef MACSURF_REAL_ASSERTS
+#ifndef NDEBUG
+#define NDEBUG 1
+#endif
+/* Belt-and-braces: define our own assert macro in case some TU
+ * already pulled in <assert.h> before this prefix takes effect.
+ * The macro evaluates the expression for side effects (some
+ * NetSurf asserts do meaningful work), logs on failure if the
+ * debug log is available, and returns to the caller. */
+#define assert(expr) \
+	((void)((expr) ? 0 : \
+		(macsurf_assert_failed_(#expr, __FILE__, __LINE__), 0)))
+
+/* Declared early so every TU can call it through the assert
+ * macro. The implementation is in macsurf_debug_log.c. */
+void macsurf_assert_failed_(const char *expr, const char *file, int line);
+#endif
+
 /* Block MSL C++ headers */
 #define _CSTDINT
 #define _CINTTYPES
