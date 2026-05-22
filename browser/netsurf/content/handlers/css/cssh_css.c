@@ -101,9 +101,14 @@ typedef struct nscss_content
  * fixes161c — raised to 256 KB. The Apple post-READY crash log
  * (2026-05-21) showed two ~149 KB Apple sheets being dropped, leaving
  * the page in a half-styled cascade state that contributed to the
- * downstream crash. 256 KB covers Apple's full theme bundle while
- * still keeping out genuinely monster sheets. */
-#define MACOS9_CSS_MAX_BYTES (256UL * 1024UL)
+ * downstream crash.
+ *
+ * fixes174 — raised to 1 MB. Apple's iPhone page ships a 289 KB
+ * overview.built.css that was still being dropped at 256 KB,
+ * leaving the page unstyled in places. Browsers are supposed to
+ * load whatever they're given; the 16 MB Carbon partition has
+ * room for it. Now matches the per-entry HTTP cache cap. */
+#define MACOS9_CSS_MAX_BYTES (1024UL * 1024UL)
 
 /**
  * Context for import fetches
