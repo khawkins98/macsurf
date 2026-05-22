@@ -5733,28 +5733,31 @@ bool layout_document(html_content *content, int width, int height)
 		(int)ret, (void *)doc,
 		(int)doc->width, (int)doc->height);
 
-	/* fixes164 — partial-layout detection. layout_block_context can
-	 * return ret=true with doc->height == 0 when the box-tree contains
-	 * degenerate intermediates (huffpost: w=0 flex item inside a flex
-	 * container, layout collapses to zero overall doc height). The
-	 * htmlbody-fill block below then bumps doc->height up to viewport
-	 * height for paint sizing, but the underlying CSS containing-block
-	 * dimensions stay at zero. Running layout_position_absolute /
-	 * layout_position_relative against that state derefs through the
-	 * box tree looking for positioned descendants, and CSS 2.1
-	 * positional math (which all reads containing_block->width /
-	 * height) is undefined for zero containing blocks. Huffpost crashes
-	 * inside layout_position_absolute's recursion every time on this
-	 * tree.
+	/* fixes167d — partial-layout policy update. Previously
+	 * (fixes164/fixes165) any layout_block_context that returned
+	 * doc->height==0 caused the document tail (abs/rel/bbox) to be
+	 * skipped globally and bbox descendant recursion to be skipped
+	 * entirely. That produced the "alive but unpositioned" failure
+	 * mode visible on huffpost / drudge / npr where every text run
+	 * paints at a single (8,46)-ish coordinate because no box ever
+	 * gets a position from layout_position_absolute, nor a bbox
+	 * from layout_calculate_descendant_bboxes.
 	 *
-	 * Capture the pre-fill height as the "did layout actually
-	 * complete" signal: if it's > 0 (or layout_block_context returned
-	 * false explicitly), positional passes are skipped and we go
-	 * straight to bbox computation. Lists pass is always safe via
-	 * fixes163 and runs regardless. The page renders at static
-	 * positions; absolute-positioned overlays (modals, dropdowns)
-	 * end up inline at their static x/y instead of overlapping
-	 * content. That's the right trade-off versus crashing. */
+	 * fixes167's flex survival layer now converts any flex container
+	 * that the spec algorithm cannot finish into a block-flow stack
+	 * locally, with concrete heights. After that, the box tree is
+	 * walkable: every box has a valid height, every container has
+	 * non-AUTO descendants. The tail passes are safe to run.
+	 *
+	 * New policy: run abs/rel/bbox whenever layout_block_context
+	 * returned true. If it returned false, treat that as the only
+	 * catastrophic signal — set a safe doc bbox and skip the tail.
+	 * doc->height==0 is no longer interpreted as failure; it's a
+	 * legitimate state for an empty document and the htmlbody-fill
+	 * block below grows it before bbox runs.
+	 *
+	 * Capture pre-fill height for instrumentation only; gate uses
+	 * `ret` alone. */
 	doc_h_after_block = (int)doc->height;
 
 	/* fixes161f — tail-fixup pre/post markers. */
@@ -5786,8 +5789,16 @@ bool layout_document(html_content *content, int width, int height)
 	layout_lists(content, doc);
 	macsurf_debug_log_writef("LAYOUTPHASE doc tail post-lists");
 
-	if (ret && doc_h_after_block > 0) {
-		macsurf_debug_log_writef("LAYOUTPHASE doc tail pre-abs");
+	/* fixes167d — gate now hangs on `ret` alone. doc_h_after_block is
+	 * kept in the log for diagnostics but no longer gates the tail.
+	 * The local flex-fallback in layout_flex.c guarantees a walkable
+	 * tree even when individual flex containers cannot complete spec
+	 * layout, so the tail passes are safe on pages that previously
+	 * tripped the partial-layout escape. */
+	if (ret) {
+		macsurf_debug_log_writef(
+			"LAYOUTPHASE doc tail pre-abs doc_h_pre_fill=%d",
+			doc_h_after_block);
 		layout_position_absolute(doc, doc, 0, 0, content);
 		macsurf_debug_log_writef("LAYOUTPHASE doc tail post-abs");
 
@@ -5800,13 +5811,13 @@ bool layout_document(html_content *content, int width, int height)
 		macsurf_debug_log_writef("LAYOUTPHASE doc tail post-bbox");
 	} else {
 		macsurf_debug_log_writef(
-			"LAYOUTPHASE doc tail partial-layout: "
+			"LAYOUTPHASE doc tail catastrophic: "
 			"ret=%d doc_h_pre_fill=%d - skipping abs/rel/bbox",
 			(int)ret, doc_h_after_block);
-		/* fixes165 — bbox recursion asserts box->height != AUTO and the
-		 * tree has dangling h=AUTO children when block layout returned
-		 * h=0. Set doc's own bbox to its border-edge bounds so redraw
-		 * has a valid root rect; skip descendant recursion entirely. */
+		/* Root block layout returned false. The tree may have AUTO
+		 * heights anywhere; bbox recursion's assert would fire. Set
+		 * doc's own bbox to its border-edge bounds so redraw has a
+		 * valid root rect; skip descendant recursion entirely. */
 		doc->descendant_x0 = 0;
 		doc->descendant_y0 = 0;
 		doc->descendant_x1 = doc->width;
