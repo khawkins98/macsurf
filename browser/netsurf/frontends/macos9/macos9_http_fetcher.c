@@ -384,63 +384,109 @@ static int mfs_open(struct macos9_fetch_ctx *c) {
 	 * the origin close after the response, which OTRcv reports as
 	 * n==0 and we transition to MFS_DONE. Cost: one TCP setup per
 	 * direct fetch. Still saves the Hetzner round-trip vs proxy. */
-	if (use_proxy) {
-		u_full = nsurl_access(c->url);
-		macsurf_debug_log_writef("mfs_open: GET (proxy) %s",
-				u_full ? u_full : "(null)");
-		sprintf(req,
-			"GET %s HTTP/1.1\r\n"
-			"Host: %.*s\r\n"
-			"User-Agent: MacSurf/0.2\r\n"
-			"Accept: */*\r\n"
-			"Connection: keep-alive\r\n\r\n",
-			u_full, (int)host_len, host_str);
-	} else {
-		path_lwc = nsurl_get_component(c->url, NSURL_PATH);
-		query_lwc = nsurl_get_component(c->url, NSURL_QUERY);
-		{
-			const char *p_str = NULL;
-			size_t p_len = 0;
-			const char *q_str = NULL;
-			size_t q_len = 0;
-			if (path_lwc != NULL && lwc_string_length(path_lwc) > 0) {
-				p_str = lwc_string_data(path_lwc);
-				p_len = lwc_string_length(path_lwc);
+	/* fixes169 (SAFETY_REPORT §3) — bound the request-line write. The
+	 * template constant is 86 chars; the variable part is the URL (or
+	 * path?query) plus the host. Refuse the fetch if the combined
+	 * length would exceed sizeof(req)-1 so sprintf cannot overrun the
+	 * stack. CW8's MSL has no snprintf, so we size-check first and
+	 * keep sprintf for the actual format. */
+	{
+		/* Length of the constant template (without %-substitutions). */
+		size_t TEMPLATE_LEN = 86;
+		if (use_proxy) {
+			size_t u_len;
+			u_full = nsurl_access(c->url);
+			if (u_full == NULL) {
+				MS_LOG("mfs_open: nsurl_access NULL");
+				goto fail_unref;
 			}
-			if (query_lwc != NULL && lwc_string_length(query_lwc) > 0) {
-				q_str = lwc_string_data(query_lwc);
-				q_len = lwc_string_length(query_lwc);
+			u_len = strlen(u_full);
+			if (TEMPLATE_LEN + u_len + host_len + 1 > sizeof(req)) {
+				macsurf_debug_log_writef(
+					"mfs_open: REJECT oversize URL "
+					"u_len=%lu host_len=%lu cap=%lu",
+					(unsigned long)u_len,
+					(unsigned long)host_len,
+					(unsigned long)sizeof(req));
+				c->err = "URL too long";
+				goto fail_unref;
 			}
-			if (p_str == NULL) {
-				strcpy(path_buf, "/");
-			} else if (q_str == NULL) {
-				if (p_len >= sizeof(path_buf)) p_len = sizeof(path_buf) - 1;
-				memcpy(path_buf, p_str, p_len);
-				path_buf[p_len] = '\0';
-			} else {
-				size_t total = p_len + 1 + q_len;
-				if (total >= sizeof(path_buf)) total = sizeof(path_buf) - 1;
-				sprintf(path_buf, "%.*s?%.*s",
-					(int)p_len, p_str,
-					(int)q_len, q_str);
-				path_buf[sizeof(path_buf) - 1] = '\0';
-				(void)total;
+			macsurf_debug_log_writef("mfs_open: GET (proxy) %s",
+					u_full);
+			sprintf(req,
+				"GET %s HTTP/1.1\r\n"
+				"Host: %.*s\r\n"
+				"User-Agent: MacSurf/0.2\r\n"
+				"Accept: */*\r\n"
+				"Connection: keep-alive\r\n\r\n",
+				u_full, (int)host_len, host_str);
+		} else {
+			size_t pb_used;
+			path_lwc = nsurl_get_component(c->url, NSURL_PATH);
+			query_lwc = nsurl_get_component(c->url, NSURL_QUERY);
+			{
+				const char *p_str = NULL;
+				size_t p_len = 0;
+				const char *q_str = NULL;
+				size_t q_len = 0;
+				if (path_lwc != NULL && lwc_string_length(path_lwc) > 0) {
+					p_str = lwc_string_data(path_lwc);
+					p_len = lwc_string_length(path_lwc);
+				}
+				if (query_lwc != NULL && lwc_string_length(query_lwc) > 0) {
+					q_str = lwc_string_data(query_lwc);
+					q_len = lwc_string_length(query_lwc);
+				}
+				if (p_str == NULL) {
+					strcpy(path_buf, "/");
+					pb_used = 1;
+				} else if (q_str == NULL) {
+					if (p_len >= sizeof(path_buf))
+						p_len = sizeof(path_buf) - 1;
+					memcpy(path_buf, p_str, p_len);
+					path_buf[p_len] = '\0';
+					pb_used = p_len;
+				} else {
+					/* fixes169 (SAFETY_REPORT §3) — bound
+					 * path?query writes to path_buf. Truncate
+					 * path then query so the assembly fits in
+					 * the buffer with room for '?' and NUL. */
+					size_t cap = sizeof(path_buf) - 2;
+					if (p_len > cap) p_len = cap;
+					if (p_len + q_len > cap)
+						q_len = cap - p_len;
+					memcpy(path_buf, p_str, p_len);
+					path_buf[p_len] = '?';
+					memcpy(path_buf + p_len + 1, q_str, q_len);
+					path_buf[p_len + 1 + q_len] = '\0';
+					pb_used = p_len + 1 + q_len;
+				}
 			}
+			if (TEMPLATE_LEN + pb_used + host_len + 1 > sizeof(req)) {
+				macsurf_debug_log_writef(
+					"mfs_open: REJECT oversize req "
+					"pb=%lu host_len=%lu cap=%lu",
+					(unsigned long)pb_used,
+					(unsigned long)host_len,
+					(unsigned long)sizeof(req));
+				c->err = "URL too long";
+				goto fail_unref;
+			}
+			macsurf_debug_log_writef("mfs_open: GET (direct) %s %s",
+					target, path_buf);
+			/* fixes98: direct requests now use keep-alive — the chunked
+			 * decoder in mfs_poll_one / process_chunked_bytes frames
+			 * Transfer-Encoding: chunked responses correctly so we don't
+			 * need the server to close after each. Pool reuse on direct
+			 * origins eliminates per-fetch TCP setup latency. */
+			sprintf(req,
+				"GET %s HTTP/1.1\r\n"
+				"Host: %.*s\r\n"
+				"User-Agent: MacSurf/0.2\r\n"
+				"Accept: */*\r\n"
+				"Connection: keep-alive\r\n\r\n",
+				path_buf, (int)host_len, host_str);
 		}
-		macsurf_debug_log_writef("mfs_open: GET (direct) %s %s",
-				target, path_buf);
-		/* fixes98: direct requests now use keep-alive — the chunked
-		 * decoder in mfs_poll_one / process_chunked_bytes frames
-		 * Transfer-Encoding: chunked responses correctly so we don't
-		 * need the server to close after each. Pool reuse on direct
-		 * origins eliminates per-fetch TCP setup latency. */
-		sprintf(req,
-			"GET %s HTTP/1.1\r\n"
-			"Host: %.*s\r\n"
-			"User-Agent: MacSurf/0.2\r\n"
-			"Accept: */*\r\n"
-			"Connection: keep-alive\r\n\r\n",
-			path_buf, (int)host_len, host_str);
 	}
 
 	r = OTSnd(c->ep, req, (long)strlen(req), 0);
@@ -721,10 +767,15 @@ static void mfs_poll_one(struct macos9_fetch_ctx *c) {
 	/* fixes107 — bytes received, reset no-progress timer. */
 	c->progress_ticks = (unsigned long)TickCount();
 	if(c->state==MFS_HEADERS) {
+		/* fixes169 (SAFETY_REPORT §4) — keep one trailing byte in
+		 * h_buf reserved for a NUL terminator. strstr / strlen on
+		 * h_buf must see network data terminated cleanly even when
+		 * the origin sent no CRLF-CRLF yet. */
 		long nl=c->h_len+n;
-		if(nl>c->h_cap) { long nc=c->h_cap==0?4096:c->h_cap*2; while(nc<nl)nc*=2; c->h_buf=realloc(c->h_buf,nc); if(c->h_buf) c->h_cap=nc; }
+		if(nl+1>c->h_cap) { long nc=c->h_cap==0?4096:c->h_cap*2; while(nc<nl+1)nc*=2; c->h_buf=realloc(c->h_buf,nc); if(c->h_buf) c->h_cap=nc; }
 		if(!c->h_buf) { c->err="OOM"; c->state=MFS_FAIL; return; }
 		memcpy(c->h_buf+c->h_len,b,(size_t)n); c->h_len=nl;
+		c->h_buf[c->h_len]='\0';
 		if(strstr(c->h_buf,"\r\n\r\n")) mfs_parse_headers(c);
 	} else {
 		if (c->chunked) {
