@@ -1,0 +1,210 @@
+<!doctype html>
+<html>
+<head>
+<title>MacSurf layout survival</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  font-family: Helvetica, Geneva, sans-serif;
+  font-size: 13px;
+  margin: 16px;
+  color: #000;
+  background: #fff;
+}
+
+h1 { color: #003366; font-size: 18px; }
+h2 { color: #003366; font-size: 15px; margin-top: 24px; }
+
+.note { background: #eee; padding: 6px; border: 1px solid #999; margin-bottom: 12px; }
+
+.section { border: 1px solid #888; padding: 8px; margin-bottom: 16px; }
+
+/* === Apple-ish: nested flex > grid > flex > content cards === */
+.apple-ish { background: #f4f4f4; }
+.apple-ish .row { display: flex; gap: 12px; }
+.apple-ish .grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  flex: 1;
+}
+.apple-ish .card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #aaa;
+  padding: 8px;
+  min-height: 80px;
+}
+.apple-ish .card .head { color: #003366; font-weight: bold; }
+.apple-ish .card .body { flex: 1; min-height: 0; overflow: hidden; }
+.apple-ish .card .link { color: #00f; }
+
+/* === HuffPost-ish: flex column header + deep block children +
+       hidden/deferred image boxes === */
+.huff-ish .header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #c00;
+  color: #fff;
+  padding: 6px;
+}
+.huff-ish .nav {
+  display: flex;
+  gap: 8px;
+  background: #800;
+  color: #fff;
+  padding: 4px;
+}
+.huff-ish .article {
+  padding: 6px;
+}
+.huff-ish .article .lede { font-size: 16px; font-weight: bold; }
+.huff-ish .article .body p { margin: 6px 0; }
+.huff-ish .deferred {
+  width: 100%;
+  height: 120px;
+  background: #ddd;
+  border: 1px dashed #999;
+  text-align: center;
+  line-height: 120px;
+}
+
+/* === BBC-ish: grid container with auto rows, many cards === */
+.bbc-ish .grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.bbc-ish .grid .item {
+  background: #fff;
+  border: 1px solid #888;
+  padding: 4px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+/* === Auto/INT_MIN bait: containers whose dimensions resolve auto
+       under the layout's sentinel-handling rules. Pre-fixes168 these
+       could propagate INT_MIN into child arithmetic. === */
+.bait-ish .flex-auto {
+  display: flex;
+  height: auto;
+  min-height: 0;
+}
+.bait-ish .grid-auto {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: auto;
+}
+.bait-ish .child {
+  border: 1px solid #888;
+  padding: 4px;
+  height: auto;
+  min-height: 0;
+}
+</style>
+</head>
+<body>
+<h1>layout survival</h1>
+<div class="note">
+  This page exercises nested flex/grid/table patterns common to heavy modern
+  sites. None of it should crash. Containers that cannot lay out spec-cleanly
+  should degrade locally to block flow; the document's box positions must
+  remain real.
+</div>
+
+<h2>S1 — Apple-ish: flex &gt; grid &gt; flex card grid</h2>
+<div class="section apple-ish">
+  <div class="row">
+    <div class="grid">
+      <div class="card">
+        <div class="head">Card A</div>
+        <div class="body">flex item inside grid inside flex.</div>
+        <a class="link" href="#">link</a>
+      </div>
+      <div class="card">
+        <div class="head">Card B</div>
+        <div class="body">three columns, gap 8px, min-height per card.</div>
+        <a class="link" href="#">link</a>
+      </div>
+      <div class="card">
+        <div class="head">Card C</div>
+        <div class="body">aspect / min / overflow exercise.</div>
+        <a class="link" href="#">link</a>
+      </div>
+      <div class="card">
+        <div class="head">Card D</div>
+        <div class="body">row 2 column 1.</div>
+        <a class="link" href="#">link</a>
+      </div>
+      <div class="card">
+        <div class="head">Card E</div>
+        <div class="body">row 2 column 2.</div>
+        <a class="link" href="#">link</a>
+      </div>
+      <div class="card">
+        <div class="head">Card F</div>
+        <div class="body">row 2 column 3.</div>
+        <a class="link" href="#">link</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>S2 — HuffPost-ish: flex header + deep block + deferred images</h2>
+<div class="section huff-ish">
+  <div class="header">
+    <div class="brand">SITE</div>
+    <div class="nav">
+      <a href="#">News</a>
+      <a href="#">Politics</a>
+      <a href="#">Culture</a>
+      <a href="#">Tech</a>
+    </div>
+  </div>
+  <div class="article">
+    <div class="lede">Lede paragraph for the layout survival test.</div>
+    <div class="body">
+      <p>First paragraph of body copy. Real text, no placeholder.</p>
+      <div class="deferred">deferred image slot 1</div>
+      <p>Second paragraph after the deferred slot. Engine must keep
+      walking past auto-height boxes without losing position.</p>
+      <div class="deferred">deferred image slot 2</div>
+      <p>Third paragraph. End of article body.</p>
+    </div>
+  </div>
+</div>
+
+<h2>S3 — BBC-ish: grid with many auto-row cards and aspect-ratio</h2>
+<div class="section bbc-ish">
+  <div class="grid">
+    <div class="item">Item 1</div>
+    <div class="item">Item 2</div>
+    <div class="item">Item 3</div>
+    <div class="item">Item 4</div>
+    <div class="item">Item 5</div>
+    <div class="item">Item 6</div>
+    <div class="item">Item 7</div>
+    <div class="item">Item 8</div>
+  </div>
+</div>
+
+<h2>S4 — Sentinel bait: AUTO / min-height: 0 / nested flex</h2>
+<div class="section bait-ish">
+  <div class="flex-auto">
+    <div class="child">child of flex (height auto)</div>
+    <div class="child">
+      <div class="grid-auto">
+        <div class="child">inner grid cell 1</div>
+        <div class="child">inner grid cell 2</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>end of survival page</h2>
+</body>
+</html>

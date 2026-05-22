@@ -41,6 +41,10 @@
 #include "html/private.h"
 #include "html/box_inspect.h"
 #include "html/layout_internal.h"
+/* fixes168 — shared sanitizers (layout-wide). flex's own FLEX_SAFE_*
+ * helpers stay for back-compat with the fixes167 call sites; new
+ * code uses the layout_dim_* shared API. */
+#include "html/layout_safe.h"
 
 /* fixes161d — diagnostic-only macsurf_debug_log_writef for the
  * LAYOUTPHASE flex marker. Compiles to a no-op in release builds. */
@@ -1491,9 +1495,29 @@ static bool layout_flex_fallback_block(struct box *flex, int available_width,
 			ok = layout_flex(c, child_avail, content);
 			c->float_container = NULL;
 			break;
+		case BOX_GRID:
+		case BOX_INLINE_GRID:
+			/* fixes168c — flex fallback now dispatches grid
+			 * children through layout_grid, which has its own
+			 * fallback (fixes168b). Previously these went into
+			 * the default case and stayed unlaid-out. */
+			c->float_container = c->parent;
+			ok = layout_grid(c, child_avail, content);
+			c->float_container = NULL;
+			break;
 		default:
+			/* Unsupported child type — give it a zero-height
+			 * slot, don't crash the flex fallback. */
+			c->height = 0;
 			ok = true;
 			break;
+		}
+		if (!ok) {
+			/* fixes168c — child layout itself failed inside the
+			 * flex fallback. Convert to a zero-height continuation
+			 * rather than abort the whole flex subtree. */
+			c->height = 0;
+			ok = true;
 		}
 		(void)ok;
 
