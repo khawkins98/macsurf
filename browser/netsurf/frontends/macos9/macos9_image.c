@@ -705,7 +705,7 @@ macos9_qt_image_convert(struct content *c)
 	int bw, bh;
 	long src_size;
 	bool wants_alpha;
-	nserror err;
+	nserror err = NSERROR_OK;
 	const unsigned char *src_bytes;
 
 	if (qti->compressed == NULL ||
