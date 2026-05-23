@@ -217,7 +217,8 @@ void macos9_window_address_bar_submit(struct gui_window *g) {
 
 void macos9_window_back(struct gui_window *g) { if(g&&g->bw&&browser_window_history_back_available(g->bw)) { browser_window_history_back(g->bw, false); macos9_window_update_button_states(g); } }
 void macos9_window_forward(struct gui_window *g) { if(g&&g->bw&&browser_window_history_forward_available(g->bw)) { browser_window_history_forward(g->bw, false); macos9_window_update_button_states(g); } }
-void macos9_window_reload(struct gui_window *g) { if(g&&g->bw) browser_window_reload(g->bw, true); }
+extern int macsurf_http_skip_next_cache;
+void macos9_window_reload(struct gui_window *g) { if(g&&g->bw) { macsurf_http_skip_next_cache = 1; browser_window_reload(g->bw, true); } }
 void macos9_window_home(struct gui_window *g) { macos9_window_navigate(g, MACSURF_HOME_URL); }
 
 void macos9_window_update_button_states(struct gui_window *g) {

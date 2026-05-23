@@ -73,6 +73,13 @@ extern OTClientContextPtr macos9_ot_context;
  * still served live, just not cached. */
 #define MACSURF_CACHE_MAX_BYTES (1L * 1024L * 1024L)
 
+/* fixes181 — when the user clicks Reload, window.c sets this to 1.
+ * mfs_open skips cache_lookup while it is non-zero; cache_store clears
+ * it after the fresh body is written. Page sub-resources fetched after
+ * the main document re-store therefore see a cleared flag and hit cache
+ * normally. */
+int macsurf_http_skip_next_cache = 0;
+
 /* ---- Cache helpers (Carbon File Manager) ---- */
 
 /* FNV-1a 32-bit hash. Cheap, well-distributed, no allocation. */
@@ -261,6 +268,7 @@ static void cache_store(const char *url, int status, const char *mime,
 	macsurf_debug_log_writef(
 		"CACHE store url=%s mime=%s len=%ld",
 		url, mime, body_len);
+	macsurf_http_skip_next_cache = 0;
 #else
 	(void)url; (void)status; (void)mime; (void)body_ptr; (void)body_len;
 #endif
@@ -749,7 +757,8 @@ static int mfs_open(struct macos9_fetch_ctx *c) {
 	 * delivers headers + body + finished in one cycle. */
 	{
 		const char *url_str = nsurl_access(c->url);
-		if (url_str != NULL && c->cache_hit == 0) {
+		if (url_str != NULL && c->cache_hit == 0 &&
+				macsurf_http_skip_next_cache == 0) {
 			if (cache_lookup(url_str, &c->cache_hit_body,
 					&c->cache_hit_len,
 					c->cache_hit_mime,
