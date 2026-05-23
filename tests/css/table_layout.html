@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PROBE: table-layout: fixed (fixes184)</title>
+<style>
+body { font-family: sans-serif; font-size: 12px; margin: 8px; }
+h2 { font-size: 13px; color: #003366; margin: 8px 0 2px 0; }
+p.exp { font-size: 11px; color: #555; margin: 2px 0; }
+table { border-collapse: collapse; margin: 4px 0; }
+table.t1, table.t2, table.t3, table.t4 { width: 400px; border: 1px solid #888; }
+td { border: 1px solid #ccc; padding: 2px 4px; font-size: 11px; }
+
+/* TL1: auto layout (baseline) — first row width hints ignored vs content */
+table.t1 { table-layout: auto; }
+table.t1 td.w { width: 80px; }
+
+/* TL2: fixed layout — first row widths SET the columns regardless of later content */
+table.t2 { table-layout: fixed; }
+table.t2 td.w { width: 80px; }
+
+/* TL3: fixed with percent column widths */
+table.t3 { table-layout: fixed; }
+table.t3 td.p25 { width: 25%; }
+table.t3 td.p50 { width: 50%; }
+
+/* TL4: fixed — later-row width on same column has no effect */
+table.t4 { table-layout: fixed; }
+table.t4 td.first  { width: 60px; }
+table.t4 td.second { width: 200px; }
+</style>
+</head>
+<body>
+
+<h2>PROBE TL1 — table-layout: auto (baseline)</h2>
+<p class="exp">Expected: column widths reflect content, w=80 is a hint.</p>
+<table class="t1">
+  <tr><td class="w">a (w=80)</td><td>bbbbbbbbbb</td><td>c</td></tr>
+  <tr><td>longer cell content here</td><td>x</td><td>y</td></tr>
+</table>
+
+<h2>PROBE TL2 — table-layout: fixed, first-row widths win</h2>
+<p class="exp">Expected: column 1 is 80px exactly; later rows don't widen it.</p>
+<table class="t2">
+  <tr><td class="w">a (w=80)</td><td>b</td><td>c</td></tr>
+  <tr><td>this is much longer content that would expand in auto mode</td><td>x</td><td>y</td></tr>
+</table>
+
+<h2>PROBE TL3 — table-layout: fixed with percent columns</h2>
+<p class="exp">Expected: 25% / 50% / 25% (last is auto remainder).</p>
+<table class="t3">
+  <tr><td class="p25">25%</td><td class="p50">50%</td><td>auto</td></tr>
+  <tr><td>x</td><td>much wider second cell here</td><td>z</td></tr>
+</table>
+
+<h2>PROBE TL4 — fixed, later row width is ignored</h2>
+<p class="exp">Expected: col1=60px (from row 1), col2 unconstrained by row 2's 200px.</p>
+<table class="t4">
+  <tr><td class="first">60px</td><td>auto</td></tr>
+  <tr><td>second row</td><td class="second">w=200 (ignored under fixed)</td></tr>
+</table>
+
+</body>
+</html>

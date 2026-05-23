@@ -815,6 +815,7 @@ table_calculate_column_types(const css_unit_ctx *unit_len_ctx, struct box *table
 	unsigned int i, j;
 	struct column *col;
 	struct box *row_group, *row, *cell;
+	bool tl_fixed = false;
 
 	if (table->col)
 		/* table->col already constructed, for example frameset table */
@@ -830,9 +831,16 @@ table_calculate_column_types(const css_unit_ctx *unit_len_ctx, struct box *table
 		col[i].positioned = true;
 	}
 
+	/* fixes184: table-layout: fixed — column widths set by the first row
+	 * (and any <col> elements) only. Later rows do not influence widths. */
+	if (table->style != NULL &&
+	    css_computed_table_layout(table->style) == CSS_TABLE_LAYOUT_FIXED) {
+		tl_fixed = true;
+	}
+
 	/* 1st pass: cells with colspan 1 only */
 	for (row_group = table->children; row_group; row_group =row_group->next)
-		for (row = row_group->children; row; row = row->next)
+		for (row = row_group->children; row; row = row->next) {
 			for (cell = row->children; cell; cell = cell->next) {
 				enum css_width_e type;
 				css_fixed value = 0;
@@ -879,6 +887,12 @@ table_calculate_column_types(const css_unit_ctx *unit_len_ctx, struct box *table
 					col[i].type = COLUMN_WIDTH_AUTO;
 				}
 			}
+			if (tl_fixed) {
+				/* fixes184: only the first row sets widths */
+				goto first_pass_done;
+			}
+		}
+first_pass_done:
 
 	/* 2nd pass: cells which span multiple columns */
 	for (row_group = table->children; row_group; row_group =row_group->next)
