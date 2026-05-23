@@ -1735,6 +1735,320 @@ static void layout_move_children(struct box *box, int x, int y)
 	}
 }
 
+static int layout_multicol_default_gap(
+		const struct box *block,
+		const css_unit_ctx *unit_len_ctx)
+{
+	css_fixed one_em;
+	int gap;
+
+	one_em = INTTOFIX(1);
+	gap = FIXTOINT(css_unit_len2device_px(block->style,
+			unit_len_ctx, one_em, CSS_UNIT_EM));
+	if (gap < 0)
+		gap = 0;
+	return gap;
+}
+
+static bool layout_multicol_resolve(
+		const struct box *block,
+		const css_unit_ctx *unit_len_ctx,
+		int *count_out,
+		int *gap_out,
+		int *column_width_out,
+		bool *balance_out)
+{
+	uint8_t count_type;
+	uint8_t gap_type;
+	uint8_t width_type;
+	uint8_t fill_type;
+	int32_t count_value;
+	css_fixed gap_len;
+	css_fixed width_len;
+	css_unit gap_unit;
+	css_unit width_unit;
+	int available_width;
+	int gap;
+	int count;
+	int preferred_width;
+	int fit_count;
+	int total_gap;
+
+	if (block == NULL || block->style == NULL)
+		return false;
+
+	available_width = block->width;
+	if (available_width <= 0 || available_width == AUTO ||
+			available_width == UNKNOWN_WIDTH)
+		return false;
+
+	count_value = 0;
+	gap_len = 0;
+	width_len = 0;
+	gap_unit = CSS_UNIT_PX;
+	width_unit = CSS_UNIT_PX;
+	preferred_width = 0;
+	count = 0;
+
+	count_type = css_computed_column_count(block->style, &count_value);
+	width_type = css_computed_column_width(block->style, &width_len,
+			&width_unit);
+	gap_type = css_computed_column_gap(block->style, &gap_len, &gap_unit);
+	fill_type = css_computed_column_fill(block->style);
+
+	if (gap_type == CSS_COLUMN_GAP_NORMAL) {
+		gap = layout_multicol_default_gap(block, unit_len_ctx);
+	} else if (gap_type == CSS_COLUMN_GAP_SET) {
+		gap = FIXTOINT(css_unit_len2device_px(block->style,
+				unit_len_ctx, gap_len, gap_unit));
+	} else {
+		gap = 0;
+	}
+	if (gap < 0)
+		gap = 0;
+
+	if (width_type == CSS_COLUMN_WIDTH_SET) {
+		preferred_width = FIXTOINT(css_unit_len2device_px(block->style,
+				unit_len_ctx, width_len, width_unit));
+		if (preferred_width < 0)
+			preferred_width = 0;
+	}
+
+	if (count_type == CSS_COLUMN_COUNT_SET && count_value > 1) {
+		count = (int) count_value;
+	}
+
+	if (preferred_width > 0) {
+		fit_count = (available_width + gap) / (preferred_width + gap);
+		if (fit_count < 1)
+			fit_count = 1;
+		if (count > 0) {
+			if (fit_count < count)
+				count = fit_count;
+		} else {
+			count = fit_count;
+		}
+	}
+
+	if (count < 2)
+		return false;
+	if (count > 8)
+		count = 8;
+
+	total_gap = gap * (count - 1);
+	if (available_width <= total_gap)
+		return false;
+
+	*column_width_out = (available_width - total_gap) / count;
+	if (*column_width_out < 24)
+		return false;
+
+	*count_out = count;
+	*gap_out = gap;
+	*balance_out = (fill_type == CSS_COLUMN_FILL_BALANCE);
+
+	return true;
+}
+
+static bool layout_multicol_child_supported(const struct box *child)
+{
+	if (child == NULL)
+		return false;
+
+	if (child->type == BOX_BLOCK ||
+			child->type == BOX_FLEX ||
+			child->type == BOX_GRID) {
+		return true;
+	}
+
+	return false;
+}
+
+static bool layout_multicol_layout_child(
+		struct box *child,
+		int available_width,
+		int viewport_height,
+		html_content *content)
+{
+	if (child->type == BOX_BLOCK) {
+		layout_block_find_dimensions(&content->unit_len_ctx,
+				available_width, viewport_height, 0, 0, child);
+		if (!(child->flags & IFRAME)) {
+			layout_block_add_scrollbar(child, RIGHT);
+			layout_block_add_scrollbar(child, BOTTOM);
+		}
+		if (!layout_block_context(child, viewport_height, content))
+			return false;
+		if (child->height == AUTO) {
+			child->height = 0;
+			layout_block_add_scrollbar(child, BOTTOM);
+		}
+		return true;
+	}
+
+	if (child->type == BOX_FLEX) {
+		layout_block_find_dimensions(&content->unit_len_ctx,
+				available_width, viewport_height, 0, 0, child);
+		if (!layout_flex(child, child->width, content))
+			return false;
+		if (child->height == AUTO)
+			child->height = 0;
+		return true;
+	}
+
+	if (child->type == BOX_GRID) {
+		layout_block_find_dimensions(&content->unit_len_ctx,
+				available_width, viewport_height, 0, 0, child);
+		if (!layout_grid(child, child->width, content))
+			return false;
+		if (child->height == AUTO)
+			child->height = 0;
+		return true;
+	}
+
+	return false;
+}
+
+static bool layout_multicol_context(
+		struct box *block,
+		int viewport_height,
+		html_content *content)
+{
+	struct box *child;
+	struct box **items;
+	int *outer_heights;
+	int child_count;
+	int item_index;
+	int count;
+	int gap;
+	int column_width;
+	int total_height;
+	int target_height;
+	int tallest_item;
+	int current_column;
+	int current_y;
+	int max_column_height;
+	int base_x;
+	int base_y;
+	bool balance;
+
+	if (!layout_multicol_resolve(block, &content->unit_len_ctx, &count,
+			&gap, &column_width, &balance)) {
+		return false;
+	}
+
+	child_count = 0;
+	for (child = block->children; child != NULL; child = child->next) {
+		if (child->style != NULL &&
+				(css_computed_position(child->style) ==
+				CSS_POSITION_ABSOLUTE ||
+				css_computed_position(child->style) ==
+				CSS_POSITION_FIXED)) {
+			continue;
+		}
+		if (!layout_multicol_child_supported(child))
+			return false;
+		child_count++;
+	}
+
+	if (child_count < 2)
+		return false;
+
+	items = malloc(sizeof(struct box *) * child_count);
+	outer_heights = malloc(sizeof(int) * child_count);
+	if (items == NULL || outer_heights == NULL) {
+		free(items);
+		free(outer_heights);
+		return false;
+	}
+
+	total_height = 0;
+	tallest_item = 0;
+	item_index = 0;
+
+	for (child = block->children; child != NULL; child = child->next) {
+		int outer_height;
+
+		if (child->style != NULL &&
+				(css_computed_position(child->style) ==
+				CSS_POSITION_ABSOLUTE ||
+				css_computed_position(child->style) ==
+				CSS_POSITION_FIXED)) {
+			continue;
+		}
+
+		if (!layout_multicol_layout_child(child, column_width,
+				viewport_height, content)) {
+			free(items);
+			free(outer_heights);
+			return false;
+		}
+
+		outer_height = child->height + lh__delta_outer_height(child);
+		if (outer_height < 0)
+			outer_height = 0;
+
+		items[item_index] = child;
+		outer_heights[item_index] = outer_height;
+		total_height += outer_height;
+		if (tallest_item < outer_height)
+			tallest_item = outer_height;
+		item_index++;
+	}
+
+	target_height = tallest_item;
+	if (count > 0) {
+		int average_height;
+		average_height = (total_height + count - 1) / count;
+		if (average_height > target_height)
+			target_height = average_height;
+	}
+	if (target_height < 1)
+		target_height = 1;
+
+	base_x = block->padding[LEFT];
+	base_y = block->padding[TOP];
+	current_column = 0;
+	current_y = 0;
+	max_column_height = 0;
+
+	for (item_index = 0; item_index < child_count; item_index++) {
+		struct box *item;
+		int outer_height;
+
+		item = items[item_index];
+		outer_height = outer_heights[item_index];
+
+		if (current_column < count - 1 &&
+				current_y > 0 &&
+				current_y + outer_height > target_height) {
+			if (current_y > max_column_height)
+				max_column_height = current_y;
+			current_column++;
+			current_y = 0;
+		}
+
+		item->x = base_x + current_column * (column_width + gap) +
+				lh__non_auto_margin(item, LEFT) +
+				item->border[LEFT].width;
+		item->y = base_y + current_y +
+				lh__non_auto_margin(item, TOP) +
+				item->border[TOP].width;
+		current_y += outer_height;
+		if (current_y > max_column_height)
+			max_column_height = current_y;
+	}
+
+	block->height = max_column_height;
+	if (block->height < 0)
+		block->height = 0;
+
+	free(items);
+	free(outer_heights);
+	(void) balance;
+	return true;
+}
+
 
 /* fixes171 — Watchdog wrapper for layout_table. */
 static bool layout_table_inner(struct box *table, int available_width,
@@ -3945,6 +4259,11 @@ static bool layout_block_context_inner(
 		return true;
 	} else if (block->flags & REPLACE_DIM) {
 		return true;
+	}
+
+	if (block->type == BOX_BLOCK && block->children != NULL) {
+		if (layout_multicol_context(block, viewport_height, content))
+			return true;
 	}
 
 	/* special case if the block contains an radio button or checkbox */

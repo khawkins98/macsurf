@@ -2010,6 +2010,224 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 	return true;
 }
 
+static int html_redraw_multicol_default_gap(
+		struct box *box,
+		const css_unit_ctx *unit_len_ctx)
+{
+	css_fixed one_em;
+	int gap;
+
+	one_em = INTTOFIX(1);
+	gap = FIXTOINT(css_unit_len2device_px(box->style,
+			unit_len_ctx, one_em, CSS_UNIT_EM));
+	if (gap < 0)
+		gap = 0;
+	return gap;
+}
+
+static bool html_redraw_multicol_resolve(
+		struct box *box,
+		const css_unit_ctx *unit_len_ctx,
+		int *count_out,
+		int *gap_out,
+		int *column_width_out)
+{
+	uint8_t count_type;
+	uint8_t gap_type;
+	uint8_t width_type;
+	int32_t count_value;
+	css_fixed gap_len;
+	css_fixed width_len;
+	css_unit gap_unit;
+	css_unit width_unit;
+	int available_width;
+	int gap;
+	int count;
+	int preferred_width;
+	int fit_count;
+	int total_gap;
+
+	if (box == NULL || box->style == NULL)
+		return false;
+
+	available_width = box->width;
+	if (available_width <= 0)
+		return false;
+
+	count_value = 0;
+	gap_len = 0;
+	width_len = 0;
+	gap_unit = CSS_UNIT_PX;
+	width_unit = CSS_UNIT_PX;
+	count = 0;
+	preferred_width = 0;
+
+	count_type = css_computed_column_count(box->style, &count_value);
+	width_type = css_computed_column_width(box->style, &width_len,
+			&width_unit);
+	gap_type = css_computed_column_gap(box->style, &gap_len, &gap_unit);
+
+	if (gap_type == CSS_COLUMN_GAP_NORMAL) {
+		gap = html_redraw_multicol_default_gap(box, unit_len_ctx);
+	} else if (gap_type == CSS_COLUMN_GAP_SET) {
+		gap = FIXTOINT(css_unit_len2device_px(box->style,
+				unit_len_ctx, gap_len, gap_unit));
+	} else {
+		gap = 0;
+	}
+	if (gap < 0)
+		gap = 0;
+
+	if (width_type == CSS_COLUMN_WIDTH_SET) {
+		preferred_width = FIXTOINT(css_unit_len2device_px(box->style,
+				unit_len_ctx, width_len, width_unit));
+		if (preferred_width < 0)
+			preferred_width = 0;
+	}
+
+	if (count_type == CSS_COLUMN_COUNT_SET && count_value > 1)
+		count = (int) count_value;
+
+	if (preferred_width > 0) {
+		fit_count = (available_width + gap) / (preferred_width + gap);
+		if (fit_count < 1)
+			fit_count = 1;
+		if (count > 0) {
+			if (fit_count < count)
+				count = fit_count;
+		} else {
+			count = fit_count;
+		}
+	}
+
+	if (count < 2)
+		return false;
+	if (count > 8)
+		count = 8;
+
+	total_gap = gap * (count - 1);
+	if (available_width <= total_gap)
+		return false;
+
+	*column_width_out = (available_width - total_gap) / count;
+	if (*column_width_out < 24)
+		return false;
+
+	*count_out = count;
+	*gap_out = gap;
+	return true;
+}
+
+static bool html_redraw_multicol_rules(
+		const html_content *html,
+		struct box *box,
+		int x,
+		int y,
+		float scale,
+		const struct rect *clip,
+		const struct redraw_context *ctx)
+{
+	uint8_t rule_style_type;
+	uint8_t rule_width_type;
+	uint8_t rule_color_type;
+	css_fixed rule_len;
+	css_unit rule_unit;
+	css_color rule_color;
+	plot_style_t rule_style;
+	struct rect line_rect;
+	int count;
+	int gap;
+	int column_width;
+	int rule_width_px;
+	int i;
+
+	if (!html_redraw_multicol_resolve(box, &html->unit_len_ctx, &count,
+			&gap, &column_width)) {
+		return true;
+	}
+
+	rule_style_type = css_computed_column_rule_style(box->style);
+	if (rule_style_type == CSS_COLUMN_RULE_STYLE_NONE ||
+			rule_style_type == CSS_COLUMN_RULE_STYLE_HIDDEN ||
+			rule_style_type == CSS_COLUMN_RULE_STYLE_INHERIT) {
+		return true;
+	}
+
+	rule_len = 0;
+	rule_unit = CSS_UNIT_PX;
+	rule_width_type = css_computed_column_rule_width(box->style,
+			&rule_len, &rule_unit);
+	switch (rule_width_type) {
+	case CSS_COLUMN_RULE_WIDTH_THIN:
+		rule_width_px = 1;
+		break;
+	case CSS_COLUMN_RULE_WIDTH_MEDIUM:
+		rule_width_px = 3;
+		break;
+	case CSS_COLUMN_RULE_WIDTH_THICK:
+		rule_width_px = 5;
+		break;
+	case CSS_COLUMN_RULE_WIDTH_WIDTH:
+		rule_width_px = FIXTOINT(css_unit_len2device_px(box->style,
+				&html->unit_len_ctx, rule_len, rule_unit));
+		break;
+	default:
+		rule_width_px = 0;
+		break;
+	}
+	if (rule_width_px < 1)
+		return true;
+
+	rule_color = 0;
+	rule_color_type = css_computed_column_rule_color(box->style,
+			&rule_color);
+	if (rule_color_type == CSS_COLUMN_RULE_COLOR_CURRENT_COLOR ||
+			rule_color_type == CSS_COLUMN_RULE_COLOR_INHERIT) {
+		css_computed_color(box->style, &rule_color);
+	}
+
+	rule_style.stroke_type = PLOT_OP_TYPE_SOLID;
+	if (rule_style_type == CSS_COLUMN_RULE_STYLE_DASHED) {
+		rule_style.stroke_type = PLOT_OP_TYPE_DASH;
+	} else if (rule_style_type == CSS_COLUMN_RULE_STYLE_DOTTED) {
+		rule_style.stroke_type = PLOT_OP_TYPE_DOT;
+	}
+	rule_style.stroke_width =
+			(rule_width_px * scale) * PLOT_STYLE_SCALE;
+	rule_style.stroke_colour = nscss_color_to_ns(rule_color);
+	rule_style.fill_type = PLOT_OP_TYPE_NONE;
+	rule_style.fill_colour = 0;
+	rule_style.border_radius = 0;
+	rule_style.box_shadow = 0;
+	rule_style.fill_colour2 = 0;
+	rule_style.box_shadow_y = 0;
+	rule_style.box_shadow_color = 0;
+	rule_style.opacity = PLOT_STYLE_SCALE;
+	rule_style.transform = 0;
+	rule_style.transform_b = 0;
+
+	for (i = 1; i < count; i++) {
+		int line_x;
+
+		line_x = x + box->padding[LEFT] +
+				i * column_width + (i - 1) * gap + gap / 2;
+		line_rect.x0 = line_x * scale;
+		line_rect.x1 = line_rect.x0;
+		line_rect.y0 = (y + box->padding[TOP]) * scale;
+		line_rect.y1 = (y + box->padding[TOP] + box->height) * scale;
+
+		if (line_rect.x0 < clip->x0 || line_rect.x0 > clip->x1)
+			continue;
+		if (line_rect.y1 < clip->y0 || line_rect.y0 > clip->y1)
+			continue;
+
+		if (ctx->plot->line(ctx, &rule_style, &line_rect) != NSERROR_OK)
+			return false;
+	}
+
+	return true;
+}
+
 bool html_redraw_box(const html_content *html, struct box *box,
 		int x_parent, int y_parent,
 		const struct rect *clip, float scale,
@@ -2812,6 +3030,9 @@ bool html_redraw_box(const html_content *html, struct box *box,
 				return false;
 		}
 	}
+
+	if (!html_redraw_multicol_rules(html, box, x, y, scale, &r, ctx))
+		return false;
 
 	/* Debug outlines */
 	if (html_redraw_debug) {

@@ -62,10 +62,10 @@ css__parse_column_rule_cleanup
 css__parse_column_rule_color
 css__parse_column_rule_style
 css__parse_column_rule_width
-css__parse_columns
-css__parse_columns_cleanup
 css__parse_column_span
 css__parse_column_width
+css__parse_columns
+css__parse_columns_cleanup
 css__parse_content
 css__parse_counter_increment
 css__parse_counter_reset

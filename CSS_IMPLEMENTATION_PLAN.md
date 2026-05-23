@@ -158,27 +158,27 @@ Tests: `tests/css/grid_areas.html`, `tests/css/grid_alignment.html`,
 
 ---
 
-## Track E — fixes204: Multi-column
+## Track E — fixes179: Multi-column
 
 Real layout work, no libcss work needed (everything is already parsed).
 
-1. **`column-count` / `column-width`** — new layout phase in
-   `layout_block_context` that, when a block has `column-count > 1`
-   or `column-width != auto`, divides its content into N equal-width
-   columns by re-flowing inline content with a narrower
-   `available_width`. Sequential fill is acceptable V1; balancing
-   deferred.
-2. **`column-gap`** — already in storage; consume here.
-3. **`column-rule-*`** — paint a vertical rule between columns at
-   redraw time. Uses existing `border-*-style` plotter logic.
-4. **`column-span: all`** — element spans across all columns, breaks
-   the multi-col flow.
-5. **`column-fill`**: V1 always `auto` (sequential). `balance`
-   deferred.
+1. **`column-count` / `column-width`** — shipped in fixes179 as a
+   block-container multicol branch in `layout_block_context` that
+   narrows child layout width and places direct block children into N
+   columns. V1 uses approximate balancing / sequential placement rather
+   than full inline fragmentation.
+2. **`column-gap`** — consumed by fixes179 in width/count math.
+3. **`column-rule-*`** — shipped in fixes179 as redraw-time vertical
+   rules between columns.
+4. **`column-span: all`** — deferred; remains parsed-not-consumed.
+5. **`column-fill`** — consumed in fixes179, but `balance` currently
+   maps to the same approximate V1 placement path.
 
 Tests: `tests/css/multicolumn.html` with PROBE MC1 (2-col text),
-MC2 (3-col with rule), MC3 (column-span:all), MC4 (column-width
-auto-determines count from container).
+MC2 (3-col with rule), MC3 (column-width auto-determines count from
+container), MC4 (`column-fill: balance` fallback), MC5
+(`column-span: all` deferred note), MC6 regression single-column,
+MC7 links/lists in columns.
 
 Acceptance: news/blog-style pages with `column-count: 2` render as
 two columns instead of one tall block.

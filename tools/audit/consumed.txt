@@ -29,7 +29,13 @@ css_computed_caption_side
 css_computed_clear
 css_computed_clip
 css_computed_color
+css_computed_column_count
+css_computed_column_fill
 css_computed_column_gap
+css_computed_column_rule_color
+css_computed_column_rule_style
+css_computed_column_rule_width
+css_computed_column_width
 css_computed_content
 css_computed_counter_increment
 css_computed_counter_reset

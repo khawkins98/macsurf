@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PROBE: multi-column layout (fixes179)</title>
+<style>
+body { font-family: sans-serif; font-size: 12px; margin: 8px; }
+h2 { font-size: 13px; color: #003366; margin: 10px 0 2px 0; }
+p.exp { font-size: 11px; color: #555; margin: 2px 0 4px 0; }
+.mc {
+	width: 420px;
+	border: 1px solid #888;
+	padding: 8px;
+	margin: 6px 0 12px 0;
+	background: #f0f0f0;
+}
+.mc p, .mc ul {
+	margin: 0 0 8px 0;
+	padding: 0;
+	background: #fffbe8;
+	border: 1px solid #ccb;
+}
+.mc p { padding: 6px; }
+.mc ul { padding: 6px 6px 6px 20px; }
+.wide-note {
+	border: 1px dashed #999;
+	padding: 6px;
+	margin: 6px 0;
+	background: #eef6ff;
+}
+</style>
+</head>
+<body>
+
+<h2>PROBE MC1 — two columns from count</h2>
+<p class="exp">Expected: content distributes into two vertical columns inside the 420px card.</p>
+<div class="mc" style="column-count: 2; column-gap: 24px;">
+<p>MC1-A. The first paragraph should stay in normal document order but no longer form one tall single strip.</p>
+<p>MC1-B. The second paragraph should appear below the first in the same column until the engine decides to continue in column two.</p>
+<p>MC1-C. The third paragraph gives enough height to make the split obvious on hardware.</p>
+<p>MC1-D. The fourth paragraph exists only to force another visible placement step.</p>
+</div>
+
+<h2>PROBE MC2 — three columns with rules</h2>
+<p class="exp">Expected: three columns with two vertical separator rules between them.</p>
+<div class="mc" style="column-count: 3; column-gap: 30px; column-rule: 2px solid #000;">
+<p>MC2-A. Three-column probe.</p>
+<p>MC2-B. Rule painting should appear centered in each gap.</p>
+<p>MC2-C. Content remains readable and ordered.</p>
+<p>MC2-D. No overlap.</p>
+<p>MC2-E. No text stacked at one coordinate.</p>
+<p>MC2-F. End of probe.</p>
+</div>
+
+<h2>PROBE MC3 — column-width auto count</h2>
+<p class="exp">Expected: the container chooses as many roughly 180px columns as fit.</p>
+<div class="mc" style="column-width: 180px; column-gap: 20px;">
+<p>MC3-A. Width-driven columns should choose two columns at this card width.</p>
+<p>MC3-B. The exact balance can vary, but it should not stay single-column.</p>
+<p>MC3-C. The item order must remain A then B then C then D.</p>
+<p>MC3-D. Final paragraph.</p>
+</div>
+
+<h2>PROBE MC4 — column-fill balance fallback</h2>
+<p class="exp">Expected: either approximate balancing or sequential fill, but no overlap and no crash.</p>
+<div class="mc" style="column-count: 3; column-fill: balance; column-gap: 18px;">
+<p>MC4-A. Balance is allowed to be approximate in V1.</p>
+<p>MC4-B. This content exists to make the height split visible.</p>
+<p>MC4-C. Another paragraph in the same ordered flow.</p>
+<p>MC4-D. Yet another paragraph.</p>
+<p>MC4-E. Final paragraph for the third column.</p>
+</div>
+
+<h2>PROBE MC5 — column-span: all</h2>
+<p class="exp">Expected in fixes179 V1: this remains deferred unless specifically implemented.</p>
+<div class="mc" style="column-count: 2; column-gap: 24px;">
+<div class="wide-note" style="column-span: all;">MC5 heading asks for column-span: all. If V1 defers it, this note may stay in normal flow.</div>
+<p>MC5-A. Content after the heading should still remain readable.</p>
+<p>MC5-B. No overlap or collapse is acceptable.</p>
+</div>
+
+<h2>PROBE MC6 — regression: no columns</h2>
+<p class="exp">Expected: this card stays single-column normal flow.</p>
+<div class="mc">
+<p>MC6-A. No column properties here.</p>
+<p>MC6-B. This must remain ordinary block layout.</p>
+</div>
+
+<h2>PROBE MC7 — links and lists in columns</h2>
+<p class="exp">Expected: list markers and inline links stay readable inside columns.</p>
+<div class="mc" style="column-count: 2; column-gap: 24px; column-rule: 1px solid #333;">
+<ul>
+<li><a href="https://example.com/">MC7 link one</a> with surrounding text.</li>
+<li><a href="https://example.com/two">MC7 link two</a> plus more words.</li>
+<li>Plain list item with no link.</li>
+<li>Fourth item to force a visible split.</li>
+</ul>
+</div>
+
+</body>
+</html>
