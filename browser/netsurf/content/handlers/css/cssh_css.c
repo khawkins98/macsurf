@@ -2119,9 +2119,67 @@ macsurf__rewrite_modern_compat(const char *data, size_t in_size,
 		"image-rendering",
 		"font-variant-numeric",
 		"break-inside",
-		"outline-offset"
+		"outline-offset",
+		/* fixes191f -- transition/animation/keyframes-triggered props
+		 * silently dropped. MacSurf has no animation timer playback in
+		 * this round; the final static computed value still applies via
+		 * the regular cascade. The shorthand and all longhands need to
+		 * drop together so the value isn't a stray ident the parser
+		 * trips on. */
+		"transition",
+		"transition-property",
+		"transition-duration",
+		"transition-timing-function",
+		"transition-delay",
+		"animation",
+		"animation-name",
+		"animation-duration",
+		"animation-timing-function",
+		"animation-delay",
+		"animation-iteration-count",
+		"animation-direction",
+		"animation-fill-mode",
+		"animation-play-state",
+		/* fixes191e -- pointer-events. Drop the declaration text so
+		 * libcss doesn't warn. Hit-test still treats every visible
+		 * box as targettable; document as PARTIAL. */
+		"pointer-events",
+		/* fixes191d -- object-position. apply_object_fit (redraw.c)
+		 * already centers fitted images in their slot, which is the
+		 * default object-position. Non-default values silently
+		 * degrade to center; the only mactrove use of this property
+		 * is `center center` which is a no-op against the default,
+		 * so the round-trip is visually identical. */
+		"object-position",
+		/* fixes191f -- user-select / overscroll-behavior etc. are
+		 * silently dropped. MacSurf has no native equivalent for
+		 * these; pages render fine without them. */
+		"user-select",
+		"-webkit-user-select",
+		"-moz-user-select",
+		"overscroll-behavior",
+		"overscroll-behavior-x",
+		"overscroll-behavior-y",
+		"-webkit-overflow-scrolling",
+		"-webkit-font-smoothing",
+		"-moz-osx-font-smoothing",
+		"-webkit-tap-highlight-color",
+		"-webkit-box-orient",
+		"will-change",
+		"contain",
+		"content-visibility",
+		"scroll-margin-top",
+		"scroll-margin-bottom",
+		"scroll-margin-left",
+		"scroll-margin-right",
+		"scroll-margin",
+		"scroll-padding",
+		"scroll-snap-type",
+		"scroll-snap-align",
+		"font-display"
 	};
-	static const size_t N_DROP_PROPS = 6;
+	static const size_t N_DROP_PROPS =
+			sizeof(DROP_PROPS) / sizeof(DROP_PROPS[0]);
 	static const char REPEAT_LIN_FROM[] = "repeating-linear-gradient(";
 	static const char REPEAT_LIN_TO[]   = "          linear-gradient(";
 	static const char REPEAT_RAD_FROM[] = "repeating-radial-gradient(";
@@ -2282,6 +2340,200 @@ macsurf__rewrite_modern_compat(const char *data, size_t in_size,
 }
 
 
+/* fixes191a — inset shorthand expander.
+ *
+ * Rewrite `inset: A [B [C [D]]]` declarations to the four longhands
+ * `top:A; right:B; bottom:C; left:D` per CSS Logical Properties.
+ * Expansion table:
+ *   inset: A;         -> top:A; right:A; bottom:A; left:A;
+ *   inset: A B;       -> top:A; right:B; bottom:A; left:B;
+ *   inset: A B C;     -> top:A; right:B; bottom:C; left:B;
+ *   inset: A B C D;   -> top:A; right:B; bottom:C; left:D;
+ * Values: length, percentage, auto, calc(), var() (tokens kept verbatim).
+ * `!important` on the shorthand is propagated to all four longhands.
+ *
+ * Output grows (longest case ~5x: "inset:0" -> 36 chars). Allocates a
+ * fresh buffer; returns NULL on no-op.
+ *
+ * Word-boundary safe via macsurf__match_prop_name: only triggers on
+ * property-position "inset", never on `border-style: inset` or
+ * `box-shadow: inset ...`. */
+static char *
+macsurf__rewrite_inset(const char *data, size_t in_size, size_t *out_size_p)
+{
+	static const char NAME[] = "inset";
+	static const size_t NAME_LEN = 5;
+	char *out;
+	size_t cap;
+	size_t out_pos;
+	size_t i;
+	int changed = 0;
+
+	cap = in_size + 256;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+	out_pos = 0;
+	i = 0;
+
+	while (i < in_size) {
+		size_t name_end;
+		size_t val_start;
+		size_t val_end;
+		const char *toks[4];
+		size_t tlens[4];
+		int ntok;
+		int important;
+		size_t scan;
+		size_t expanded_max;
+		const char *part_v[4];
+		size_t part_l[4];
+		static const char *const FIELDS[4] = {
+			"top:", "right:", "bottom:", "left:"
+		};
+		static const size_t FIELD_LENS[4] = {4, 6, 7, 5};
+		int k;
+
+		if (!macsurf__match_prop_name(data, in_size, i,
+				NAME, NAME_LEN)) {
+			if (out_pos + 1 >= cap) goto grow_fail;
+			out[out_pos++] = data[i++];
+			continue;
+		}
+		name_end = i + NAME_LEN;
+		while (name_end < in_size && (data[name_end] == ' ' ||
+				data[name_end] == '\t' ||
+				data[name_end] == '\n' ||
+				data[name_end] == '\r')) name_end++;
+		if (name_end >= in_size || data[name_end] != ':') {
+			if (out_pos + 1 >= cap) goto grow_fail;
+			out[out_pos++] = data[i++];
+			continue;
+		}
+		val_start = name_end + 1;
+		val_end = val_start;
+		while (val_end < in_size && data[val_end] != ';' &&
+				data[val_end] != '}') val_end++;
+
+		/* Tokenise value into up to 4 components.
+		 * Whitespace splits; balanced () groups are one token. */
+		ntok = 0;
+		important = 0;
+		scan = val_start;
+		while (scan < val_end && ntok < 4) {
+			size_t tok_start;
+			while (scan < val_end && (data[scan] == ' ' ||
+					data[scan] == '\t' ||
+					data[scan] == '\n' ||
+					data[scan] == '\r')) scan++;
+			if (scan >= val_end) break;
+			tok_start = scan;
+			if (data[scan] == '!') {
+				/* !important suffix -- stop tokenising. */
+				important = 1;
+				scan = val_end;
+				break;
+			}
+			while (scan < val_end && data[scan] != ' ' &&
+					data[scan] != '\t' &&
+					data[scan] != '\n' &&
+					data[scan] != '\r') {
+				if (data[scan] == '(') {
+					int depth = 1;
+					scan++;
+					while (scan < val_end && depth > 0) {
+						if (data[scan] == '(') depth++;
+						else if (data[scan] == ')') depth--;
+						scan++;
+					}
+				} else {
+					scan++;
+				}
+			}
+			toks[ntok] = data + tok_start;
+			tlens[ntok] = scan - tok_start;
+			ntok++;
+		}
+
+		if (ntok < 1 || ntok > 4) {
+			/* Malformed value -- pass through unchanged. */
+			while (i < val_end) {
+				if (out_pos + 1 >= cap) goto grow_fail;
+				out[out_pos++] = data[i++];
+			}
+			continue;
+		}
+
+		/* Expand to TRBL per CSS shorthand rules. */
+		switch (ntok) {
+		case 1:
+			part_v[0] = part_v[1] = part_v[2] = part_v[3] = toks[0];
+			part_l[0] = part_l[1] = part_l[2] = part_l[3] = tlens[0];
+			break;
+		case 2:
+			part_v[0] = toks[0]; part_l[0] = tlens[0];
+			part_v[1] = toks[1]; part_l[1] = tlens[1];
+			part_v[2] = toks[0]; part_l[2] = tlens[0];
+			part_v[3] = toks[1]; part_l[3] = tlens[1];
+			break;
+		case 3:
+			part_v[0] = toks[0]; part_l[0] = tlens[0];
+			part_v[1] = toks[1]; part_l[1] = tlens[1];
+			part_v[2] = toks[2]; part_l[2] = tlens[2];
+			part_v[3] = toks[1]; part_l[3] = tlens[1];
+			break;
+		default:
+			part_v[0] = toks[0]; part_l[0] = tlens[0];
+			part_v[1] = toks[1]; part_l[1] = tlens[1];
+			part_v[2] = toks[2]; part_l[2] = tlens[2];
+			part_v[3] = toks[3]; part_l[3] = tlens[3];
+			break;
+		}
+
+		/* Grow if needed: 4 fields, each "name:value [!important];" */
+		expanded_max = 0;
+		for (k = 0; k < 4; k++) {
+			expanded_max += FIELD_LENS[k] + part_l[k] +
+				(important ? 11 : 0) + 2;
+		}
+		while (out_pos + expanded_max + 8 >= cap) {
+			char *grown;
+			size_t newcap = cap * 2 + 256;
+			grown = (char *)realloc(out, newcap);
+			if (grown == NULL) goto grow_fail;
+			out = grown;
+			cap = newcap;
+		}
+
+		for (k = 0; k < 4; k++) {
+			memcpy(out + out_pos, FIELDS[k], FIELD_LENS[k]);
+			out_pos += FIELD_LENS[k];
+			memcpy(out + out_pos, part_v[k], part_l[k]);
+			out_pos += part_l[k];
+			if (important) {
+				memcpy(out + out_pos, " !important", 11);
+				out_pos += 11;
+			}
+			if (k < 3) {
+				out[out_pos++] = ';';
+			}
+		}
+		changed = 1;
+		i = val_end;  /* keep terminator (; or }) for caller. */
+	}
+
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+	*out_size_p = out_pos;
+	return out;
+
+grow_fail:
+	free(out);
+	return NULL;
+}
+
+
 static bool
 nscss_process_data(struct content *c, const char *data, unsigned int size)
 {
@@ -2293,10 +2545,12 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_text_shadow = NULL;
 	char *rewritten_transform = NULL;
 	char *rewritten_modern_compat = NULL;
+	char *rewritten_inset = NULL;
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
 	size_t modern_compat_size = 0;
+	size_t inset_size = 0;
 	const char *final_data;
 	unsigned int final_size;
 
@@ -2422,8 +2676,20 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 		final_size = (unsigned int)modern_compat_size;
 	}
 
+	/* fixes191a — inset shorthand expansion to top/right/bottom/left.
+	 * Allocates a growable buffer (output is up to ~5x input for the
+	 * matched declarations). Pass-through on no-op. */
+	rewritten_inset = macsurf__rewrite_inset(final_data,
+			(size_t)final_size, &inset_size);
+	if (rewritten_inset != NULL &&
+			inset_size <= (size_t)0x7fffffff) {
+		final_data = (const char *)rewritten_inset;
+		final_size = (unsigned int)inset_size;
+	}
+
 	error = nscss_process_css_data(&css->data, final_data, final_size);
 
+	if (rewritten_inset != NULL) free(rewritten_inset);
 	if (rewritten_modern_compat != NULL) free(rewritten_modern_compat);
 	if (rewritten_transform != NULL) free(rewritten_transform);
 	if (rewritten_text_shadow != NULL) free(rewritten_text_shadow);

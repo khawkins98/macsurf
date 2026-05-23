@@ -344,6 +344,17 @@ struct css_computed_style_i {
 	css_fixed_or_calc width;
 	css_fixed word_spacing;
 	int32_t z_index;
+	/* fixes191b: background-size.
+	 *   bits 31..16: w_code  (int16 cast)
+	 *   bits 15..0:  h_code  (int16 cast)
+	 * Each code:
+	 *    0 = auto (use natural image dimension on this axis)
+	 *    +N = explicit pixels (0 < N <= 32767)
+	 *   -1 = sentinel COVER     (-1 in int16 == 0xFFFF)
+	 *   -2 = sentinel CONTAIN
+	 * Whole word 0 = unset / treat as `auto auto` (CSS default).
+	 * int32 storage is self-aligning (fixes151b padding lesson). */
+	int32_t background_size;
 };
 
 struct css_computed_style {

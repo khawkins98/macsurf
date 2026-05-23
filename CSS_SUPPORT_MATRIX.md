@@ -112,8 +112,9 @@ All pseudos below are **parsed**. Column indicates dynamic/match behaviour.
 | `display: contents` | NEEDS_LAYOUT |
 | `display: flow-root` | NEEDS_LAYOUT — treated as block; doesn't establish BFC |
 | `position: static / relative / absolute / fixed` | FULL |
-| `position: sticky` | NEEDS_LAYOUT — falls back to relative |
+| `position: sticky` | PARTIAL (fixes191c) — vertical-only V1: clamps painted y to `top:` in viewport coords; no containing-block-bottom clamp, no `bottom`/`left`/`right`, no nested scroll containers |
 | `top`/`right`/`bottom`/`left` | FULL |
+| `inset` shorthand | FULL (fixes191a) — cssh_css expands `inset: A [B [C [D]]]` to top/right/bottom/left longhands before libcss sees the source. `!important` is propagated; `auto`, `calc()`, `var()`, lengths and percentages pass through verbatim. |
 | `float: left / right / none` | FULL |
 | `clear` | FULL |
 | `visibility: visible / hidden / collapse` | PARTIAL — collapse not honoured on table rows |
@@ -154,7 +155,8 @@ Covered above.
 | `background-repeat` (`repeat/repeat-x/repeat-y/no-repeat`) | FULL (fixes138 tile loop) |
 | `background-position` | FULL |
 | `background-attachment: scroll / fixed` | FULL (fixes137) |
-| `background-clip` / `background-origin` / `background-size` | MISSING_PARSER (`size` partially via shorthand) |
+| `background-size` | PARTIAL (fixes191b) — bitmap backgrounds: `auto`, `cover`, `contain`, `<length>`, `<length> <length>`, `auto <length>`, `<length> auto` all wired. Percentages and gradient-backgrounds deferred (gradients render once across the box; tiling-a-gradient requires plotter rewrite). Unset preserves the historical per-box-size tile behaviour. |
+| `background-clip` / `background-origin` | MISSING_PARSER |
 | Multiple backgrounds (`background: a, b`) | MISSING_PARSER — only first layer kept |
 | Linear gradients (`linear-gradient`) | FULL via `-macsurf-gradient` and standard alias |
 | Radial gradients | FULL (fixes74) — vendor-only `-macsurf-gradient` |
@@ -221,8 +223,8 @@ Covered above.
 | Property | Status |
 |---|---|
 | `cursor` | FULL — set_pointer in window.c (fixes131) |
-| `pointer-events: auto/none` | MISSING_PARSER (re-classified fixes202) — no libcss parser, no public accessor. Would need a new property, which is the trap zone; deferred until a Track-H sized round. |
-| `user-select` | MISSING_PARSER — selection model is platform-defined |
+| `pointer-events: auto/none` | QUICKDRAW_FALLBACK (fixes191e) — cssh_css drops the declaration so libcss does not warn. Hit-testing still treats every visible box as targettable; full hit-test skip deferred to a future round (would need new libcss property storage). |
+| `user-select` | QUICKDRAW_FALLBACK (fixes191f) — silently dropped via cssh_css. Selection model is platform-defined. |
 | `caret-color` | MISSING_PARSER |
 | `appearance` | MISSING_PARSER |
 | `resize` | MISSING_PARSER |
@@ -317,15 +319,16 @@ Mostly aliased into flex/grid above. `place-content`, `place-items`,
 
 | Feature | Status |
 |---|---|
-| `transition`, `transition-*` | MISSING_PARSER. **Track H.** |
-| `animation`, `animation-*`, `@keyframes` | PARTIAL — vendor `-macsurf-animation-*` opacity/rotate exists. **Track H.** |
+| `transition`, `transition-*` | QUICKDRAW_FALLBACK (fixes191f) — silently dropped via cssh_css; final static value still applies. No timer playback. |
+| `animation`, `animation-*` | QUICKDRAW_FALLBACK (fixes191f) — silently dropped via cssh_css; final static value still applies. Vendor `-macsurf-animation-*` opacity/rotate retained as the supported animation path. |
+| `@keyframes` | PARSE-INERT (fixes191f) — block parses but no rule matches because animation-name never lands in the cascade; no playback. |
 
 ### B.7 Backgrounds & Borders Level 3
 
 | Feature | Status |
 |---|---|
 | `border-image-*` | MISSING_PARSER |
-| `background-size` | PARTIAL — `cover`/`contain` not in layout |
+| `background-size` | PARTIAL (fixes191b) — `auto`, `cover`, `contain`, `<length>`, two-value form all wired for bitmap backgrounds. Percentages and gradient-bg tiling deferred. See A.8. |
 | `box-shadow` (covered above) | FULL (no blur) |
 | `border-radius` (covered above) | FULL |
 
@@ -363,7 +366,7 @@ Covered in A.9. Level 4 syntaxes are MISSING_PARSER.
 | PNG/GIF/JPEG/BMP/TIFF decode | FULL (fixes78/79b) — PNG has real per-pixel mask |
 | WebP / AVIF / HEIC | INTENTIONALLY_UNSUPPORTED |
 | `object-fit` (fill/contain/cover/none/scale-down) | FULL (fixes116) |
-| `object-position` | MISSING_PARSER |
+| `object-position` | QUICKDRAW_FALLBACK (fixes191d) — cssh_css drops the declaration. apply_object_fit centres the fitted image, matching the default `center center`. Non-default values degrade to centre. Real per-axis support deferred. |
 | `image-set()` | MISSING_PARSER |
 | Lazy / responsive `srcset`, `sizes` | NEEDS_FRONTEND — fetcher picks first |
 

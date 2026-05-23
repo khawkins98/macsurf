@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes191a (inset shorthand)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 { color: #003366; font-size: 14pt; margin: 0 0 4px 0; }
+  .lede { color: #666; font-size: 8pt; margin: 0 0 12px 0; }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+    position: relative;
+    height: 110px;
+  }
+  .card-title { color: #003366; font-size: 10pt; font-weight: bold; margin: 0 0 8px 0; }
+  .expect { color: #888; font-style: italic; font-size: 8pt; margin: 8px 0 0 0; }
+
+  /* fixes191a — inset shorthand probes.
+   * Each ::before overlay is positioned with `inset:` instead of
+   * top/right/bottom/left and should fill the area defined by the
+   * shorthand. The cssh_css preprocessor expands the shorthand
+   * before libcss sees it; libcss never learns the property name. */
+
+  .i1 .ov { position: absolute; inset: 0;
+            background: rgba(0,80,160,0.25); }
+  .i2 .ov { position: absolute; inset: 8px;
+            background: rgba(160,80,0,0.25); }
+  .i3 .ov { position: absolute; inset: 4px 20px;
+            background: rgba(0,140,0,0.25); }
+  .i4 .ov { position: absolute; inset: 4px 20px 16px;
+            background: rgba(140,0,140,0.25); }
+  .i5 .ov { position: absolute; inset: 4px 20px 16px 60px;
+            background: rgba(180,40,40,0.30); }
+</style>
+</head>
+<body>
+<h1>fixes191a — inset shorthand</h1>
+<p class="lede">Each ::before/overlay is positioned via the inset shorthand. The preprocessor expands to top/right/bottom/left so libcss handles the longhands normally.</p>
+
+<div class="card i1">
+  <div class="card-title">I1 — inset: 0</div>
+  <div class="ov"></div>
+  <p class="expect">Overlay should fill the entire card (all four edges flush).</p>
+</div>
+
+<div class="card i2">
+  <div class="card-title">I2 — inset: 8px</div>
+  <div class="ov"></div>
+  <p class="expect">Overlay inset 8px from every edge.</p>
+</div>
+
+<div class="card i3">
+  <div class="card-title">I3 — inset: 4px 20px (V/H)</div>
+  <div class="ov"></div>
+  <p class="expect">4px top/bottom, 20px left/right.</p>
+</div>
+
+<div class="card i4">
+  <div class="card-title">I4 — inset: 4px 20px 16px (T R+L B)</div>
+  <div class="ov"></div>
+  <p class="expect">top=4, right=20, bottom=16, left=20.</p>
+</div>
+
+<div class="card i5">
+  <div class="card-title">I5 — inset: 4px 20px 16px 60px (TRBL)</div>
+  <div class="ov"></div>
+  <p class="expect">top=4, right=20, bottom=16, left=60 — visibly asymmetric.</p>
+</div>
+</body>
+</html>

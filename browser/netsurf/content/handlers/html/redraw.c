@@ -1372,6 +1372,108 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 				bg_data.repeat_x = repeat_x;
 				bg_data.repeat_y = repeat_y;
 
+				/* fixes191b -- background-size consumer.
+				 *
+				 * The default (unset / 0) keeps the historical
+				 * MacSurf behaviour where each "tile" is the
+				 * box size (one tile fills the box). When set,
+				 * resolve to a tile dimension per axis:
+				 *
+				 *   auto (0)  - use natural image dimension
+				 *               (or aspect-preserved when the
+				 *                other axis has an explicit size)
+				 *   +N px     - tile that many pixels (scaled)
+				 *   cover (-1)- scale to MAX(box/nat ratios)
+				 *               so the image covers the box.
+				 *   contain (-2)- scale to MIN ratio so the
+				 *               image fits inside the box.
+				 *
+				 * Integer math (no int64) per CW8 PPC long-long
+				 * codegen gotcha. */
+				if (background->style != NULL) {
+					int32_t bgsz = css_computed_background_size(
+							background->style);
+					if (bgsz != 0) {
+						int16_t wc = (int16_t)(
+							(bgsz >> 16) & 0xFFFF);
+						int16_t hc = (int16_t)(
+							bgsz & 0xFFFF);
+						int nat_w =
+							content_get_width(
+							background->background);
+						int nat_h =
+							content_get_height(
+							background->background);
+						int box_w = (int)ceilf(
+							width * scale);
+						int box_h = (int)ceilf(
+							height * scale);
+						int tile_w = box_w;
+						int tile_h = box_h;
+						if (nat_w < 1) nat_w = 1;
+						if (nat_h < 1) nat_h = 1;
+						if (wc == -1 || hc == -1) {
+							/* cover */
+							if (nat_w * box_h >
+							  nat_h * box_w) {
+								tile_h = box_h;
+								tile_w = (nat_w *
+								  box_h) / nat_h;
+							} else {
+								tile_w = box_w;
+								tile_h = (nat_h *
+								  box_w) / nat_w;
+							}
+						} else if (wc == -2 ||
+								hc == -2) {
+							/* contain */
+							if (nat_w * box_h <
+							  nat_h * box_w) {
+								tile_h = box_h;
+								tile_w = (nat_w *
+								  box_h) / nat_h;
+							} else {
+								tile_w = box_w;
+								tile_h = (nat_h *
+								  box_w) / nat_w;
+							}
+						} else {
+							/* per-axis explicit
+							 * or auto. */
+							if (wc > 0) {
+								tile_w = (int)(
+								(float)wc *
+								scale);
+							} else if (hc > 0) {
+								tile_w = (int)(
+								(float)hc *
+								(float)nat_w /
+								(float)nat_h *
+								scale);
+							} else {
+								tile_w = nat_w;
+							}
+							if (hc > 0) {
+								tile_h = (int)(
+								(float)hc *
+								scale);
+							} else if (wc > 0) {
+								tile_h = (int)(
+								(float)wc *
+								(float)nat_h /
+								(float)nat_w *
+								scale);
+							} else {
+								tile_h = nat_h;
+							}
+						}
+						if (tile_w < 1) tile_w = 1;
+						if (tile_h < 1) tile_h = 1;
+						bg_data.width = tile_w;
+						bg_data.height = tile_h;
+					}
+				}
+
 				/* We just continue if redraw fails */
 				content_redraw(background->background,
 						&bg_data, &r, ctx);
@@ -2570,6 +2672,58 @@ bool html_redraw_box(const html_content *html, struct box *box,
 			box->descendant_x1 = box->descendant_x0 + 10000;
 		if (box->descendant_y1 <= box->descendant_y0)
 			box->descendant_y1 = box->descendant_y0 + 200000;
+	}
+
+	/* fixes191c — position: sticky vertical clamp (V1).
+	 *
+	 * Sticky is laid out exactly like position: relative, then at paint
+	 * time we shift the box (and all descendants, by adjusting y_parent
+	 * BEFORE the x/y computation below) so the painted y never goes
+	 * above `top` in viewport coordinates.
+	 *
+	 * NetSurf calls browser_window_redraw with y_offset = -scroll_y; by
+	 * the time we reach this function, y_parent + box->y is already in
+	 * VIEWPORT coordinates (0 = first painted row of the content area).
+	 * That means top:32px wants to pin the box at viewport-y = 32. If
+	 * (y_parent + box->y) < 32, we shift down by the delta; otherwise
+	 * the box paints at its normal relative position.
+	 *
+	 * V1 limits:
+	 *   - vertical only (`top`); `bottom`/`left`/`right` deferred.
+	 *   - no containing-block-bottom clamp (sticky never "lets go" at
+	 *     parent's bottom edge). For sidebars/headers in modern themes
+	 *     the parent is usually tall enough that this is invisible.
+	 *   - no nested-scroll-container support (sticky pins to viewport).
+	 *   - hit-testing uses the shifted painted position because the
+	 *     downstream walker takes y_parent into account.
+	 */
+	if (box->style != NULL &&
+			css_computed_position(box->style) ==
+				CSS_POSITION_STICKY) {
+		css_fixed t_v = 0;
+		css_unit t_u = CSS_UNIT_PX;
+		uint8_t t_type;
+		t_type = css_computed_top(box->style, &t_v, &t_u);
+		if (t_type == CSS_TOP_SET) {
+			int top_px;
+			int normal_y;
+			if (t_u == CSS_UNIT_PCT) {
+				/* Percentage of containing block height; if
+				 * containing block isn't trivially available,
+				 * fall back to 0. Modern themes use px values
+				 * for sticky anchors. */
+				top_px = 0;
+			} else {
+				top_px = FIXTOINT(css_unit_len2device_px(
+						box->style,
+						&html->unit_len_ctx,
+						t_v, t_u));
+			}
+			normal_y = y_parent + box->y;
+			if (normal_y < top_px) {
+				y_parent += (top_px - normal_y);
+			}
+		}
 	}
 
 	/* avoid trivial FP maths */
