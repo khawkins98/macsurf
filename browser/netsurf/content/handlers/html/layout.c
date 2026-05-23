@@ -1735,6 +1735,9 @@ static void layout_move_children(struct box *box, int x, int y)
 	}
 }
 
+static bool layout_inline_container(struct box *inline_container, int width,
+		struct box *cont, int cx, int cy, html_content *content);
+
 static int layout_multicol_default_gap(
 		const struct box *block,
 		const css_unit_ctx *unit_len_ctx)
@@ -1857,7 +1860,8 @@ static bool layout_multicol_child_supported(const struct box *child)
 
 	if (child->type == BOX_BLOCK ||
 			child->type == BOX_FLEX ||
-			child->type == BOX_GRID) {
+			child->type == BOX_GRID ||
+			child->type == BOX_INLINE_CONTAINER) {
 		return true;
 	}
 
@@ -1868,8 +1872,20 @@ static bool layout_multicol_layout_child(
 		struct box *child,
 		int available_width,
 		int viewport_height,
+		struct box *cont,
 		html_content *content)
 {
+	if (child->type == BOX_INLINE_CONTAINER) {
+		child->width = available_width;
+		if (!layout_inline_container(child, available_width,
+				cont, 0, 0, content))
+			return false;
+		if (child->height == AUTO)
+			child->height = 0;
+		return true;
+	}
+
+
 	if (child->type == BOX_BLOCK) {
 		layout_block_find_dimensions(&content->unit_len_ctx,
 				available_width, viewport_height, 0, 0, child);
@@ -1978,7 +1994,7 @@ static bool layout_multicol_context(
 		}
 
 		if (!layout_multicol_layout_child(child, column_width,
-				viewport_height, content)) {
+				viewport_height, block, content)) {
 			free(items);
 			free(outer_heights);
 			return false;
