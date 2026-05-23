@@ -101,7 +101,7 @@ css_error css__parse_background_size(css_language *c,
 	} else if (token->type == CSS_TOKEN_DIMENSION ||
 			token->type == CSS_TOKEN_NUMBER) {
 		css_fixed length = 0;
-		uint32_t unit = 0;
+		css_unit unit = CSS_UNIT_PX;
 		size_t consumed = 0;
 		if (token->idata == NULL) { *ctx = orig_ctx; return CSS_INVALID; }
 		length = css__number_from_lwc_string(token->idata, false,
@@ -109,8 +109,7 @@ css_error css__parse_background_size(css_language *c,
 		if (token->type == CSS_TOKEN_DIMENSION) {
 			const char *u = lwc_string_data(token->idata) + consumed;
 			size_t ulen = lwc_string_length(token->idata) - consumed;
-			error = css__parse_unit_keyword(u, ulen,
-					(css_unit *)&unit);
+			error = css__parse_unit_keyword(u, ulen, &unit);
 			if (error != CSS_OK) { *ctx = orig_ctx; return error; }
 		} else {
 			/* Bare number: treat as px when 0, else invalid. */
