@@ -1948,8 +1948,19 @@ static bool layout_multicol_context(
 	int base_y;
 	bool balance;
 
-	macsurf_debug_log_writef("MCOL try box=%p w=%d", (void*)block,
-			block->width);
+	{
+		int32_t dbg_cv = 0;
+		css_fixed dbg_wl = 0;
+		css_unit dbg_wu = CSS_UNIT_PX;
+		uint8_t dbg_ct = css_computed_column_count(block->style,
+				&dbg_cv);
+		uint8_t dbg_wt = css_computed_column_width(block->style,
+				&dbg_wl, &dbg_wu);
+		macsurf_debug_log_writef(
+			"MCOL try box=%p w=%d ct=%d cv=%d wt=%d wl=%d",
+			(void*)block, block->width, (int)dbg_ct, (int)dbg_cv,
+			(int)dbg_wt, (int)dbg_wl);
+	}
 	if (!layout_multicol_resolve(block, &content->unit_len_ctx, &count,
 			&gap, &column_width, &balance)) {
 		macsurf_debug_log_writef("MCOL resolve=BAIL w=%d", block->width);
