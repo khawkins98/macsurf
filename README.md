@@ -35,9 +35,9 @@
 > [!WARNING]
 > **MacSurf 0.1a1 is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, but **most websites in 2026 will not work** in it. Expect: crashes on heavy SPAs, broken layouts on sites that lean on modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
 >
-> **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it, bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too**, there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
+> **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it. Bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too**; there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
 >
-> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, mactrove.com, a respectable subset of the CSS Grid spec, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
+> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, a respectable subset of the CSS Grid spec, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
 >
 > Released **2026-05-20** as the first numbered version. Release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
 
@@ -47,17 +47,9 @@
 
 The web outgrew Classic Mac OS twenty years ago. Modern HTTPS killed it for good around 2016. Today, an out-of-the-box G3 or G4 running OS 9 can barely reach a single live website.
 
-MacSurf brings the real web back. Not a screenshot proxy. Not a remote terminal session. A native browser, built with the tools that were on the platform, CodeWarrior, the Carbon API, QuickDraw, Open Transport, running real CSS3 layouts and real JavaScript inside the 64-megabyte memory floor of a 1999 iMac.
+MacSurf brings the real web back. Not a screenshot proxy. Not a remote terminal session. A native browser, built with the tools that were on the platform—CodeWarrior, the Carbon API, QuickDraw, Open Transport—running real CSS3 layouts and real JavaScript inside the 64-megabyte memory floor of a 1999 iMac.
 
 It is, as far as we can find, the first serious [NetSurf](https://www.netsurf-browser.org/) port to Classic Mac OS, and the first browser shipped on Mac OS 9 with native CSS Grid, CSS custom properties, and ES5 JavaScript.
-
----
-
-## Built with AI assistance
-
-MacSurf was built with heavy use of AI coding assistants, primarily [Claude Code](https://www.anthropic.com/claude-code), plus other tools where they helped. Hundreds of hours of human direction, architectural decisions, hardware testing, and debugging on a real beige G3 went into it; an LLM does not write a NetSurf port to CodeWarrior 8 on its own. But the keystroke-level work, typing the C, writing the libcss patches, drafting the cssh_css preprocessors, iterating on plotters and image decoders, was a human-and-AI collaboration from day one. The repo includes [CLAUDE.md](CLAUDE.md) (the working assistant directives accumulated over the project) and [docs/claude-code-tasks.md](docs/claude-code-tasks.md) (the original task list that bootstrapped the port) so you can see how the work actually happened.
-
-If "vibe-coded" is your objection, it's a fair label and not one I'm hiding from. The output is a real C89 codebase that builds in CodeWarrior 8 and runs on a 25-year-old Mac. Judge it by what it does.
 
 ---
 
@@ -115,8 +107,6 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 </td>
 </tr>
 </table>
-
----
 
 ---
 
@@ -231,58 +221,3 @@ A single Go binary. No config files. No dependencies beyond stdlib.
 cd proxy
 go build -o macsurf-proxy
 ./macsurf-proxy
-```
-
-- [Deploy guide](docs/deploying-proxy.md)
-
-</td>
-</tr>
-</table>
-
----
-
-## Documentation
-
-- [**Architecture**](docs/architecture.md), rendering modes, proxy services, milestone plan
-- [**Project status**](docs/status.md), what works, what's next
-- [**Version history**](docs/HISTORY.md), milestone timeline
-- [**CSS status**](docs/css-status.md), feature-by-feature CSS coverage
-- [**The MacSurf story**](docs/story.html), narrative writeup
-- [**Full doc index**](docs/README.md)
-
----
-
-## Technical constraints
-
-The platform sets the rules. MacSurf works around them, not against them.
-
-- **Cooperative multitasking only.** No preemptive threads anywhere. `WaitNextEvent` drives the UI; Open Transport synchronous calls yield via the Thread Manager on `kOTSyncIdleEvent`.
-- **Strict C89.** No `inline`, no `//`, no designated initializers, no variadic macros, no for-scope declarations. CW8 doesn't compile anything more modern.
-- **No HTTPS in the browser** (without macSSL). All TLS is handled by the proxy, the Mac speaks plain HTTP and the proxy bridges out to HTTPS.
-- **16&nbsp;MB Carbon application partition.** libcss allocates from the OS heap and runs out below ~12&nbsp;MB on real pages.
-- **Two memory floors:** 64&nbsp;MB RAM (development) on a G3 iMac, 256&nbsp;MB+ (enthusiast tier) on G4 hardware.
-
----
-
-## Prior art
-
-There was nothing here before. The netsurf-dev list has a single 2017 "Port to OS9?" thread with no follow-through. Best references the project was built against:
-
-- [**Classilla**](https://sourceforge.net/projects/classilla/), the Mozilla-era reference Carbon browser. MacSurf borrows the `'carb'` resource pattern and Open Transport architecture from Classilla's `macsockotpt.c`.
-- [**cy384/ssheven**](https://github.com/cy384/ssheven), production SSH client for OS 9; the canonical reference for cooperative-multitasking + Open Transport on real hardware.
-- [**cy384/miscellany**](https://github.com/cy384/miscellany), the shortest known-good OT HTTP client (~220 lines).
-
----
-
-## License
-
-MacSurf is a derivative work of [NetSurf](https://www.netsurf-browser.org/) and inherits its licensing terms: **GPLv2** with the OpenSSL linking exception, plus MIT for visual artwork. The complete text is in [LICENSE](LICENSE).
-
-The Go proxy and macSSL ship under permissive licences, see each subproject for details.
-
----
-
-<p align="center">
-  <img src="img/elin.png" width="72" height="72" alt="MacSurf"><br>
-  <sub><em>Built with stubbornness for a 25-year-old operating system.</em></sub>
-</p>
