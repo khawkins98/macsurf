@@ -2,13 +2,13 @@
  * MacSurf - macos9_fetch.c
  * HTTP fetch via Open Transport.
  *
- * Mirrors the Retro68 ot-tcp-demo.c pattern verbatim (verified on real
- * Mac OS 9.2 hardware): plain non-InContext OT API, sync+blocking endpoint,
- * OTUseSyncIdleEvents(ep, true) plus a notifier that yields to the classic
- * Thread Manager on kOTSyncIdleEvent.
+ * Uses the same sync+blocking endpoint plus OTUseSyncIdleEvents(ep, true)
+ * notifier-yield pattern as the Retro68 OT demos, but in MacSurf's current
+ * Carbon build the endpoint is opened through OTOpenEndpointInContext()
+ * with the shared macos9_ot_context from main.c.
  *
- * InitOpenTransport() and CloseOpenTransport() are called ONCE in main() -
- * not per-fetch. This file only opens and closes individual endpoints.
+ * InitOpenTransportInContext() is called ONCE in main() - not per-fetch.
+ * This file only opens and closes individual endpoints.
  *
  * Also provides HTML tag stripping and word wrapping used by window.c
  * to turn a fetch body into displayable text.

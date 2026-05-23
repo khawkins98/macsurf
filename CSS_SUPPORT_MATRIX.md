@@ -291,11 +291,11 @@ INTENTIONALLY_UNSUPPORTED — visual browser only.
 
 | Feature | Status |
 |---|---|
-| `column-count`, `column-width`, `columns` shorthand | PARSED_NOT_CONSUMED. **Track D.** |
+| `column-count`, `column-width`, `columns` shorthand | PARTIAL (fixes179) — real multicol block-container layout, width/count heuristic, direct block-child placement only |
 | `column-gap` | FULL (shared with flex/grid) |
-| `column-rule-*` | PARSED_NOT_CONSUMED. **Track D.** |
-| `column-span` | PARSED_NOT_CONSUMED |
-| `column-fill` | PARSED_NOT_CONSUMED |
+| `column-rule-*` | PARTIAL (fixes179) — vertical rules paint between columns; dashed/dotted use plotter strokes, other styles fall back visually |
+| `column-span` | PARSED_NOT_CONSUMED — deferred in fixes179 |
+| `column-fill` | PARTIAL (fixes179) — `balance` currently uses the same approximate placement path as V1 sequential fill |
 | `break-before/after/inside` (and legacy `page-break-*`) | PARSED_NOT_CONSUMED — relevant only in multicol/print |
 
 ### B.4 Box Alignment (Level 3)

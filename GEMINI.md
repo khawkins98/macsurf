@@ -27,7 +27,7 @@ This file contains the foundational mandates, technical constraints, and operati
   - **CRITICAL BUG:** DO NOT cast function pointers to UPPs for CarbonLib (e.g., `NewControlActionUPP(proc)` macro override is unsafe and crashes). Use `TrackControl(ctrl, pt, NULL)`.
   - **CRITICAL BUG:** DO NOT register Carbon event classes that are not available in CarbonLib (e.g., `kEventMouseWheelMoved` crashes the dispatcher).
 - **Networking (Open Transport):**
-  - Use plain, non-`InContext` calls ONLY (`InitOpenTransport`, `OTOpenEndpoint`). `*InContext` variants crash in OTClientLib.
+  - The current browser code uses `InitOpenTransportInContext` plus `OTOpenEndpointInContext` with a shared `macos9_ot_context`. Follow the implementation unless a future hardware-verified change replaces it.
   - Use `OTUseSyncIdleEvents(ep, true)` with a notifier that calls `YieldToAnyThread()` on `kOTSyncIdleEvent`.
 - **JavaScript:**
   - Engine: Duktape 2.7.0 (ES5). Linked into the base build.

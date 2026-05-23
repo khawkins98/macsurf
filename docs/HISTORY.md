@@ -46,7 +46,7 @@ The compiler. The last professional C/C++ IDE for Classic Mac OS, running native
 The application framework. Carbon provides the window manager, event loop, controls, QuickDraw drawing, and Open Transport networking that MacSurf uses. Designed as a bridge between Classic Mac OS and OS X, Carbon gave MacSurf access to modern (for 2001) UI primitives while remaining compatible with the cooperative multitasking model of OS 9.
 
 ### Open Transport (Apple)
-The networking layer. MacSurf uses plain (non-InContext) Open Transport calls for TCP/IP, matching the patterns established by cy384's SSHeven and the Retro68 OT TCP demo. Synchronous blocking calls with `OTUseSyncIdleEvents` and a yield-to-thread notifier keep the UI responsive during network operations.
+The networking layer. MacSurf's current Carbon browser code uses `InitOpenTransportInContext` and `OTOpenEndpointInContext` with a shared OT client context. Synchronous blocking calls with `OTUseSyncIdleEvents` and a yield-to-thread notifier keep the UI responsive during network operations.
 
 ### MacSurf Proxy (custom, Go)
 The TLS termination layer. A single Go binary running on a VPS (Hetzner, Germany) that receives plain HTTP from the Mac, fetches the requested URL via HTTPS, and returns the response as plain HTTP. No configuration files, no dependencies. The proxy is what makes modern HTTPS websites accessible to a machine that has no TLS stack.
