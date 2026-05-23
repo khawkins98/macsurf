@@ -533,6 +533,12 @@ int32_t css_computed_aspect_ratio(
 	return style->i.aspect_ratio;
 }
 
+int32_t css_computed_background_size(
+		const css_computed_style *style)
+{
+	return style->i.background_size;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

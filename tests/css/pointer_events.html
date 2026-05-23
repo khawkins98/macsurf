@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes191e (pointer-events)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 { color: #003366; font-size: 14pt; margin: 0 0 4px 0; }
+  .lede { color: #666; font-size: 8pt; margin: 0 0 12px 0; }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+    position: relative;
+    height: 100px;
+  }
+  .card-title { color: #003366; font-size: 10pt; font-weight: bold; margin: 0 0 8px 0; }
+  .expect { color: #888; font-style: italic; font-size: 8pt; margin: 8px 0 0 0; }
+
+  /* fixes191e — pointer-events declarations silently dropped via
+   * cssh_css. Hit-testing in MacSurf treats every visible box as
+   * targettable. The overlay below paints (semi-transparent blue)
+   * but currently still blocks the link beneath; full hit-test
+   * support is deferred. */
+  .overlay {
+    position: absolute;
+    top: 8px; right: 8px; bottom: 8px; left: 8px;
+    background: rgba(0,80,160,0.18);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<h1>fixes191e — pointer-events (PARTIAL: parser-safe only)</h1>
+<p class="lede">Declaration parses without breaking the cascade. Full hit-test support deferred to a future round.</p>
+
+<div class="card">
+  <div class="card-title">PE1 — link under pointer-events: none overlay</div>
+  <a href="#somewhere">This link should remain clickable (V2 work)</a>
+  <div class="overlay"></div>
+  <p class="expect">Overlay paints over the link. With full pointer-events support the link would still be clickable; currently it is blocked.</p>
+</div>
+</body>
+</html>

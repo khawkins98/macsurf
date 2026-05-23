@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes191c (position: sticky)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 { color: #003366; font-size: 14pt; margin: 0 0 4px 0; }
+  .lede { color: #666; font-size: 8pt; margin: 0 0 12px 0; }
+  .layout { display: flex; gap: 12px; align-items: flex-start; }
+  .sidebar {
+    width: 160px;
+    background: #ffe;
+    border: 1px solid #aa8;
+    padding: 8px;
+    position: sticky;
+    top: 32px;
+  }
+  .sidebar-title { color: #003366; font-weight: bold; margin: 0 0 4px 0; }
+  .main { flex: 1; min-width: 0; }
+  .filler {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+    height: 220px;
+  }
+  .filler-title { color: #003366; font-weight: bold; margin: 0 0 8px 0; }
+  .expect { color: #888; font-style: italic; font-size: 8pt; }
+</style>
+</head>
+<body>
+<h1>fixes191c — position: sticky</h1>
+<p class="lede">Scroll the window. The yellow sidebar on the left should stick at top:32 instead of scrolling off the top.</p>
+
+<div class="layout">
+  <aside class="sidebar">
+    <p class="sidebar-title">Sticky sidebar</p>
+    <p>position: sticky; top: 32px</p>
+    <p class="expect">Stays pinned 32px below viewport top while page scrolls. Rides with content until reaching the line, then locks.</p>
+  </aside>
+  <main class="main">
+    <div class="filler"><p class="filler-title">Block A</p><p>Filler content. Scroll to see sidebar behaviour.</p></div>
+    <div class="filler"><p class="filler-title">Block B</p><p>Filler.</p></div>
+    <div class="filler"><p class="filler-title">Block C</p><p>Filler.</p></div>
+    <div class="filler"><p class="filler-title">Block D</p><p>Filler.</p></div>
+    <div class="filler"><p class="filler-title">Block E</p><p>Filler. Sidebar should remain in view at the top of the viewport.</p></div>
+  </main>
+</div>
+</body>
+</html>

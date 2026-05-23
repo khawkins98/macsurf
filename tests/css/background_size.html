@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes191b (background-size)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 { color: #003366; font-size: 14pt; margin: 0 0 4px 0; }
+  .lede { color: #666; font-size: 8pt; margin: 0 0 12px 0; }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+  }
+  .card-title { color: #003366; font-size: 10pt; font-weight: bold; margin: 0 0 8px 0; }
+  .expect { color: #888; font-style: italic; font-size: 8pt; margin: 8px 0 0 0; }
+  .swatch { width: 320px; height: 160px; border: 1px solid #999; }
+
+  /* fixes191b — background-size probes.
+   * Each card uses a small bitmap (the favicon) plus background-repeat
+   * and a different background-size value. The 32x32 source bitmap
+   * makes scale dimensions easy to read off the screen. */
+
+  .bs1 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: repeat;
+    /* default: no background-size -> historical behaviour preserved */
+  }
+  .bs2 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: repeat;
+    background-size: 32px 32px;
+  }
+  .bs3 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: repeat;
+    background-size: 16px 16px;
+  }
+  .bs4 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+  .bs5 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+  .bs6 .swatch {
+    background-image: url("/themes/custom/platinum/images/favicon-32.png");
+    background-repeat: repeat;
+    background-size: 48px auto;  /* aspect preserved */
+  }
+</style>
+</head>
+<body>
+<h1>fixes191b — background-size</h1>
+<p class="lede">Tile-size resolution for bitmap backgrounds. Unset preserves the historical MacSurf default (single tile = box).</p>
+
+<div class="card bs1">
+  <div class="card-title">BS1 — no background-size (default)</div>
+  <div class="swatch"></div>
+  <p class="expect">Current default behaviour. Single tile, may scale to swatch dimensions.</p>
+</div>
+
+<div class="card bs2">
+  <div class="card-title">BS2 — background-size: 32px 32px (natural)</div>
+  <div class="swatch"></div>
+  <p class="expect">Tiles at 32x32 = 10 columns by 5 rows in a 320x160 swatch.</p>
+</div>
+
+<div class="card bs3">
+  <div class="card-title">BS3 — background-size: 16px 16px (half)</div>
+  <div class="swatch"></div>
+  <p class="expect">Tiles at 16x16 = 20 columns by 10 rows. Same icon, scaled down per tile.</p>
+</div>
+
+<div class="card bs4">
+  <div class="card-title">BS4 — background-size: contain</div>
+  <div class="swatch"></div>
+  <p class="expect">Single tile, scaled so the whole image fits inside swatch with aspect preserved. Square image, 160-tall swatch -> 160x160 tile.</p>
+</div>
+
+<div class="card bs5">
+  <div class="card-title">BS5 — background-size: cover</div>
+  <div class="swatch"></div>
+  <p class="expect">Single tile, scaled to cover swatch. Square image, 320-wide swatch -> 320x320 tile (may overflow vertically; clipped to swatch box).</p>
+</div>
+
+<div class="card bs6">
+  <div class="card-title">BS6 — background-size: 48px auto (aspect-preserved)</div>
+  <div class="swatch"></div>
+  <p class="expect">w=48px, h derived from natural aspect ratio (32x32 square -> 48x48). Tiles at 48x48.</p>
+</div>
+</body>
+</html>

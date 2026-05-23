@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MacSurf — fixes191f (transition/animation safe drop)</title>
+<style>
+  body {
+    font-family: Helvetica, sans-serif;
+    background: #f0f0f0;
+    color: #222;
+    margin: 16px;
+  }
+  h1 { color: #003366; font-size: 14pt; margin: 0 0 4px 0; }
+  .lede { color: #666; font-size: 8pt; margin: 0 0 12px 0; }
+  .card {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 12px;
+    margin: 0 0 14px 0;
+  }
+  .card-title { color: #003366; font-size: 10pt; font-weight: bold; margin: 0 0 8px 0; }
+  .expect { color: #888; font-style: italic; font-size: 8pt; margin: 8px 0 0 0; }
+
+  /* fixes191f — transition / animation declarations are silently
+   * dropped by cssh_css so libcss never sees them. The final static
+   * value of the transitioned property still applies via the normal
+   * cascade.
+   *
+   * @keyframes blocks are NOT dropped here (lexer-level construct,
+   * not a property), but libcss never matches them against any rule
+   * because no `animation-name` is in the cascade. They turn into
+   * inert rule-with-no-selector and the document continues. */
+  .ts1 {
+    background: #ffcc88;
+    color: #002;
+    padding: 8px;
+    transition: background 200ms ease-in-out;
+  }
+  .ts2 {
+    background: #cceeff;
+    color: #002;
+    padding: 8px;
+    animation: spin 2s infinite;
+  }
+  @keyframes spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<h1>fixes191f — transition / animation safe drop</h1>
+<p class="lede">Animation and transition declarations are silently dropped without poisoning the rest of the cascade. Final static values still apply.</p>
+
+<div class="card">
+  <div class="card-title">TS1 — transition declaration</div>
+  <div class="ts1">Box has transition: background 200ms — declaration dropped. Background should still be orange (#ffcc88).</div>
+  <p class="expect">No regression to background color. No timer playback.</p>
+</div>
+
+<div class="card">
+  <div class="card-title">TS2 — animation declaration with @keyframes</div>
+  <div class="ts2">Box has animation: spin 2s infinite — declaration dropped. Background should still be light blue.</div>
+  <p class="expect">No regression. @keyframes block is inert.</p>
+</div>
+</body>
+</html>

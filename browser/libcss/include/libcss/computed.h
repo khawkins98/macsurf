@@ -247,6 +247,13 @@ int32_t css_computed_macsurf_grid_placement(
 int32_t css_computed_aspect_ratio(
 		const css_computed_style *style);
 
+/* fixes191b: background-size packed int32.
+ *   bits 31..16: w_code (int16: 0=auto, +N=px, -1=cover, -2=contain)
+ *   bits 15..0:  h_code (int16: same encoding)
+ *   0 (whole word) = unset (treat as `auto auto`). */
+int32_t css_computed_background_size(
+		const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.
