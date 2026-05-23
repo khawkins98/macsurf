@@ -1052,7 +1052,57 @@ static void layout_minmax_block_inner(
 			min = html_get_box_tree(block->object)->min_width;
 			max = html_get_box_tree(block->object)->max_width;
 		} else {
-			min = max = content_get_width(block->object);
+			/* fixes194 — replaced element (img / embed / object).
+			 *
+			 * Old behaviour set min = max = content_get_width(object)
+			 * — the natural pixel width of the source bitmap (e.g.
+			 * 1058 for mactrove's logo PNG). Inside a flex/grid
+			 * container, that natural width then propagated up via
+			 * fixes176's intrinsic-main-size walk, blowing the
+			 * whole ancestor chain wider than the viewport (logged
+			 * cascade: img 1058 -> flex 1788 -> block 1818 -> c_w
+			 * 2054 at the root).
+			 *
+			 * The HTML `width="N"` / `height="N"` presentational
+			 * attributes already flow into css_computed_width via
+			 * hints.c::css_hint_width. So if the cascade gives us
+			 * an explicit width (px or length), honour it as the
+			 * min/max-content size of the replaced box. Falls back
+			 * to natural intrinsic when no explicit width is set,
+			 * preserving the long-standing default.
+			 *
+			 * Percentages are skipped because they need a defined
+			 * containing block to resolve and the minmax pass
+			 * doesn't have one. Length-with-non-pct unit converts
+			 * via the unit ctx the same way layout_find_dimensions
+			 * does later. */
+			int natural = content_get_width(block->object);
+			int natural_h = content_get_height(block->object);
+			int explicit_w = -1;
+			int explicit_h = -1;
+			if (wtype == CSS_WIDTH_SET && wunit != CSS_UNIT_PCT) {
+				explicit_w = FIXTOINT(css_unit_len2device_px(
+					block->style,
+					&content->unit_len_ctx,
+					width, wunit));
+			}
+			if (htype == CSS_HEIGHT_SET && hunit != CSS_UNIT_PCT) {
+				explicit_h = FIXTOINT(css_unit_len2device_px(
+					block->style,
+					&content->unit_len_ctx,
+					height, hunit));
+			}
+			if (explicit_w >= 0) {
+				min = max = explicit_w;
+			} else if (explicit_h >= 0 && natural_h > 0) {
+				/* No explicit width but explicit height:
+				 * preserve aspect from natural dims. */
+				min = max = (explicit_h * natural) / natural_h;
+			} else {
+				min = max = natural;
+			}
+			if (min < 0) min = 0;
+			if (max < 0) max = 0;
 		}
 
 		block->flags |= HAS_HEIGHT;
