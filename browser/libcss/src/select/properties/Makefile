@@ -101,6 +101,7 @@ pause_before.c \
 pitch.c \
 pitch_range.c \
 play_during.c \
+s_pointer_events.c \
 position.c \
 quotes.c \
 richness.c \

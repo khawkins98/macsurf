@@ -14,61 +14,71 @@
 #include "select/properties/properties.h"
 #include "select/properties/helpers.h"
 
-/* fixes50 -- pack h-offset, v-offset, and RGB565 colour into the
+/* fixes50/200 -- pack h-offset, v-offset, blur, and RGB565 colour into the
  * single int32_t storage slot reserved for macsurf_text_shadow.
- * Identical layout to the box-shadow packer (s_box_shadow.c):
- *   bits 31..24 h-offset px (int8)
- *   bits 23..16 v-offset px (int8)
- *   bits 15..0  RGB565 (0 = use default opaque black) */
+ *   bits 31..26 h-offset px (6-bit signed, -32..31)
+ *   bits 25..20 v-offset px (6-bit signed, -32..31)
+ *   bits 19..16 blur radius px (4-bit unsigned, 0..15)
+ *   bits 15..0  RGB565 colour
+ */
 static int32_t macsurf_text_shadow_pack(css_fixed h, css_fixed v,
-		css_color color)
+		css_fixed blur, css_color color)
 {
 	int32_t h_px = (int32_t)(h >> 10);
 	int32_t v_px = (int32_t)(v >> 10);
+	int32_t b_px = (int32_t)(blur >> 10);
 	uint8_t r = (uint8_t)((color >> 16) & 0xff);
 	uint8_t g = (uint8_t)((color >>  8) & 0xff);
 	uint8_t b = (uint8_t)((color >>  0) & 0xff);
 	uint16_t rgb565;
 	uint32_t out;
-	if (h_px > 127) h_px = 127;
-	if (h_px < -128) h_px = -128;
-	if (v_px > 127) v_px = 127;
-	if (v_px < -128) v_px = -128;
+
+	if (h_px > 31) h_px = 31;
+	if (h_px < -32) h_px = -32;
+	if (v_px > 31) v_px = 31;
+	if (v_px < -32) v_px = -32;
+	if (b_px > 15) b_px = 15;
+	if (b_px < 0) b_px = 0;
+
 	rgb565 = (uint16_t)((((uint32_t)r >> 3) << 11) |
 			(((uint32_t)g >> 2) <<  5) |
 			 ((uint32_t)b >> 3));
-	out = (((uint32_t)((uint8_t)h_px)) << 24) |
-	      (((uint32_t)((uint8_t)v_px)) << 16) |
+
+	out = (((uint32_t)((uint8_t)h_px & 0x3f)) << 26) |
+	      (((uint32_t)((uint8_t)v_px & 0x3f)) << 20) |
+	      (((uint32_t)((uint8_t)b_px & 0x0f)) << 16) |
 	       (uint32_t)rgb565;
+
 	return (int32_t)out;
 }
 
 css_error css__cascade_macsurf_text_shadow(uint32_t opv, css_style *style,
-		css_select_state *state)
+                css_select_state *state)
 {
-	uint16_t value = CSS_MACSURF_TEXT_SHADOW_INHERIT;
-	css_fixed h = 0, v = 0;
-	css_color color = 0;
-	int32_t packed = 0;
+        uint16_t value = CSS_MACSURF_TEXT_SHADOW_INHERIT;
+        css_fixed h = 0, v = 0, blur = 0;
+        css_color color = 0;
+        int32_t packed = 0;
 
-	if (hasFlagValue(opv) == false) {
-		switch (getValue(opv)) {
-		case 0x0000: /* NONE */
-			value = CSS_MACSURF_TEXT_SHADOW_NONE;
-			break;
-		case 0x0080: /* SET */
-			value = CSS_MACSURF_TEXT_SHADOW_SET;
-			h = *((css_fixed *) style->bytecode);
-			advance_bytecode(style, sizeof(css_fixed));
-			v = *((css_fixed *) style->bytecode);
-			advance_bytecode(style, sizeof(css_fixed));
-			color = *((css_color *) style->bytecode);
-			advance_bytecode(style, sizeof(css_color));
-			packed = macsurf_text_shadow_pack(h, v, color);
-			break;
-		}
-	}
-
+        if (hasFlagValue(opv) == false) {
+                switch (getValue(opv)) {
+                case 0x0000: /* NONE */
+                        value = CSS_MACSURF_TEXT_SHADOW_NONE;
+                        break;
+                case 0x0080: /* SET */
+                        value = CSS_MACSURF_TEXT_SHADOW_SET;
+                        h = *((css_fixed *) style->bytecode);
+                        advance_bytecode(style, sizeof(css_fixed));
+                        v = *((css_fixed *) style->bytecode);
+                        advance_bytecode(style, sizeof(css_fixed));
+                        blur = *((css_fixed *) style->bytecode);
+                        advance_bytecode(style, sizeof(css_fixed));
+                        color = *((css_color *) style->bytecode);
+                        advance_bytecode(style, sizeof(css_color));
+                        packed = macsurf_text_shadow_pack(h, v, blur, color);
+                        break;
+                }
+        }
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
 		return set_macsurf_text_shadow(state->computed, value, packed);

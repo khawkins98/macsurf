@@ -1717,6 +1717,23 @@ static inline css_error set_macsurf_object_position(
 
 	return CSS_OK;
 }
+
+#define POINTER_EVENTS_INDEX 15
+#define POINTER_EVENTS_SHIFT 15
+#define POINTER_EVENTS_MASK 0x18000
+static inline css_error set_pointer_events(css_computed_style *style, uint8_t type)
+{
+	uint32_t *bits = &style->i.bits[POINTER_EVENTS_INDEX];
+
+	*bits = (*bits & ~POINTER_EVENTS_MASK) |
+			(((uint32_t)type & 0x3) << POINTER_EVENTS_SHIFT);
+
+	return CSS_OK;
+}
+#undef POINTER_EVENTS_INDEX
+#undef POINTER_EVENTS_SHIFT
+#undef POINTER_EVENTS_MASK
+
 #undef OBJECT_FIT_INDEX
 #undef OBJECT_FIT_SHIFT
 #undef OBJECT_FIT_MASK

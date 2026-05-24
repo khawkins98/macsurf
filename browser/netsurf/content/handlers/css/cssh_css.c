@@ -2194,10 +2194,11 @@ macsurf__rewrite_modern_compat(const char *data, size_t in_size,
 		"animation-direction",
 		"animation-fill-mode",
 		"animation-play-state",
-		/* fixes191e -- pointer-events. Drop the declaration text so
-		 * libcss doesn't warn. Hit-test still treats every visible
-		 * box as targettable; document as PARTIAL. */
-		"pointer-events",
+		/* fixes201 -- pointer-events PROMOTED out of the drop list.
+		 * libcss now has a real CSS_PROP_POINTER_EVENTS with parser
+		 * + selector + accessor wiring; the cascade respects the
+		 * declaration and the hit-test path in box_at_point honours
+		 * `pointer-events: none`. fixes191e's "drop" entry is gone. */
 		/* fixes191f -- user-select / overscroll-behavior etc. are
 		 * silently dropped. MacSurf has no native equivalent for
 		 * these; pages render fine without them. */

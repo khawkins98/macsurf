@@ -94,13 +94,13 @@ typedef struct plot_style_s {
         colour fill_colour; /**< Colour of fill */
         plot_style_fixed border_radius; /**< Corner radius */
         plot_style_fixed box_shadow; /**< Box shadow h-offset, fixed-point */
+        bool box_shadow_inset; /**< Box shadow inset flag */
         /* fixes47: second endpoint colour for PLOT_OP_TYPE_LINEAR_GRADIENT */
         colour fill_colour2;
         /* fixes48: box-shadow v-offset (fixed-point) and shadow colour.
          * box_shadow_color of 0 means use the default 40% grey. */
         plot_style_fixed box_shadow_y;
-        colour box_shadow_color;
-        /* fixes49: element opacity, plot_style_fixed (PLOT_STYLE_SCALE
+        colour box_shadow_color;        /* fixes49: element opacity, plot_style_fixed (PLOT_STYLE_SCALE
          * = 1.0 opaque, 0 = transparent). When < ~0.85 the rectangle
          * plotter switches to a QuickDraw stipple pattern to approximate
          * alpha blend on 8/16-bit displays. */
@@ -169,6 +169,7 @@ typedef struct plot_font_style {
 	 * already in NetSurf BGR byte order (R in low byte). */
 	int shadow_x;
 	int shadow_y;
+	int shadow_blur;
 	colour shadow_color;
 	/* fixes71: -macsurf-transform packed value (same layout as
 	 * plot_style_t.transform). plot_text honours 90/180/270 rotations

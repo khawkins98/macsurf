@@ -596,8 +596,18 @@ box_at_point(const css_unit_ctx *unit_len_ctx,
 			*box_x -= scrollbar_get_offset(box->scroll_x);
 			*box_y -= scrollbar_get_offset(box->scroll_y);
 
-			if (physically)
+			if (physically) {
+				/* fixes200: respect pointer-events: none. Skip
+				 * the box and its children if pointer-events
+				 * is none. */
+				if (box->style != NULL &&
+						css_computed_pointer_events(box->style) ==
+						CSS_POINTER_EVENTS_NONE) {
+					skip_children = true;
+					continue;
+				}
 				return box;
+			}
 
 			skip_children = false;
 		} else {
