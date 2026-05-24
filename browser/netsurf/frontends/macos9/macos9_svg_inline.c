@@ -127,19 +127,58 @@ struct svg_ctx {
 	int box_y;
 	int box_w;
 	int box_h;
-	/* SVG viewBox. */
+	/* SVG viewBox (kept for diagnostics; the matrix below is the
+	 * load-bearing transform). */
 	float vb_x;
 	float vb_y;
 	float vb_w;
 	float vb_h;
-	/* derived scale factors: screen_dx = (svg_x - vb_x) * scale_x. */
 	float scale_x;
 	float scale_y;
+	/* fixes201 — full affine matrix applied during point mapping.
+	 * Combines the viewBox-to-screen mapping with any element
+	 * transform="..." attribute encountered while walking into a
+	 * subtree. Layout:
+	 *   screen_x = m[0] * sx + m[2] * sy + m[4]
+	 *   screen_y = m[1] * sx + m[3] * sy + m[5]
+	 *
+	 * At svg root: m = [scale_x, 0, 0, scale_y,
+	 *                   box_x - vb_x*scale_x,
+	 *                   box_y - vb_y*scale_y]
+	 * For descendants of <g transform="X">: m = parent_m * X */
+	float m[6];
 	/* plotter table. */
 	const struct redraw_context *plot_ctx;
 	/* gradient table populated before painting (fixes201). */
 	struct svg_gradient_table *grads;
 };
+
+/* fixes201 — 3x3 matrix multiply (only top two rows since the third
+ * row is always [0 0 1] for affine 2D). out = a * b. */
+static void svg__matrix_mul(const float *a, const float *b, float *out)
+{
+	float r0, r1, r2, r3, r4, r5;
+	r0 = a[0] * b[0] + a[2] * b[1];
+	r2 = a[0] * b[2] + a[2] * b[3];
+	r4 = a[0] * b[4] + a[2] * b[5] + a[4];
+	r1 = a[1] * b[0] + a[3] * b[1];
+	r3 = a[1] * b[2] + a[3] * b[3];
+	r5 = a[1] * b[4] + a[3] * b[5] + a[5];
+	out[0] = r0;
+	out[1] = r1;
+	out[2] = r2;
+	out[3] = r3;
+	out[4] = r4;
+	out[5] = r5;
+}
+
+/* fixes201 — set a matrix to identity. */
+static void svg__matrix_identity(float *m)
+{
+	m[0] = 1.0f; m[1] = 0.0f;
+	m[2] = 0.0f; m[3] = 1.0f;
+	m[4] = 0.0f; m[5] = 0.0f;
+}
 
 
 /* ----------------------------------------------------------------- */
@@ -392,14 +431,23 @@ static float svg__attr_float(dom_node *node, const char *name,
 /* Coordinate transform                                              */
 /* ----------------------------------------------------------------- */
 
-static float svg__map_x(const struct svg_ctx *c, float sx)
+/* fixes201 — both axes route through the affine matrix. Callers
+ * MUST pass both x and y because a transform with rotation or skew
+ * couples the axes:
+ *   screen_x = m[0]*sx + m[2]*sy + m[4]
+ *   screen_y = m[1]*sx + m[3]*sy + m[5]
+ *
+ * For a non-rotated, non-skewed transform (the common case), m[1]
+ * and m[2] are zero, so the math reduces to scale_x*sx + tx — no
+ * cost for the unrotated path. */
+static float svg__map_x(const struct svg_ctx *c, float sx, float sy)
 {
-	return (float)c->box_x + (sx - c->vb_x) * c->scale_x;
+	return c->m[0] * sx + c->m[2] * sy + c->m[4];
 }
 
-static float svg__map_y(const struct svg_ctx *c, float sy)
+static float svg__map_y(const struct svg_ctx *c, float sx, float sy)
 {
-	return (float)c->box_y + (sy - c->vb_y) * c->scale_y;
+	return c->m[1] * sx + c->m[3] * sy + c->m[5];
 }
 
 
@@ -808,10 +856,10 @@ static void svg__paint_rect(dom_node *node,
 	if (w <= 0.0f || h <= 0.0f) return;
 
 	svg__init_plot_style(&pstyle, st, c);
-	r.x0 = (int)svg__map_x(c, x);
-	r.y0 = (int)svg__map_y(c, y);
-	r.x1 = (int)svg__map_x(c, x + w);
-	r.y1 = (int)svg__map_y(c, y + h);
+	r.x0 = (int)svg__map_x(c, x, y);
+	r.y0 = (int)svg__map_y(c, x, y);
+	r.x1 = (int)svg__map_x(c, x + w, y + h);
+	r.y1 = (int)svg__map_y(c, x + w, y + h);
 	c->plot_ctx->plot->rectangle(c->plot_ctx, &pstyle, &r);
 }
 
@@ -828,10 +876,10 @@ static void svg__paint_line(dom_node *node,
 
 	if (!st->stroke_present) return;
 	svg__init_plot_style(&pstyle, st, c);
-	r.x0 = (int)svg__map_x(c, x1);
-	r.y0 = (int)svg__map_y(c, y1);
-	r.x1 = (int)svg__map_x(c, x2);
-	r.y1 = (int)svg__map_y(c, y2);
+	r.x0 = (int)svg__map_x(c, x1, y1);
+	r.y0 = (int)svg__map_y(c, x1, y1);
+	r.x1 = (int)svg__map_x(c, x2, y2);
+	r.y1 = (int)svg__map_y(c, x2, y2);
 	c->plot_ctx->plot->line(c->plot_ctx, &pstyle, &r);
 }
 
@@ -911,13 +959,13 @@ static void svg__paint_ellipse_like(dom_node *node,
 			tmp[j++] = op;
 			if (op == (float)PLOTTER_PATH_MOVE ||
 					op == (float)PLOTTER_PATH_LINE) {
-				tmp[j++] = svg__map_x(c, buf[i++]);
-				tmp[j++] = svg__map_y(c, buf[i++]);
+				tmp[j++] = svg__map_x(c, buf[i++], buf[i++]);
+				tmp[j++] = svg__map_y(c, buf[i++], buf[i++]);
 			} else if (op == (float)PLOTTER_PATH_BEZIER) {
 				int k;
 				for (k = 0; k < 3; k++) {
-					tmp[j++] = svg__map_x(c, buf[i++]);
-					tmp[j++] = svg__map_y(c, buf[i++]);
+					tmp[j++] = svg__map_x(c, buf[i++], buf[i++]);
+					tmp[j++] = svg__map_y(c, buf[i++], buf[i++]);
 				}
 			}
 			/* CLOSE has no args */
@@ -989,8 +1037,8 @@ static int svg__emit_arc_as_bezier(const struct svg_ctx *c,
 	if (rx <= 0.0f || ry <= 0.0f) {
 		if (cap >= 3) {
 			out[0] = (float)PLOTTER_PATH_LINE;
-			out[1] = svg__map_x(c, x2);
-			out[2] = svg__map_y(c, y2);
+			out[1] = svg__map_x(c, x2, y2);
+			out[2] = svg__map_y(c, x2, y2);
 			return 3;
 		}
 		return 0;
@@ -1094,12 +1142,12 @@ static int svg__emit_arc_as_bezier(const struct svg_ctx *c,
 			float p2y = p3y - k * ry * cos_b;
 			if (n + 7 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_BEZIER;
-			out[n++] = svg__map_x(c, p1x);
-			out[n++] = svg__map_y(c, p1y);
-			out[n++] = svg__map_x(c, p2x);
-			out[n++] = svg__map_y(c, p2y);
-			out[n++] = svg__map_x(c, p3x);
-			out[n++] = svg__map_y(c, p3y);
+			out[n++] = svg__map_x(c, p1x, p1y);
+			out[n++] = svg__map_y(c, p1x, p1y);
+			out[n++] = svg__map_x(c, p2x, p2y);
+			out[n++] = svg__map_y(c, p2x, p2y);
+			out[n++] = svg__map_x(c, p3x, p3y);
+			out[n++] = svg__map_y(c, p3x, p3y);
 		}
 		(void)ux; (void)uy;
 	}
@@ -1161,8 +1209,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			if (cmd == 'm') { x += cx; y += cy; }
 			if (n + 3 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_MOVE;
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			cx = x; cy = y;
 			sx = x; sy = y;
 			has_prev_cubic = 0;
@@ -1178,8 +1226,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			if (cmd == 'l') { x += cx; y += cy; }
 			if (n + 3 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_LINE;
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			cx = x; cy = y;
 			has_prev_cubic = 0;
 			has_prev_quad = 0;
@@ -1191,8 +1239,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			x = (cmd == 'h') ? cx + v : v;
 			if (n + 3 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_LINE;
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, cy);
+			out[n++] = svg__map_x(c, x, cy);
+			out[n++] = svg__map_y(c, x, cy);
 			cx = x;
 			has_prev_cubic = 0;
 			has_prev_quad = 0;
@@ -1204,8 +1252,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			y = (cmd == 'v') ? cy + v : v;
 			if (n + 3 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_LINE;
-			out[n++] = svg__map_x(c, cx);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, cx, y);
+			out[n++] = svg__map_y(c, cx, y);
 			cy = y;
 			has_prev_cubic = 0;
 			has_prev_quad = 0;
@@ -1226,12 +1274,12 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			}
 			if (n + 7 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_BEZIER;
-			out[n++] = svg__map_x(c, x1);
-			out[n++] = svg__map_y(c, y1);
-			out[n++] = svg__map_x(c, x2);
-			out[n++] = svg__map_y(c, y2);
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, x1, y1);
+			out[n++] = svg__map_y(c, x1, y1);
+			out[n++] = svg__map_x(c, x2, y2);
+			out[n++] = svg__map_y(c, x2, y2);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			/* Reflected control point for a following S/s command. */
 			prev_cubic_x = 2.0f * x - x2;
 			prev_cubic_y = 2.0f * y - y2;
@@ -1263,12 +1311,12 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			}
 			if (n + 7 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_BEZIER;
-			out[n++] = svg__map_x(c, x1);
-			out[n++] = svg__map_y(c, y1);
-			out[n++] = svg__map_x(c, x2);
-			out[n++] = svg__map_y(c, y2);
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, x1, y1);
+			out[n++] = svg__map_y(c, x1, y1);
+			out[n++] = svg__map_x(c, x2, y2);
+			out[n++] = svg__map_y(c, x2, y2);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			prev_cubic_x = 2.0f * x - x2;
 			prev_cubic_y = 2.0f * y - y2;
 			has_prev_cubic = 1;
@@ -1296,12 +1344,12 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			c2y = y  + (2.0f / 3.0f) * (qy - y);
 			if (n + 7 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_BEZIER;
-			out[n++] = svg__map_x(c, c1x);
-			out[n++] = svg__map_y(c, c1y);
-			out[n++] = svg__map_x(c, c2x);
-			out[n++] = svg__map_y(c, c2y);
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, c1x, c1y);
+			out[n++] = svg__map_y(c, c1x, c1y);
+			out[n++] = svg__map_x(c, c2x, c2y);
+			out[n++] = svg__map_y(c, c2x, c2y);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			/* Reflected quadratic control point for a following T. */
 			prev_quad_x = 2.0f * x - qx;
 			prev_quad_y = 2.0f * y - qy;
@@ -1331,12 +1379,12 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			c2y = y  + (2.0f / 3.0f) * (qy - y);
 			if (n + 7 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_BEZIER;
-			out[n++] = svg__map_x(c, c1x);
-			out[n++] = svg__map_y(c, c1y);
-			out[n++] = svg__map_x(c, c2x);
-			out[n++] = svg__map_y(c, c2y);
-			out[n++] = svg__map_x(c, x);
-			out[n++] = svg__map_y(c, y);
+			out[n++] = svg__map_x(c, c1x, c1y);
+			out[n++] = svg__map_y(c, c1x, c1y);
+			out[n++] = svg__map_x(c, c2x, c2y);
+			out[n++] = svg__map_y(c, c2x, c2y);
+			out[n++] = svg__map_x(c, x, y);
+			out[n++] = svg__map_y(c, x, y);
 			prev_quad_x = 2.0f * x - qx;
 			prev_quad_y = 2.0f * y - qy;
 			has_prev_quad = 1;
@@ -1378,8 +1426,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 		case 'Z': case 'z': {
 			if (n + 3 > cap) return n;
 			out[n++] = (float)PLOTTER_PATH_LINE;
-			out[n++] = svg__map_x(c, sx);
-			out[n++] = svg__map_y(c, sy);
+			out[n++] = svg__map_x(c, sx, sy);
+			out[n++] = svg__map_y(c, sx, sy);
 			out[n] = (float)PLOTTER_PATH_CLOSE;
 			n++;
 			cx = sx; cy = sy;
@@ -1452,8 +1500,8 @@ static void svg__paint_text(dom_node *node, const struct svg_ctx *c,
 
 	if (!st->fill_present) return;
 
-	screen_x = (int)svg__map_x(c, x_svg);
-	screen_y = (int)svg__map_y(c, y_svg);
+	screen_x = (int)svg__map_x(c, x_svg, y_svg);
+	screen_y = (int)svg__map_y(c, x_svg, y_svg);
 
 	memset(&fstyle, 0, sizeof(fstyle));
 	fstyle.family = PLOT_FONT_FAMILY_SANS_SERIF;
@@ -1535,22 +1583,22 @@ static void svg__paint_poly(dom_node *node, const struct svg_ctx *c,
 		if (n + 3 > MACOS9_SVG_PATH_MAX) break;
 		if (!got_first) {
 			buf[n++] = (float)PLOTTER_PATH_MOVE;
-			buf[n++] = svg__map_x(c, x);
-			buf[n++] = svg__map_y(c, y);
+			buf[n++] = svg__map_x(c, x, y);
+			buf[n++] = svg__map_y(c, x, y);
 			first_x = x;
 			first_y = y;
 			got_first = 1;
 		} else {
 			buf[n++] = (float)PLOTTER_PATH_LINE;
-			buf[n++] = svg__map_x(c, x);
-			buf[n++] = svg__map_y(c, y);
+			buf[n++] = svg__map_x(c, x, y);
+			buf[n++] = svg__map_y(c, x, y);
 		}
 	}
 	dom_string_unref(ds);
 	if (closed && got_first && n + 4 <= MACOS9_SVG_PATH_MAX) {
 		buf[n++] = (float)PLOTTER_PATH_LINE;
-		buf[n++] = svg__map_x(c, first_x);
-		buf[n++] = svg__map_y(c, first_y);
+		buf[n++] = svg__map_x(c, first_x, first_y);
+		buf[n++] = svg__map_y(c, first_x, first_y);
 		buf[n++] = (float)PLOTTER_PATH_CLOSE;
 	}
 	if (n == 0) return;
@@ -1564,6 +1612,165 @@ static void svg__paint_poly(dom_node *node, const struct svg_ctx *c,
 /* ----------------------------------------------------------------- */
 /* Walker                                                            */
 /* ----------------------------------------------------------------- */
+
+/* fixes201 — parse one transform function out of an attribute
+ * string. Returns the number of bytes consumed (including the
+ * opening `name(...` and the trailing `)`), and writes the
+ * corresponding 6-component matrix into *fn_matrix. Returns 0 on
+ * end-of-string or syntax error.
+ *
+ * Supported functions:
+ *   translate(tx [, ty])    : [1 0 0 1 tx ty]
+ *   scale(sx [, sy])        : [sx 0 0 sy 0 0]   (sy defaults = sx)
+ *   rotate(deg)             : [cos sin -sin cos 0 0] with deg→rad
+ *   rotate(deg, cx, cy)     : translate(cx,cy) × rotate × translate(-cx,-cy)
+ *   matrix(a, b, c, d, e, f): direct [a b c d e f]
+ *   skewX(deg) / skewY(deg) : [1 tan 0 1 0 0] / [1 0 tan 1 0 0]
+ */
+static size_t svg__parse_one_transform(const char *s,
+		float *fn_matrix)
+{
+	const char *p = s;
+	size_t cs;
+	const char *name_start;
+	size_t name_len;
+
+	/* skip leading whitespace + commas */
+	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r' ||
+			*p == ',') p++;
+	if (*p == '\0') return 0;
+
+	name_start = p;
+	while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+			*p == '_') p++;
+	name_len = (size_t)(p - name_start);
+	if (name_len == 0) return 0;
+
+	while (*p == ' ' || *p == '\t') p++;
+	if (*p != '(') return 0;
+	p++;
+
+	/* Read up to 6 numeric arguments. */
+	{
+		float args[6] = {0,0,0,0,0,0};
+		int n_args = 0;
+		while (*p && *p != ')' && n_args < 6) {
+			while (*p == ' ' || *p == '\t' || *p == ',') p++;
+			if (*p == ')' || *p == '\0') break;
+			args[n_args] = svg__atof(p, &cs);
+			if (cs == 0) {
+				/* parse error — abort by walking to ')'. */
+				while (*p && *p != ')') p++;
+				if (*p == ')') p++;
+				svg__matrix_identity(fn_matrix);
+				return (size_t)(p - s);
+			}
+			p += cs;
+			n_args++;
+		}
+		while (*p == ' ' || *p == '\t') p++;
+		if (*p == ')') p++;
+
+		svg__matrix_identity(fn_matrix);
+
+		if (name_len == 9 &&
+				(name_start[0] == 't' || name_start[0] == 'T') &&
+				strncasecmp(name_start, "translate", 9) == 0) {
+			fn_matrix[4] = args[0];
+			fn_matrix[5] = (n_args >= 2) ? args[1] : 0.0f;
+		} else if (name_len == 5 &&
+				strncasecmp(name_start, "scale", 5) == 0) {
+			fn_matrix[0] = args[0];
+			fn_matrix[3] = (n_args >= 2) ? args[1] : args[0];
+		} else if (name_len == 6 &&
+				strncasecmp(name_start, "rotate", 6) == 0) {
+			float rad = args[0] * 3.14159265f / 180.0f;
+			extern double cos(double);
+			extern double sin(double);
+			float ca = (float)cos((double)rad);
+			float sa = (float)sin((double)rad);
+			if (n_args >= 3) {
+				/* rotate(deg, cx, cy) — compose
+				 * translate(cx, cy) * rotate * translate(-cx,-cy) */
+				float cx = args[1];
+				float cy = args[2];
+				/* Rotation centred on (cx, cy):
+				 * a=cos, b=sin, c=-sin, d=cos
+				 * e = cx - cx*cos + cy*sin
+				 * f = cy - cx*sin - cy*cos */
+				fn_matrix[0] = ca;
+				fn_matrix[1] = sa;
+				fn_matrix[2] = -sa;
+				fn_matrix[3] = ca;
+				fn_matrix[4] = cx - cx*ca + cy*sa;
+				fn_matrix[5] = cy - cx*sa - cy*ca;
+			} else {
+				fn_matrix[0] = ca;
+				fn_matrix[1] = sa;
+				fn_matrix[2] = -sa;
+				fn_matrix[3] = ca;
+			}
+		} else if (name_len == 6 &&
+				strncasecmp(name_start, "matrix", 6) == 0) {
+			if (n_args >= 6) {
+				fn_matrix[0] = args[0];
+				fn_matrix[1] = args[1];
+				fn_matrix[2] = args[2];
+				fn_matrix[3] = args[3];
+				fn_matrix[4] = args[4];
+				fn_matrix[5] = args[5];
+			}
+		} else if (name_len == 5 &&
+				strncasecmp(name_start, "skewX", 5) == 0) {
+			extern double tan(double);
+			float rad = args[0] * 3.14159265f / 180.0f;
+			fn_matrix[2] = (float)tan((double)rad);
+		} else if (name_len == 5 &&
+				strncasecmp(name_start, "skewY", 5) == 0) {
+			extern double tan(double);
+			float rad = args[0] * 3.14159265f / 180.0f;
+			fn_matrix[1] = (float)tan((double)rad);
+		} else if (name_len == 10 &&
+				strncasecmp(name_start, "translateX", 10) == 0) {
+			fn_matrix[4] = args[0];
+		} else if (name_len == 10 &&
+				strncasecmp(name_start, "translateY", 10) == 0) {
+			fn_matrix[5] = args[0];
+		}
+		/* Unknown function: identity (already set). */
+	}
+
+	return (size_t)(p - s);
+}
+
+/* fixes201 — Read the `transform="..."` attribute on a node and
+ * compose its multi-function value into a matrix. Returns 1 if a
+ * transform attribute was present (and composed into *out), 0
+ * otherwise (caller's matrix stays as-is). */
+static int svg__read_transform_attr(dom_node *node, float *out)
+{
+	dom_string *ds = NULL;
+	const char *src = svg__attr(node, "transform", &ds);
+	float chain[6];
+	float fn_mat[6];
+	size_t off;
+
+	if (src == NULL) return 0;
+	svg__matrix_identity(chain);
+	while (*src) {
+		off = svg__parse_one_transform(src, fn_mat);
+		if (off == 0) break;
+		{
+			float tmp[6];
+			svg__matrix_mul(chain, fn_mat, tmp);
+			memcpy(chain, tmp, sizeof(chain));
+		}
+		src += off;
+	}
+	memcpy(out, chain, sizeof(chain));
+	dom_string_unref(ds);
+	return 1;
+}
 
 static void svg__paint_subtree(dom_node *parent,
 		const struct svg_ctx *c,
@@ -1588,7 +1795,22 @@ static void svg__paint_subtree(dom_node *parent,
 				dom_element_get_tag_name(child, &tag) ==
 					DOM_NO_ERR && tag != NULL) {
 			struct svg_paint_state child_st = st;
+			struct svg_ctx child_ctx = *c;
+			float local_xform[6];
+			const struct svg_ctx *use_ctx = c;
 			svg__update_style(child, &child_st, c->grads);
+
+			/* fixes201 — compose any transform="..." on the
+			 * child element into a local ctx that's then used
+			 * for painting that element (and recursively
+			 * inherited for <g> children). The viewBox
+			 * matrix already lives in c->m[]; for the child
+			 * we compute child.m = parent.m * local_xform. */
+			if (svg__read_transform_attr(child, local_xform)) {
+				svg__matrix_mul(c->m, local_xform,
+						child_ctx.m);
+				use_ctx = &child_ctx;
+			}
 
 			macsurf_debug_log_writef(
 				"svg_shape: depth=%d tag=%s fill=0x%08x stroke=0x%08x",
@@ -1599,32 +1821,32 @@ static void svg__paint_subtree(dom_node *parent,
 
 			if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_g)) {
-				svg__paint_subtree(child, c, child_st,
+				svg__paint_subtree(child, use_ctx, child_st,
 						depth + 1);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_rect)) {
-				svg__paint_rect(child, c, &child_st);
+				svg__paint_rect(child, use_ctx, &child_st);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_circle)) {
-				svg__paint_circle(child, c, &child_st);
+				svg__paint_circle(child, use_ctx, &child_st);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_ellipse)) {
-				svg__paint_ellipse(child, c, &child_st);
+				svg__paint_ellipse(child, use_ctx, &child_st);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_line)) {
-				svg__paint_line(child, c, &child_st);
+				svg__paint_line(child, use_ctx, &child_st);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_path)) {
-				svg__paint_path(child, c, &child_st);
+				svg__paint_path(child, use_ctx, &child_st);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_polygon)) {
-				svg__paint_poly(child, c, &child_st, 1);
+				svg__paint_poly(child, use_ctx, &child_st, 1);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_polyline)) {
-				svg__paint_poly(child, c, &child_st, 0);
+				svg__paint_poly(child, use_ctx, &child_st, 0);
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_text)) {
-				svg__paint_text(child, c, &child_st);
+				svg__paint_text(child, use_ctx, &child_st);
 			}
 			/* <defs> / <linearGradient> / <radialGradient> /
 			 * unknown tags are silently skipped (gradients are
@@ -1704,6 +1926,17 @@ nserror macos9_svg_paint_inline(struct box *box,
 	if (c.vb_h <= 0.0f) c.vb_h = (float)h;
 	c.scale_x = (float)w / c.vb_w;
 	c.scale_y = (float)h / c.vb_h;
+
+	/* fixes201 — pre-bake the viewBox-to-screen affine matrix at
+	 * root. svg__map_x / svg__map_y apply this for every painted
+	 * shape. <g transform="..."> child elements compose into a
+	 * copy of this matrix during the subtree walk. */
+	c.m[0] = c.scale_x;
+	c.m[1] = 0.0f;
+	c.m[2] = 0.0f;
+	c.m[3] = c.scale_y;
+	c.m[4] = (float)c.box_x - c.vb_x * c.scale_x;
+	c.m[5] = (float)c.box_y - c.vb_y * c.scale_y;
 
 	/* fixes201 — gradient pre-walk. Allocated on stack to avoid heap
 	 * pressure during paint; cap of MACOS9_SVG_MAX_GRADIENTS handles
