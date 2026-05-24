@@ -1,18 +1,20 @@
 # MacSurf Status
 
-**Date:** 2026-05-20
-**Last shipped:** fixes159a, crash fix for fixes159's Grid V2 alignment round
-**Last hardware-accepted:** fixes158a, auto-flow occupancy bitmap (Grid V2 explicit placement, 6 of 6 probes passing on G3)
+**Date:** 2026-05-24
+**Engine HEAD:** fixes199h
+**Current fix round:** fixes200 (CSS standards map docs/tools)
+**Last release:** MacSurf 0.1a1 (2026-05-20)
+**Last hardware-accepted (explicitly recorded in this file):** fixes158a (2026-05-20)
 
 ---
 
 ## What MacSurf is, today
 
-MacSurf is a working web browser for Mac OS 9.1+ on PowerPC, built on a NetSurf fork with a Carbon / QuickDraw / Open Transport frontend, paired with a Go TLS-stripping proxy and the sibling `macSSL` library for native HTTPS.
+MacSurf is a working web browser for Classic Mac OS 9.1–9.2.2 on PowerPC, built on a NetSurf fork with a Carbon / QuickDraw / Open Transport frontend. For modern HTTPS sites it uses a Go TLS-stripping proxy; native TLS is a separate sibling library (`macSSL`) and is not the default browsing path yet.
 
-It is hardware-verified on a Power Macintosh G3 iMac. The build target is CodeWarrior 8 Pro (8.3 update), strict C89, 16 MB application partition. The remote-fetch path is plain HTTP from the Mac → Go proxy → upstream HTTPS, fully streamed.
+It runs on real beige G3-class hardware (with G4 upgrade also used in development). The build target is CodeWarrior 8 Pro (8.3 update), strict C89, with a ~16 MB application partition. The remote-fetch path is plain HTTP from the Mac → Go proxy → upstream HTTPS, streamed.
 
-## What works on hardware today
+## What works in the current tree (engine: fixes199h, docs/tools: fixes200)
 
 ### Rendering pipeline
 - Full NetSurf fetch → parse → cascade → layout → plot
@@ -20,18 +22,22 @@ It is hardware-verified on a Power Macintosh G3 iMac. The build target is CodeWa
 - libdom + libhubbub HTML5 parsing
 - libnsbmp / libnsgif / libjpeg / lodepng / libtiff for images
 - QuickDraw plotters with offscreen GWorld back buffer (fixes77g+)
-- Defensive-clamp threshold at ±200000 px in `redraw.c` (fixes156, handles tall pages without zeroing legitimate boxes)
+- Defensive-clamp threshold at ±200000 px in `redraw.c` (fixes156)
+- Layout hardening / watchdog caps to keep the engine alive on hostile modern pages (fixes170–173)
+- Inline SVG V1 renderer for common page-chrome icons and logos (fixes195–197)
 
-### CSS, roughly 150 properties consumed by layout
+### CSS (layout + paint), ~150+ properties with a growing “parsed → consumed” surface
 - Custom properties + `var()` resolution
 - Flexbox: `justify-content`, `align-content`, `align-items`, `align-self`, `order`, `flex-direction`, `flex-wrap`, `flex-basis`, `flex-grow`, `flex-shrink`
-- **CSS Grid (V1+V2):** `display: grid`, `grid-template-columns`, `grid-template-rows`, `gap` / `column-gap` / `row-gap`, explicit placement (`grid-column`, `grid-row`, `grid-column-start/-end`, `grid-row-start/-end`), span notation, full-row sentinel (`1 / -1`), auto-flow with occupancy avoidance, alignment (`justify-items`, `align-items`, `justify-self`, `align-self`, `start | end | center | stretch`)
+- **CSS Grid (V1+V2):** track grammar (`fr`, `repeat()`, `minmax()`), `grid-template-rows`, gaps, explicit placement (`grid-column*`, `grid-row*`, `grid-area`), `grid-template-areas` name lowering, auto-flow occupancy avoidance, `align-items` / `align-self` consumption (justify-* still limited)
+- **Multi-column layout (V1):** `column-count`, `column-width`, `column-gap`, `column-rule-*` paint (fixes179+)
 - `border-radius`, `box-shadow`, opacity, linear & radial gradients
-- `text-shadow` (vendor `-macsurf-text-shadow` from fixes50), `text-overflow: ellipsis`
-- `transform` (rotate / translate / scale via vendor `-macsurf-transform`)
+- `text-shadow` and `transform` bridged from standard CSS3 via `cssh_css` preprocessor (fixes175, fixes183)
 - z-index stacking contexts (CSS 2.1 painting order, fixes147)
 - CSS counters, viewport units (`vh`, `vw`), `aspect-ratio`
 - Font-family aliases (sans → Helvetica, serif → Times, mono → Monaco), fixes157, no horizontal scrambling on mixed-family inline runs
+- `background-size` (bitmaps V1), `position: sticky` (vertical V1), `inset` shorthand lowering (fixes191)
+- `object-fit` + `object-position` (V1; `object-position` now has a real libcss property at fixes199h)
 - See [css-status.md](css-status.md) for the full property-by-property audit
 
 ### JavaScript
@@ -40,19 +46,22 @@ It is hardware-verified on a Power Macintosh G3 iMac. The build target is CodeWa
 - Date arithmetic (Mac epoch 1904 → Unix epoch 1970 bridge)
 - Ackermann(3,7) in ~5-6 sec on a 233 MHz G3
 - Mandelbrot fractal in pure JS
+- Basic DOM bridge exists (document + element wrappers; expanding coverage), plus MacSurf-side timer and XHR plumbing
 
 ### Networking
 - Open Transport TCP, `OTOpenEndpointInContext` synchronous calls yielding on `kOTSyncIdleEvent`
 - HTTP/1.1 with chunked transfer, keep-alive, 3xx redirect follow
 - Connection pooling (128 fetcher slots, 16 concurrent)
 - 15s no-progress timeout
-- HTTPS via Go proxy or native macSSL (sibling project)
+- Persistent on-disk HTTP body cache to reduce redo work after refresh/crash (fixes172)
+- HTTPS via Go proxy; native macSSL exists as a sibling project and can be integrated as a later round
 
 ### Chrome
 - Address bar, back / forward / reload / home
 - Status bar, page-info, multi-window
 - Smooth scrollbar, keyboard scrolling
 - Hover state recascade + reformat
+- UA stylesheet tweaks for modern pages (for example: collapse `<details>` by default, fixes186)
 
 ---
 
@@ -71,21 +80,13 @@ See [codewarrior-setup.md](codewarrior-setup.md) for the full Mac-side build wal
 
 ## Current fix round
 
-**fixes159 / fixes159a, Grid V2 alignment.** Adds `justify-items`, `align-items`, `justify-self`, `align-self` for grid containers and items (values: `start | end | center | stretch`).
+**fixes200, CSS standards map (docs/tools).** Adds/refreshes the repo’s canonical “what’s implemented vs. what’s missing” view: `CSS_SUPPORT_MATRIX.md`, `CSS_IMPLEMENTATION_PLAN.md`, and supporting audit/docs.
 
-- `align-items` / `align-self` ride libcss's existing flexbox plumbing (no changes there)
-- `justify-items` / `justify-self` go through a new vendor libcss property `-macsurf-justify` (single packed int32, low nibble = justify-items, high nibble = justify-self)
-- `cssh_css.c` preprocessor adds a fourth pass that rewrites `justify-items: X; justify-self: Y` declarations into the packed property
-- `layout_grid.c` pass 3 reads container defaults + per-item overrides and applies horizontal / vertical offsets when the child is narrower / shorter than its cell
+**Engine baseline for this round:** fixes199h, cumulative updates. Focuses on “real site” layout correctness and a few long-requested CSS consumptions:
 
-fixes159 shipped with the new field inserted mid-struct in `css_computed_style_i`, which crashed on G3 because CW8 didn't rebuild libcss's internal .o files against the shifted field offsets (the [CW8 misses-header-recompile](https://github.com/mplsllc/macsurf/blob/master/.private/llm/CLAUDE.md) gotcha). fixes159a relocated the field to the end of the struct, no other field's offset shifts, so libcss .o files compiled against the old layout still see consistent offsets for everything else. Awaiting hardware verification.
-
-### V1 limitations (documented, not bugs)
-- Items with `width: auto` still stretch horizontally even when `justify-*` requests a non-stretch alignment, without an intrinsic-content pass we can't size an item smaller than its cell at this layer. Use explicit widths.
-- Same applies to `height: auto` + `align-*`.
-- `place-items` / `place-self` shorthands deferred.
-- Baseline alignment, safe/unsafe modifiers, writing-mode interactions deferred.
-- Column AND row alignment for the same element must live in the same CSS rule (cascade collapses the merged storage at the property level, inherited from fixes158).
+- Multi-column layout refinements in the layout engine (follow-on to fixes179/180/182*)
+- `object-position` promoted from a cssh-css “drop” into a real libcss property + consumer path
+- Build / integration fixes and misc layout/redraw adjustments
 
 ---
 
@@ -93,19 +94,17 @@ fixes159 shipped with the new field inserted mid-struct in `css_computed_style_i
 
 | Fix | Description | Status |
 |-----|-------------|--------|
-| **fixes159a** | Move `macsurf_justify` to end of `css_computed_style_i` struct to avoid the offset-shift CW8 stale-recompile crash from fixes159 | Awaiting G3 |
-| **fixes159** | Grid V2 alignment (justify/align items/self) | Crashed pre-159a |
-| **fixes158a** | Auto-flow occupancy bitmap so explicit grid items aren't overdrawn by auto-flow siblings | ✓ G3 accepted |
-| **fixes158** | Explicit CSS Grid placement V1 (`grid-column`, `grid-row`, longhand start/end) | ✓ via 158a |
-| **fixes157** | Font-family aliases (sans→Helvetica, serif→Times, mono→Monaco). Closes fixes52/fixes145 5-year sidestep | ✓ G3 accepted |
-| **fixes157a** | Silence FONTDIAG after acceptance (`MACSURF_FONT_ALIAS_DIAG = 0`) | ✓ G3 accepted |
-| **fixes156** | Raise defensive-clamp y/height thresholds from ±10000 to ±200000 in `redraw.c html_redraw_box`. Closes the post-fixes152 "empty render" saga, page-height growth past 10000 px from accumulated probe cards was nuking real content | ✓ G3 accepted |
-| **fixes152** | CSS `aspect-ratio` V1 | ✓ G3 accepted |
-| **fixes151** | Grid `grid-column` explicit column placement (V1, span + A/B + 1/-1) | ✓ G3 accepted |
-| **fixes150** | `grid-template-rows` (px row tracks; FR/percent degrade to tallest-child) | ✓ G3 accepted |
-| **fixes149** | Verified CSS_STATUS claims that `min-height` and `vw`/`vh` were broken, found them already wired (false alarm in status doc) | ✓ G3 accepted |
-| **fixes148** | CSS Grid V2 standard track grammar (`grid-template-columns: 1fr 1fr`, `repeat()`, `minmax()`, idents) | ✓ G3 accepted |
-| **fixes147** | CSS 2.1 stacking-context paint order (sibling-level z-index correct) | ✓ G3 accepted |
+| **fixes200** | CSS standards map docs/tools (`CSS_SUPPORT_MATRIX.md`, implementation plan, audit/docs) | Landed |
+| **fixes199h** | Multi-column refinements + `object-position` as a real libcss property + build fixes | Landed |
+| **fixes195–197** | Inline SVG V1 renderer + sizing hints + diagnostics | Landed |
+| **fixes191** | `inset` shorthand, `background-size` (bitmaps), `position: sticky` (V1), modern CSS “safe drop” bundle | Landed |
+| **fixes189–190** | Alpha correctness in ARGB copy path + composite-path rollback | Landed |
+| **fixes187–188** | PNG premultiply/mask fixes + scaled-PNG composite attempt | Landed |
+| **fixes185–186** | Modern-CSS compatibility preprocessor bundle + collapse `<details>` by default | Landed |
+| **fixes183–184** | Standard `transform` bridge + `table-layout: fixed` correctness | Landed |
+| **fixes179–182*** | Multi-column layout V1 + follow-on routing / diagnostics / correctness fixes | Landed |
+| **fixes171–174** | Layout watchdog + survival-layer hardening + CSS size cap raised | Landed |
+| **fixes172** | Persistent on-disk HTTP body cache | Landed |
 
 See [HISTORY.md](HISTORY.md) for the full version timeline going back to v0.1.
 
@@ -113,25 +112,25 @@ See [HISTORY.md](HISTORY.md) for the full version timeline going back to v0.1.
 
 ## What's queued next
 
-Per the planning notes from the most recent feature round:
+The “modern site survival” work is now mostly about filling in specific missing consumptions rather than single big subsystems. The near-term queue (order may change):
 
-- **fixes160**, `grid-template-areas`. Named cell regions for explicit placement by name.
-- **fixes161**, `column-count` / `column-rule`. Multi-column layout outside Grid.
-- **fixes162**, `outline` / focus-ring accessibility polish.
-
-The font-family work is intentionally cooling after fixes157 hardware acceptance, broader stacks and per-font metric integration are deferred.
+- **Grid:** justify-* parser/consumption strategy that avoids the libcss mid-enum trap (place-* shorthands later)
+- **Multi-column:** `column-span: all`, better balance/fill behaviour, edge-case block fragmentation
+- **SVG V2:** gradients, transforms, `<text>`, and improved path coverage (`A/S/T`)
+- **Forms / interaction:** hit-testing semantics (`pointer-events`), focus/outline polish, input widgets
+- **Native TLS:** integrate `macSSL` as an optional direct-HTTPS path (proxy remains primary)
 
 ---
 
 ## Known limitations
 
-- **No HTTPS in the browser core.** All TLS goes through the Go proxy (which fetches upstream HTTPS and serves plain HTTP to the Mac) or via macSSL (sibling library, not yet integrated into the MacSurf binary).
+- **No HTTPS by default in the browser core.** All TLS goes through the Go proxy; `macSSL` exists but is not yet the default integrated path.
 - **No preemptive threading.** Cooperative `WaitNextEvent` event loop only, all networking yields via `kOTSyncIdleEvent`.
-- **No subgrid.** Grid V1+V2 only.
+- **No subgrid.**
 - **16 MB application partition ceiling.** libcss allocates from the OS heap and runs out below ~12 MB free on heavy pages.
 - **8 grid tracks max** per row or column.
 - **Max 256 children per grid container.** Excess fall back to fixes151 auto-flow.
-- **No baseline alignment**, no `place-*` shorthands, no writing-mode logical alignment (fixes159 V1 scope).
+- **Grid alignment gaps:** baseline alignment, `place-*` shorthands, writing-mode logical alignment; justify-* is still constrained.
 - **JavaScript Date arithmetic** anchored to a fixed 2026 baseline because Mac OS 9's `GetDateTime` returns 1904-epoch seconds with no DST handling.
 
 ---
