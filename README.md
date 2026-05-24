@@ -33,7 +33,7 @@
 ---
 
 > [!WARNING]
-> **MacSurf 0.1a1 is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, but **most websites in 2026 will not work** in it. Expect: crashes on heavy SPAs, broken layouts on sites that lean on modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
+> **MacSurf is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, but **most websites in 2026 will not work** in it. Expect: crashes on heavy SPAs, broken layouts on sites that lean on modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
 >
 > **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it. Bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too**; there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
 >
