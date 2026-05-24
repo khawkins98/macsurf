@@ -736,6 +736,11 @@ uint8_t css_computed_object_fit(const css_computed_style *style)
 	return get_object_fit(style);
 }
 
+uint8_t css_computed_macsurf_object_position(const css_computed_style *style)
+{
+	return get_macsurf_object_position(style);
+}
+
 uint8_t css_computed_text_overflow(const css_computed_style *style)
 {
 	return get_text_overflow(style);
@@ -2049,4 +2054,3 @@ css_error compute_absolute_length_pair(css_computed_style *style,
 
 	return set(style, type, length1, unit1, length2, unit2);
 }
-

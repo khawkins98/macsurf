@@ -1683,6 +1683,9 @@ static inline css_error set_macsurf_animation_rotate(
 #define OBJECT_FIT_INDEX 15
 #define OBJECT_FIT_SHIFT 2
 #define OBJECT_FIT_MASK 0x1c
+#define MACSURF_OBJECT_POSITION_INDEX 15
+#define MACSURF_OBJECT_POSITION_SHIFT 11
+#define MACSURF_OBJECT_POSITION_MASK 0x7800
 #define TEXT_OVERFLOW_INDEX 15
 #define TEXT_OVERFLOW_SHIFT 5
 #define TEXT_OVERFLOW_MASK 0x60
@@ -1702,9 +1705,24 @@ static inline css_error set_object_fit(css_computed_style *style, uint8_t type)
 
 	return CSS_OK;
 }
+
+static inline css_error set_macsurf_object_position(
+		css_computed_style *style, uint8_t type)
+{
+	uint32_t *bits = &style->i.bits[MACSURF_OBJECT_POSITION_INDEX];
+
+	*bits = (*bits & ~MACSURF_OBJECT_POSITION_MASK) |
+			(((uint32_t)type & 0xf) <<
+			 MACSURF_OBJECT_POSITION_SHIFT);
+
+	return CSS_OK;
+}
 #undef OBJECT_FIT_INDEX
 #undef OBJECT_FIT_SHIFT
 #undef OBJECT_FIT_MASK
+#undef MACSURF_OBJECT_POSITION_INDEX
+#undef MACSURF_OBJECT_POSITION_SHIFT
+#undef MACSURF_OBJECT_POSITION_MASK
 
 static inline css_error set_text_overflow(css_computed_style *style,
 		uint8_t type)

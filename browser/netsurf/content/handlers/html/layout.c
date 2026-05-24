@@ -95,10 +95,125 @@ int macsurf_layout_depth = 0;
 long macsurf_layout_calls = 0;
 int macsurf_layout_aborted = 0;
 
+struct box_multicol_entry {
+	struct box *box;
+	struct box_multicol_dat_ns *data;
+	struct box_multicol_entry *next;
+};
+
+static struct box_multicol_entry *macsurf_multicol_entries = NULL;
+
 /* URL of the current page being laid out, captured from
  * html_reformat. Used by the breadcrumb writer so crash records
  * survive without needing the html_content pointer. */
 static char macsurf_layout_current_url[256] = {0};
+
+static int layout_multicol_data_destructor(struct box_multicol_dat_ns *data)
+{
+	struct box_multicol_entry **link = &macsurf_multicol_entries;
+	struct box_multicol_entry *entry;
+
+	while ((entry = *link) != NULL) {
+		if (entry->data == data) {
+			*link = entry->next;
+			free(entry);
+			break;
+		}
+		link = &entry->next;
+	}
+
+	return 0;
+}
+
+static struct box_multicol_dat_ns *layout_multicol_data_for_box(
+		const struct box *box)
+{
+	struct box_multicol_entry *entry;
+
+	for (entry = macsurf_multicol_entries; entry != NULL; entry = entry->next) {
+		if (entry->box == box)
+			return entry->data;
+	}
+
+	return NULL;
+}
+
+unsigned int layout_multicol_segment_count(const struct box *box)
+{
+	const struct box_multicol_dat_ns *data = layout_multicol_data_for_box(box);
+
+	if (data == NULL)
+		return 0;
+
+	return data->segment_count;
+}
+
+bool layout_multicol_segment_bounds(const struct box *box,
+		unsigned int index, int *top, int *bottom)
+{
+	const struct box_multicol_dat_ns *data = layout_multicol_data_for_box(box);
+
+	if (data == NULL || data->segments == NULL || index >= data->segment_count)
+		return false;
+
+	if (top != NULL)
+		*top = data->segments[index].top;
+	if (bottom != NULL)
+		*bottom = data->segments[index].bottom;
+
+	return true;
+}
+
+static void layout_multicol_clear_data(struct box *box)
+{
+	struct box_multicol_entry **link = &macsurf_multicol_entries;
+	struct box_multicol_entry *entry;
+
+	while ((entry = *link) != NULL) {
+		if (entry->box == box) {
+			*link = entry->next;
+			talloc_free(entry->data);
+			break;
+		}
+		link = &entry->next;
+	}
+}
+
+static struct box_multicol_dat_ns *layout_multicol_store_data(
+		struct box *box,
+		unsigned int segment_count)
+{
+	struct box_multicol_entry *entry;
+	struct box_multicol_dat_ns *data;
+
+	layout_multicol_clear_data(box);
+	if (segment_count == 0)
+		return NULL;
+
+	data = talloc_zero(box, struct box_multicol_dat_ns);
+	if (data == NULL)
+		return NULL;
+	talloc_set_destructor(data, layout_multicol_data_destructor);
+
+	data->segments = talloc_array(data, struct box_multicol_seg_ns,
+			segment_count);
+	if (data->segments == NULL) {
+		talloc_free(data);
+		return NULL;
+	}
+	data->segment_count = segment_count;
+
+	entry = malloc(sizeof(*entry));
+	if (entry == NULL) {
+		talloc_free(data);
+		return NULL;
+	}
+	entry->box = box;
+	entry->data = data;
+	entry->next = macsurf_multicol_entries;
+	macsurf_multicol_entries = entry;
+	return data;
+}
 
 void macsurf_layout_watchdog_reset(void)
 {
@@ -1922,6 +2037,14 @@ static bool layout_multicol_child_supported(const struct box *child)
 	return false;
 }
 
+static bool layout_multicol_child_spans_all(const struct box *child)
+{
+	if (child == NULL || child->style == NULL)
+		return false;
+
+	return css_computed_column_span(child->style) == CSS_COLUMN_SPAN_ALL;
+}
+
 static bool layout_multicol_layout_child(
 		struct box *child,
 		int available_width,
@@ -1987,19 +2110,24 @@ static bool layout_multicol_context(
 	struct box *child;
 	struct box **items;
 	int *outer_heights;
+	unsigned char *span_all_flags;
+	int *segment_starts;
+	int *segment_ends;
+	int *segment_targets;
 	int child_count;
 	int item_index;
+	int segment_index;
 	int count;
 	int gap;
 	int column_width;
-	int total_height;
 	int target_height;
-	int tallest_item;
-	int current_column;
-	int current_y;
-	int max_column_height;
+	int segment_height;
+	int segment_tallest;
+	int segment_items;
 	int base_x;
 	int base_y;
+	int flow_y;
+	int segment_count;
 	bool balance;
 
 	{
@@ -2017,6 +2145,7 @@ static bool layout_multicol_context(
 	}
 	if (!layout_multicol_resolve(block, &content->unit_len_ctx, &count,
 			&gap, &column_width, &balance)) {
+		layout_multicol_clear_data(block);
 		macsurf_debug_log_writef("MCOL resolve=BAIL w=%d", block->width);
 		return false;
 	}
@@ -2042,18 +2171,29 @@ static bool layout_multicol_context(
 	macsurf_debug_log_writef("MCOL child_count=%d", child_count);
 
 	if (child_count < 2)
-		return false;
-
-	items = malloc(sizeof(struct box *) * child_count);
-	outer_heights = malloc(sizeof(int) * child_count);
-	if (items == NULL || outer_heights == NULL) {
-		free(items);
-		free(outer_heights);
+	{
+		layout_multicol_clear_data(block);
 		return false;
 	}
 
-	total_height = 0;
-	tallest_item = 0;
+	items = malloc(sizeof(struct box *) * child_count);
+	outer_heights = malloc(sizeof(int) * child_count);
+	span_all_flags = calloc((size_t)child_count, sizeof(unsigned char));
+	segment_starts = malloc(sizeof(int) * child_count);
+	segment_ends = malloc(sizeof(int) * child_count);
+	segment_targets = malloc(sizeof(int) * child_count);
+	if (items == NULL || outer_heights == NULL || span_all_flags == NULL ||
+			segment_starts == NULL || segment_ends == NULL ||
+			segment_targets == NULL) {
+		free(items);
+		free(outer_heights);
+		free(span_all_flags);
+		free(segment_starts);
+		free(segment_ends);
+		free(segment_targets);
+		return false;
+	}
+
 	item_index = 0;
 
 	for (child = block->children; child != NULL; child = child->next) {
@@ -2071,6 +2211,10 @@ static bool layout_multicol_context(
 				viewport_height, block, content)) {
 			free(items);
 			free(outer_heights);
+			free(span_all_flags);
+			free(segment_starts);
+			free(segment_ends);
+			free(segment_targets);
 			return false;
 		}
 
@@ -2080,61 +2224,187 @@ static bool layout_multicol_context(
 
 		items[item_index] = child;
 		outer_heights[item_index] = outer_height;
-		total_height += outer_height;
-		if (tallest_item < outer_height)
-			tallest_item = outer_height;
+		if (layout_multicol_child_spans_all(child)) {
+			span_all_flags[item_index] = 1;
+		}
 		item_index++;
 	}
 
-	target_height = tallest_item;
-	if (count > 0) {
-		int average_height;
-		average_height = (total_height + count - 1) / count;
-		if (average_height > target_height)
-			target_height = average_height;
+	segment_count = 0;
+	segment_height = 0;
+	segment_tallest = 0;
+	segment_items = 0;
+	for (item_index = 0; item_index < child_count; item_index++) {
+		if (span_all_flags[item_index] != 0) {
+			if (segment_items > 0) {
+				target_height = segment_tallest;
+				if (count > 0) {
+					int average_height;
+					average_height = (segment_height + count - 1) /
+							count;
+					if (average_height > target_height) {
+						target_height = average_height;
+					}
+				}
+				if (target_height < 1) {
+					target_height = 1;
+				}
+				segment_targets[segment_count] = target_height;
+				segment_ends[segment_count] = item_index - 1;
+				segment_count++;
+				segment_items = 0;
+				segment_height = 0;
+				segment_tallest = 0;
+			}
+			continue;
+		}
+		if (segment_items == 0) {
+			segment_starts[segment_count] = item_index;
+		}
+		segment_items++;
+		segment_height += outer_heights[item_index];
+		if (outer_heights[item_index] > segment_tallest) {
+			segment_tallest = outer_heights[item_index];
+		}
 	}
-	if (target_height < 1)
-		target_height = 1;
+	if (segment_items > 0) {
+		target_height = segment_tallest;
+		if (count > 0) {
+			int average_height;
+			average_height = (segment_height + count - 1) / count;
+			if (average_height > target_height) {
+				target_height = average_height;
+			}
+		}
+		if (target_height < 1) {
+			target_height = 1;
+		}
+		segment_targets[segment_count] = target_height;
+		segment_ends[segment_count] = child_count - 1;
+		segment_count++;
+	}
 
 	base_x = block->padding[LEFT];
 	base_y = block->padding[TOP];
-	current_column = 0;
-	current_y = 0;
-	max_column_height = 0;
+	flow_y = 0;
+	if (segment_count > 0 &&
+			layout_multicol_store_data(block, segment_count) == NULL) {
+		free(items);
+		free(outer_heights);
+		free(span_all_flags);
+		free(segment_starts);
+		free(segment_ends);
+		free(segment_targets);
+		return false;
+	}
+	item_index = 0;
+	segment_index = 0;
+	while (item_index < child_count) {
+		if (span_all_flags[item_index] != 0) {
+			struct box *item = items[item_index];
+			int full_width = block->width;
+			int outer_height;
 
-	for (item_index = 0; item_index < child_count; item_index++) {
-		struct box *item;
-		int outer_height;
+			if (layout_dim_is_auto_or_bad(full_width) || full_width <= 0)
+				full_width = count * column_width + gap * (count - 1);
 
-		item = items[item_index];
-		outer_height = outer_heights[item_index];
+			if (!layout_multicol_layout_child(item, full_width,
+					viewport_height, block, content)) {
+				free(items);
+				free(outer_heights);
+				free(span_all_flags);
+				free(segment_starts);
+				free(segment_ends);
+				free(segment_targets);
+				return false;
+			}
 
-		if (current_column < count - 1 &&
-				current_y > 0 &&
-				current_y + outer_height > target_height) {
-			if (current_y > max_column_height)
-				max_column_height = current_y;
-			current_column++;
-			current_y = 0;
+			item->x = base_x + lh__non_auto_margin(item, LEFT) +
+					item->border[LEFT].width;
+			item->y = base_y + flow_y +
+					lh__non_auto_margin(item, TOP) +
+					item->border[TOP].width;
+
+			outer_height = item->height + lh__delta_outer_height(item);
+			if (outer_height < 0)
+				outer_height = 0;
+			flow_y += outer_height;
+			item_index++;
+			continue;
 		}
 
-		item->x = base_x + current_column * (column_width + gap) +
-				lh__non_auto_margin(item, LEFT) +
-				item->border[LEFT].width;
-		item->y = base_y + current_y +
-				lh__non_auto_margin(item, TOP) +
-				item->border[TOP].width;
-		current_y += outer_height;
-		if (current_y > max_column_height)
-			max_column_height = current_y;
+		if (segment_index >= segment_count ||
+				segment_starts[segment_index] != item_index) {
+			free(items);
+			free(outer_heights);
+			free(span_all_flags);
+			free(segment_starts);
+			free(segment_ends);
+			free(segment_targets);
+			return false;
+		}
+
+		target_height = segment_targets[segment_index];
+		{
+			int column_index = 0;
+			int column_y = 0;
+			int band_height = 0;
+			int band_top = flow_y;
+
+			for (; item_index <= segment_ends[segment_index];
+					item_index++) {
+				struct box *item = items[item_index];
+				int outer_height = outer_heights[item_index];
+
+				if (count > 1 &&
+						column_index < count - 1 &&
+						column_y > 0 &&
+						column_y + outer_height > target_height) {
+					if (column_y > band_height)
+						band_height = column_y;
+					column_index++;
+					column_y = 0;
+				}
+
+				item->x = base_x + (column_index * (column_width + gap)) +
+						lh__non_auto_margin(item, LEFT) +
+						item->border[LEFT].width;
+				item->y = base_y + flow_y + column_y +
+						lh__non_auto_margin(item, TOP) +
+						item->border[TOP].width;
+
+				column_y += outer_height;
+				if (column_y > band_height)
+					band_height = column_y;
+			}
+
+			flow_y += band_height;
+			{
+				struct box_multicol_dat_ns *multicol_data;
+
+				multicol_data = layout_multicol_data_for_box(block);
+				if (multicol_data != NULL &&
+						segment_index < multicol_data->segment_count) {
+					multicol_data->segments[segment_index].top =
+							band_top;
+					multicol_data->segments[segment_index].bottom =
+							flow_y;
+				}
+			}
+		}
+		segment_index++;
 	}
 
-	block->height = max_column_height;
+	block->height = flow_y;
 	if (block->height < 0)
 		block->height = 0;
 
 	free(items);
 	free(outer_heights);
+	free(span_all_flags);
+	free(segment_starts);
+	free(segment_ends);
+	free(segment_targets);
 	(void) balance;
 	return true;
 }

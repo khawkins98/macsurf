@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MacSurf — fixes191d (object-position)</title>
+<title>MacSurf — fixes191g (object-position keywords)</title>
 <style>
   body {
     font-family: Helvetica, sans-serif;
@@ -31,36 +31,35 @@
   }
   .slot img { width: 96px; height: 96px; object-fit: contain; }
 
-  /* fixes191d — object-position is currently silently dropped via the
-   * cssh_css preprocessor. apply_object_fit centers the fitted image
-   * in its slot, matching the default `object-position: center center`.
-   * Non-default values degrade to center; this test confirms center
-   * still wins for the most common mactrove use. */
+  /* fixes191g — object-position now rewrites to
+   * -macsurf-object-position and steers the existing object-fit
+   * placement path for keyword values. V1 is keyword-only:
+   * left|center|right + top|center|bottom. */
   .op1 img { object-position: center center; }
   .op2 img { object-position: left top; }
   .op3 img { object-position: right bottom; }
 </style>
 </head>
 <body>
-<h1>fixes191d — object-position (default-centred fallback)</h1>
-<p class="lede">PARTIAL: cssh_css drops the declaration; the existing object-fit centring matches "center center". Non-centre values degrade to centre.</p>
+<h1>fixes191g — object-position keyword alignment</h1>
+<p class="lede">Keyword object-position values now align replaced content inside its object-fit slot. Percentages and lengths remain deferred.</p>
 
 <div class="card">
   <div class="card-title">OP1 — object-position: center center</div>
   <span class="slot op1"><img src="/themes/custom/platinum/images/logo.png" alt="logo"></img></span>
-  <p class="expect">Image centred in 96x96 slot (default behaviour, matches authored value).</p>
+  <p class="expect">Wide logo centred in both axes inside the 96x96 slot.</p>
 </div>
 
 <div class="card">
-  <div class="card-title">OP2 — object-position: left top (degrades to centre)</div>
+  <div class="card-title">OP2 — object-position: left top</div>
   <span class="slot op2"><img src="/themes/custom/platinum/images/logo.png" alt="logo"></img></span>
-  <p class="expect">Currently centres (degraded). V2 will pin top-left.</p>
+  <p class="expect">Rendered image pinned to the slot's top-left corner.</p>
 </div>
 
 <div class="card">
-  <div class="card-title">OP3 — object-position: right bottom (degrades to centre)</div>
+  <div class="card-title">OP3 — object-position: right bottom</div>
   <span class="slot op3"><img src="/themes/custom/platinum/images/logo.png" alt="logo"></img></span>
-  <p class="expect">Currently centres (degraded). V2 will pin bottom-right.</p>
+  <p class="expect">Rendered image pinned to the slot's bottom-right corner.</p>
 </div>
 </body>
 </html>

@@ -2091,6 +2091,60 @@ macsurf__rewrite_transform(const char *data, size_t in_size,
 	return out;
 }
 
+/* fixes191g -- rewrite standard `object-position:` to
+ * `-macsurf-object-position:` so author CSS reaches the compact
+ * keyword-only V1 parser. Like transform/text-shadow, this only matches
+ * the exact property name followed by optional whitespace and `:`, so
+ * unrelated longhands are left alone. */
+static char *
+macsurf__rewrite_object_position(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	static const char NEEDLE[] = "object-position";
+	static const size_t NEEDLE_LEN = 15;
+	static const char REPLACE[] = "-macsurf-object-position";
+	static const size_t REPLACE_LEN = 24;
+	char *out;
+	size_t cap;
+	size_t pos = 0;
+	size_t i = 0;
+
+	cap = in_size +
+		(in_size / NEEDLE_LEN + 1) * (REPLACE_LEN - NEEDLE_LEN) + 256;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		if (macsurf__match_prop_name(data, in_size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			size_t j = i + NEEDLE_LEN;
+			while (j < in_size && (data[j] == ' ' ||
+					data[j] == '\t' ||
+					data[j] == '\n' ||
+					data[j] == '\r')) j++;
+			if (j < in_size && data[j] == ':') {
+				if (pos + REPLACE_LEN >= cap) {
+					free(out);
+					return NULL;
+				}
+				memcpy(out + pos, REPLACE, REPLACE_LEN);
+				pos += REPLACE_LEN;
+				i += NEEDLE_LEN;
+				continue;
+			}
+		}
+		if (pos + 1 >= cap) {
+			free(out);
+			return NULL;
+		}
+		out[pos++] = data[i++];
+	}
+
+	out[pos] = '\0';
+	if (out_size_p != NULL) *out_size_p = pos;
+	return out;
+}
+
 
 /* fixes185 — modern-CSS compatibility preprocessor. Rewrites unsupported
  * modern syntax into supported equivalents (or drops it) so author CSS
@@ -2144,13 +2198,6 @@ macsurf__rewrite_modern_compat(const char *data, size_t in_size,
 		 * libcss doesn't warn. Hit-test still treats every visible
 		 * box as targettable; document as PARTIAL. */
 		"pointer-events",
-		/* fixes191d -- object-position. apply_object_fit (redraw.c)
-		 * already centers fitted images in their slot, which is the
-		 * default object-position. Non-default values silently
-		 * degrade to center; the only mactrove use of this property
-		 * is `center center` which is a no-op against the default,
-		 * so the round-trip is visually identical. */
-		"object-position",
 		/* fixes191f -- user-select / overscroll-behavior etc. are
 		 * silently dropped. MacSurf has no native equivalent for
 		 * these; pages render fine without them. */
@@ -2544,11 +2591,13 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_col_span = NULL;
 	char *rewritten_text_shadow = NULL;
 	char *rewritten_transform = NULL;
+	char *rewritten_object_position = NULL;
 	char *rewritten_modern_compat = NULL;
 	char *rewritten_inset = NULL;
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
+	size_t object_position_size = 0;
 	size_t modern_compat_size = 0;
 	size_t inset_size = 0;
 	const char *final_data;
@@ -2661,7 +2710,19 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 		final_size = (unsigned int)transform_size;
 	}
 
-	/* fixes185 — sixth pass: modern-CSS compatibility. Rewrites
+	/* fixes191g — sixth pass: rewrite standard `object-position:` to
+	 * `-macsurf-object-position:` so the keyword-only V1 parser can
+	 * steer replaced-element alignment without touching libcss struct
+	 * layout. */
+	rewritten_object_position = macsurf__rewrite_object_position(final_data,
+			(size_t)final_size, &object_position_size);
+	if (rewritten_object_position != NULL &&
+			object_position_size <= (size_t)0x7fffffff) {
+		final_data = (const char *)rewritten_object_position;
+		final_size = (unsigned int)object_position_size;
+	}
+
+	/* fixes185 — seventh pass: modern-CSS compatibility. Rewrites
 	 * `:focus-visible` / `:focus-within` to `:focus`, drops unsupported
 	 * declarations (line-clamp, image-rendering, font-variant-numeric,
 	 * break-inside, outline-offset), and strips the `repeating-` prefix
@@ -2691,6 +2752,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 
 	if (rewritten_inset != NULL) free(rewritten_inset);
 	if (rewritten_modern_compat != NULL) free(rewritten_modern_compat);
+	if (rewritten_object_position != NULL) free(rewritten_object_position);
 	if (rewritten_transform != NULL) free(rewritten_transform);
 	if (rewritten_text_shadow != NULL) free(rewritten_text_shadow);
 	if (rewritten_col_span != NULL) free(rewritten_col_span);

@@ -244,6 +244,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("-macsurf-animation-opacity"),
 	SMAP("-macsurf-animation-rotate"),
 	SMAP("object-fit"),
+	SMAP("-macsurf-object-position"),
 	SMAP("text-overflow"),
 	SMAP("word-break"),
 	SMAP("overflow-wrap"),

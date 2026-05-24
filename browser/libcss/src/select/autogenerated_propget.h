@@ -2159,6 +2159,9 @@ static inline uint8_t get_macsurf_animation_rotate(
 #define OBJECT_FIT_INDEX 15
 #define OBJECT_FIT_SHIFT 2
 #define OBJECT_FIT_MASK 0x1c
+#define MACSURF_OBJECT_POSITION_INDEX 15
+#define MACSURF_OBJECT_POSITION_SHIFT 11
+#define MACSURF_OBJECT_POSITION_MASK 0x7800
 #define TEXT_OVERFLOW_INDEX 15
 #define TEXT_OVERFLOW_SHIFT 5
 #define TEXT_OVERFLOW_MASK 0x60
@@ -2184,9 +2187,22 @@ static inline uint8_t get_object_fit(const css_computed_style *style)
 
 	return (bits & 0x7);
 }
+
+static inline uint8_t get_macsurf_object_position(
+		const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[MACSURF_OBJECT_POSITION_INDEX];
+	bits &= MACSURF_OBJECT_POSITION_MASK;
+	bits >>= MACSURF_OBJECT_POSITION_SHIFT;
+
+	return (bits & 0xf);
+}
 #undef OBJECT_FIT_INDEX
 #undef OBJECT_FIT_SHIFT
 #undef OBJECT_FIT_MASK
+#undef MACSURF_OBJECT_POSITION_INDEX
+#undef MACSURF_OBJECT_POSITION_SHIFT
+#undef MACSURF_OBJECT_POSITION_MASK
 
 static inline uint8_t get_text_overflow_bits(const css_computed_style *style)
 {

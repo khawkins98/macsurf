@@ -1762,7 +1762,9 @@ form_redraw_select_menu(struct form_control *control,
 	}
 	item_y -= line_height_with_spacing;
 	text_pos_offset = y - scroll +
-			(int) (line_height * (0.75 + SELECT_LINE_SPACING));
+			(int) (line_height * SELECT_LINE_SPACING) +
+			font_plot_style_baseline(&plot_fstyle_entry,
+					line_height);
 	text_x = x + (box->border[LEFT].width + box->padding[LEFT]) * scale;
 
 	plot_fstyle_entry.size = menu->f_size;

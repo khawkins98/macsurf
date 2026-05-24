@@ -28,6 +28,8 @@
 #ifndef NETSURF_HTML_LAYOUT_H
 #define NETSURF_HTML_LAYOUT_H
 
+#include <stdbool.h>
+
 struct box;
 struct html_content;
 struct gui_layout_table;
@@ -41,5 +43,9 @@ struct gui_layout_table;
  * \return true on success, false on memory exhaustion
  */
 bool layout_document(struct html_content *content, int width, int height);
+
+unsigned int layout_multicol_segment_count(const struct box *box);
+bool layout_multicol_segment_bounds(const struct box *box,
+		unsigned int index, int *top, int *bottom);
 
 #endif
