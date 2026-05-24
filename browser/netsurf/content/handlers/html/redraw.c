@@ -242,6 +242,108 @@ static void macsurf_gradient_unpack(int32_t packed_signed,
 			(uint32_t)r2);
 }
 
+/* fixes201 — gradient paint with background-size tiling.
+ *
+ * The existing path emits one ctx->plot->rectangle call which fills
+ * the entire box `r` with the gradient. When background-size is set
+ * to a specific tile dimension (not auto / cover / contain), the
+ * gradient should repeat at that size — that's how stipple textures
+ * built from sharp-stop linear-gradients (mactrove body) get their
+ * pattern.
+ *
+ * V1 strategy: loop plot_rectangle once per tile, capped at
+ * MACOS9_GRAD_TILE_MAX (4096) tiles to keep pathological inputs
+ * bounded. Above the cap we fall back to a single fill — same as
+ * the unset-bg-size behaviour, so body stipple at 2x2 (~hundreds of
+ * thousands of tiles) degrades but doesn't slow the page.
+ *
+ * V2 (deferred) would rasterise the gradient into a small bitmap
+ * once and use plot_bitmap with REPEAT flags — one CopyBits per
+ * paint, scalable to any tile size.
+ */
+#define MACOS9_GRAD_TILE_MAX 4096
+
+static nserror html_redraw_paint_gradient_tiled(
+		const struct redraw_context *ctx,
+		const plot_style_t *pstyle,
+		const struct rect *r,
+		const css_computed_style *style)
+{
+	int32_t bgsz;
+	int16_t wc;
+	int16_t hc;
+	int tile_w;
+	int tile_h;
+	int box_w;
+	int box_h;
+	int tile_count;
+	int tx;
+	int ty;
+	struct rect tile_r;
+	nserror res;
+
+	if (style == NULL) {
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	bgsz = css_computed_background_size(style);
+	if (bgsz == 0) {
+		/* unset: paint as single rect (CSS default behaviour). */
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	wc = (int16_t)((bgsz >> 16) & 0xFFFF);
+	hc = (int16_t)(bgsz & 0xFFFF);
+
+	/* cover / contain don't tile (they scale to fit). */
+	if (wc < 0 || hc < 0) {
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	/* auto on either axis → fill once. */
+	if (wc == 0 || hc == 0) {
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	tile_w = (int)wc;
+	tile_h = (int)hc;
+	if (tile_w < 1 || tile_h < 1) {
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	box_w = r->x1 - r->x0;
+	box_h = r->y1 - r->y0;
+	if (box_w <= 0 || box_h <= 0) {
+		return NSERROR_OK;
+	}
+
+	/* Cap: if we'd emit more than MACOS9_GRAD_TILE_MAX tiles, fall
+	 * back to single-rect paint. Body-stipple-style tiny tiles fall
+	 * here; they'd render correctly but at unacceptable cost. The
+	 * future V2 bitmap-rasterise path is the right fix for them. */
+	tile_count = ((box_w + tile_w - 1) / tile_w) *
+			((box_h + tile_h - 1) / tile_h);
+	if (tile_count > MACOS9_GRAD_TILE_MAX) {
+		return ctx->plot->rectangle(ctx, pstyle, r);
+	}
+
+	for (ty = r->y0; ty < r->y1; ty += tile_h) {
+		for (tx = r->x0; tx < r->x1; tx += tile_w) {
+			tile_r.x0 = tx;
+			tile_r.y0 = ty;
+			tile_r.x1 = tx + tile_w;
+			tile_r.y1 = ty + tile_h;
+			if (tile_r.x1 > r->x1) tile_r.x1 = r->x1;
+			if (tile_r.y1 > r->y1) tile_r.y1 = r->y1;
+			res = ctx->plot->rectangle(ctx, pstyle, &tile_r);
+			if (res != NSERROR_OK) {
+				return res;
+			}
+		}
+	}
+	return NSERROR_OK;
+}
+
 /**
  * Determine if a box has a background that needs drawing
  *
@@ -270,6 +372,75 @@ static void macsurf_gradient_unpack(int32_t packed_signed,
  * miscompiles them — see CLAUDE.md Known Gotchas). The 32-bit products
  * here (e.g. nat_w * cell_h) cap at ~16k*16k = 256M, which fits.
  */
+/* fixes201 — object-position offset resolver.
+ *
+ * Reads both the keyword and numeric (percent/px) storage slots; when
+ * the numeric slot has bit 31 set (the parser's "numeric SET"
+ * marker), resolves per CSS spec:
+ *
+ *   px value:        offset = px
+ *   percent value:   offset = (axis_free) * pct / 100
+ *
+ * Otherwise falls back to the keyword (START/CENTER/END snapped to
+ * 0% / 50% / 100% effectively).
+ *
+ * The fixes191g keyword storage remains for backward compatibility
+ * and as the fallback when no numeric value is in the cascade.
+ */
+static int html_redraw_object_pos_offset(int axis_free, uint8_t kw_pos,
+		int packed_xy, int is_horizontal)
+{
+	int has_value;
+	int is_px;
+	int q86;
+	int real_int;
+	int real_frac_64;
+	int offset;
+
+	has_value = ((unsigned int)packed_xy >> 31) & 1;
+	if (!has_value) {
+		/* Fallback to the 4-bit keyword storage. */
+		if (kw_pos == CSS_MACSURF_OBJECT_POSITION_START) return 0;
+		if (kw_pos == CSS_MACSURF_OBJECT_POSITION_END) return axis_free;
+		return axis_free / 2;
+	}
+	if (is_horizontal) {
+		is_px = ((unsigned int)packed_xy >> 30) & 1;
+		q86 = ((unsigned int)packed_xy >> 16) & 0x3FFF;
+	} else {
+		is_px = ((unsigned int)packed_xy >> 14) & 1;
+		q86 = (unsigned int)packed_xy & 0x3FFF;
+	}
+	/* Sign-extend the 14-bit Q8.6 value. */
+	if (q86 & 0x2000) q86 |= ~0x3FFF;
+	/* q86 is value * 64 in real units. real_int = q86 >> 6 with
+	 * arithmetic shift (preserve sign). */
+	real_int = q86 >> 6;
+	real_frac_64 = q86 & 0x3F;
+	if (is_px) {
+		/* px: offset = value (real_int is integer pixels, drop
+		 * sub-pixel fraction for QuickDraw int-pixel paint). */
+		offset = real_int;
+	} else {
+		/* percent: offset = axis_free * pct / 100. Use the
+		 * fractional 1/64-percent bits for sub-percent precision:
+		 *   offset = (axis_free * q86) / (64 * 100)
+		 *         = (axis_free * q86) / 6400
+		 * axis_free up to ~16000 (cell dim), q86 up to ~8191, so
+		 * the int32 product caps at 1.3e8 — fits comfortably. */
+		(void)real_int;
+		(void)real_frac_64;
+		offset = (axis_free * q86) / 6400;
+	}
+	/* Clamp to the slot bounds. CSS allows negative offsets and
+	 * over-100% (image hangs off the slot), but for QuickDraw paint
+	 * we keep it within the cell so plot_bitmap's clip catches the
+	 * rest correctly. */
+	if (offset < 0) offset = 0;
+	if (offset > axis_free) offset = axis_free;
+	return offset;
+}
+
 static void html_redraw_apply_object_fit(struct box *box,
 		struct content_redraw_data *obj)
 {
@@ -277,6 +448,7 @@ static void html_redraw_apply_object_fit(struct box *box,
 	uint8_t pos;
 	uint8_t pos_x;
 	uint8_t pos_y;
+	int32_t pos_xy;
 	int nat_w, nat_h;
 	int cell_w, cell_h;
 	int cell_x, cell_y;
@@ -307,6 +479,7 @@ static void html_redraw_apply_object_fit(struct box *box,
 	}
 
 	pos = css_computed_macsurf_object_position(box->style);
+	pos_xy = css_computed_macsurf_object_position_xy(box->style);
 	pos_x = (uint8_t)((pos >> 2) & 0x3);
 	pos_y = (uint8_t)(pos & 0x3);
 	if (pos_x < CSS_MACSURF_OBJECT_POSITION_START ||
@@ -318,10 +491,17 @@ static void html_redraw_apply_object_fit(struct box *box,
 		pos_y = CSS_MACSURF_OBJECT_POSITION_CENTER;
 	}
 
+/* fixes201: route both axes through the numeric-aware offset
+ * resolver. When numeric storage (bit 31 of pos_xy) is clear the
+ * resolver falls back to the keyword path automatically, which
+ * matches the fixes191g behaviour byte-for-byte. */
+#define MACSURF_ALIGN_POS_H(axis_free) \
+	html_redraw_object_pos_offset((axis_free), pos_x, pos_xy, 1)
+#define MACSURF_ALIGN_POS_V(axis_free) \
+	html_redraw_object_pos_offset((axis_free), pos_y, pos_xy, 0)
 #define MACSURF_ALIGN_POS(axis_free, axis_pos) \
-	(((axis_pos) == CSS_MACSURF_OBJECT_POSITION_START) ? 0 : \
-	 ((axis_pos) == CSS_MACSURF_OBJECT_POSITION_END) ? (axis_free) : \
-	 ((axis_free) / 2))
+	(((axis_pos) == pos_x) ? MACSURF_ALIGN_POS_H(axis_free) : \
+				  MACSURF_ALIGN_POS_V(axis_free))
 
 	switch (fit) {
 	case CSS_OBJECT_FIT_CONTAIN:
@@ -1353,7 +1533,13 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 				pstyle_fill_bg.fill_colour2 = gc2;
 			}
 			if (plot_colour) {
-				res = ctx->plot->rectangle(ctx, &pstyle_fill_bg, &r);
+				/* fixes201: route through the bg-size tiling
+				 * helper so gradient backgrounds repeat at
+				 * the requested tile size when bg-size is set
+				 * to a specific px value. */
+				res = html_redraw_paint_gradient_tiled(ctx,
+						&pstyle_fill_bg, &r,
+						background ? background->style : NULL);
 				if (res != NSERROR_OK) {
 					return false;
 				}
@@ -1376,7 +1562,9 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 							  PLOT_OP_TYPE_LINEAR_GRADIENT);
 				pstyle_fill_bg.fill_colour  = gc1;
 				pstyle_fill_bg.fill_colour2 = gc2;
-				res = ctx->plot->rectangle(ctx, &pstyle_fill_bg, &r);
+				res = html_redraw_paint_gradient_tiled(ctx,
+						&pstyle_fill_bg, &r,
+						background->style);
 				if (res != NSERROR_OK) {
 					return false;
 				}
@@ -1796,7 +1984,10 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 		}
 
 		if (plot_colour) {
-			res = ctx->plot->rectangle(ctx, &pstyle_fill_bg, &r);
+			/* fixes201: gradient bg-size tile loop (inline path). */
+			res = html_redraw_paint_gradient_tiled(ctx,
+					&pstyle_fill_bg, &r,
+					box ? box->style : NULL);
 			if (res != NSERROR_OK) {
 				return false;
 			}
@@ -1818,7 +2009,9 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 						  PLOT_OP_TYPE_LINEAR_GRADIENT);
 			pstyle_fill_bg.fill_colour  = gc1;
 			pstyle_fill_bg.fill_colour2 = gc2;
-			res = ctx->plot->rectangle(ctx, &pstyle_fill_bg, &r);
+			res = html_redraw_paint_gradient_tiled(ctx,
+					&pstyle_fill_bg, &r,
+					box->style);
 			if (res != NSERROR_OK) {
 				return false;
 			}

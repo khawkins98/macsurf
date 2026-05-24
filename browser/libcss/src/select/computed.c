@@ -747,6 +747,12 @@ uint8_t css_computed_macsurf_object_position(const css_computed_style *style)
 	return get_macsurf_object_position(style);
 }
 
+int32_t css_computed_macsurf_object_position_xy(
+		const css_computed_style *style)
+{
+	return style->i.macsurf_object_position_xy;
+}
+
 uint8_t css_computed_text_overflow(const css_computed_style *style)
 {
 	return get_text_overflow(style);

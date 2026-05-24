@@ -357,6 +357,27 @@ struct css_computed_style_i {
 	 * Whole word 0 = unset / treat as `auto auto` (CSS default).
 	 * int32 storage is self-aligning (fixes151b padding lesson). */
 	int32_t background_size;
+	/* fixes201: object-position numeric value (percent or px).
+	 *
+	 * Encoded as:
+	 *   bit  31:    has-value flag (0 = unset, defer to keyword
+	 *               field; 1 = use numeric value below)
+	 *   bit  30:    h-unit (0 = percentage, 1 = px)
+	 *   bit  29:    v-unit (0 = percentage, 1 = px)
+	 *   bit  28:    reserved (must be 0)
+	 *   bits 27..14 h-value (signed Q8.6 -- enough range for
+	 *               -128..127% or -128..127 px in 14 bits, plus
+	 *               6 fractional bits for sub-pixel/sub-percent)
+	 *   bits 13..0  v-value (signed Q8.6)
+	 *
+	 * Why both percent and px in one slot: CSS object-position can
+	 * mix axes (`object-position: 25% 10px` is valid). The unit
+	 * bits per axis avoid two passes.
+	 *
+	 * Resolution at consumer time: percent values resolve against
+	 * (slot_dim - object_dim) per CSS spec; px values are
+	 * absolute offsets within the slot. */
+	int32_t macsurf_object_position_xy;
 };
 
 struct css_computed_style {

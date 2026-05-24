@@ -158,7 +158,12 @@ css_error css__parse_macsurf_transform(css_language *c,
 			error = css__parse_unit_specifier(c, vector, ctx,
 					UNIT_DEG, &angle, &unit);
 			if (error == CSS_OK) {
-				rotation = angle;  /* Q22.10 degrees */
+				/* fixes201: compose multiple rotate() calls
+				 * by summing the angles. Two rotate(30deg)
+				 * in one declaration now total 60deg
+				 * instead of the previous overwrite-last
+				 * behaviour. Angle stays Q22.10 degrees. */
+				rotation += angle;
 				got_any = 1;
 			}
 			/* skip until ')' */
@@ -178,7 +183,11 @@ css_error css__parse_macsurf_transform(css_language *c,
 			error = css__parse_unit_specifier(c, vector, ctx,
 					UNIT_PX, &v1, &unit);
 			if (error == CSS_OK) {
-				tx = v1;
+				/* fixes201: compose multiple translate()
+				 * calls by accumulating. Translation is
+				 * commutative so order doesn't matter for
+				 * the net offset. */
+				tx += v1;
 				consumeWhitespace(vector, ctx);
 				token = parserutils_vector_peek(vector, *ctx);
 				if (token != NULL && token->type == CSS_TOKEN_CHAR &&
@@ -191,7 +200,7 @@ css_error css__parse_macsurf_transform(css_language *c,
 								c, vector, ctx,
 								UNIT_PX, &v2,
 								&unit);
-						if (error == CSS_OK) ty = v2;
+						if (error == CSS_OK) ty += v2;
 					}
 				}
 				got_any = 1;
@@ -242,13 +251,33 @@ css_error css__parse_macsurf_transform(css_language *c,
 						}
 					}
 				}
+				/* fixes201: compose multiple scale() calls by
+				 * multiplying. Scale is multiplicative in
+				 * fixed-point Q22.10: new = (old * v) >> 10.
+				 * Initial scale_x/scale_y default to 1.0
+				 * (1 << 10), so the first scale() multiplies
+				 * 1.0 * v == v as expected. Subsequent
+				 * scale() compounds.
+				 *
+				 * CW8 PPC int64_t multiply codegen is unsafe
+				 * (CLAUDE.md gotcha). For typical scale
+				 * values 0.01..10.0 in Q22.10 (10..10240),
+				 * the product fits within int32_t (max
+				 * ~1.05e8 << INT32_MAX), so straight int32
+				 * arithmetic is sound. Defensive clamp keeps
+				 * unreasonable input out of the overflow
+				 * zone. */
+				if (sv1 < 1) sv1 = 1;
+				if (sv1 > 32768) sv1 = 32768;
+				if (sv2 < 1) sv2 = 1;
+				if (sv2 > 32768) sv2 = 32768;
 				if (scale_axis_x) {
-					scale_x = sv1;
+					scale_x = (scale_x * sv1) >> 10;
 				} else if (scale_axis_y) {
-					scale_y = sv1;
+					scale_y = (scale_y * sv1) >> 10;
 				} else {
-					scale_x = sv1;
-					scale_y = sv2;
+					scale_x = (scale_x * sv1) >> 10;
+					scale_y = (scale_y * sv2) >> 10;
 				}
 				got_any = 1;
 			}
