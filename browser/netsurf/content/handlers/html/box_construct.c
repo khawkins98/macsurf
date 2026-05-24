@@ -1322,7 +1322,20 @@ box_construct_element(struct box_construct_ctx *ctx, bool *convert_children)
 			int matched = dom_string_caseless_lwc_isequal(
 					svg_name, corestring_lwc_svg);
 			if (matched) {
-				box->flags |= SVG_INLINE;
+				/* fixes202: mark the SVG root as a replaced
+				 * element with given dimensions. Without this,
+				 * lh__box_is_replace() returns false and the
+				 * inline layout path treats the box as non-
+				 * replaced — width collapses to 0 and height
+				 * collapses to the parent line-height, so the
+				 * macos9 SVG painter (fixes195) is invoked with
+				 * a degenerate 0xN rect and nothing renders.
+				 * fixes196's presentational-hint dispatch puts
+				 * width/height in computed style; this flag
+				 * combination makes layout actually consume
+				 * them. */
+				box->flags |= SVG_INLINE | IS_REPLACED |
+						REPLACE_DIM;
 				*convert_children = false;
 			}
 			/* Only log s-prefixed tags to keep noise down; <svg>

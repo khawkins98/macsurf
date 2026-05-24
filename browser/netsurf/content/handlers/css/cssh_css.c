@@ -2582,6 +2582,81 @@ grow_fail:
 }
 
 
+/* fixes202 — inline-style preprocessor.
+ *
+ * External stylesheets and <style> blocks run through nscss_process_data
+ * below, which threads the source bytes through a chain of name-rewriting
+ * passes (fixes175 text-shadow, fixes183 transform, fixes191g
+ * object-position, etc). Inline `style="..."` attributes take a different
+ * path: box_construct calls nscss_create_inline_style which hands the
+ * bytes straight to libcss with no preprocessing. Result: inline
+ * declarations like `transform: rotate(30deg)` or `text-shadow: 2px 2px`
+ * are unknown to libcss and silently dropped — TS1/TC1-3 on advanced.html
+ * shipped at fixes201b rendered as plain boxes with no shadow / no
+ * rotation / no translation / no scale.
+ *
+ * This helper runs the inline-style-relevant rewrite passes against a
+ * buffer and returns a freshly-allocated, length-prefixed result. The
+ * caller frees the result with free(). When no rewrites apply, the
+ * helper returns NULL and *out_size_p is unchanged; the caller should
+ * use the original buffer in that case.
+ *
+ * Grid template / inset / modern-compat passes are deliberately
+ * omitted — they target stylesheet patterns (selectors, multi-line
+ * declarations) that don't appear in inline-style attributes. Adding
+ * them is cheap if a future inline declaration needs them. */
+char *macsurf__rewrite_inline_style(const char *data, size_t in_size,
+		size_t *out_size_p);
+
+char *macsurf__rewrite_inline_style(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	char *cur = NULL;
+	size_t cur_size = in_size;
+	const char *src = data;
+	size_t src_size = in_size;
+	char *next;
+	size_t next_size = 0;
+
+	if (data == NULL || in_size == 0 || out_size_p == NULL) {
+		return NULL;
+	}
+
+	next = macsurf__rewrite_text_shadow(src, src_size, &next_size);
+	if (next != NULL) {
+		if (cur != NULL) free(cur);
+		cur = next;
+		cur_size = next_size;
+		src = (const char *)cur;
+		src_size = cur_size;
+	}
+
+	next = macsurf__rewrite_transform(src, src_size, &next_size);
+	if (next != NULL) {
+		if (cur != NULL) free(cur);
+		cur = next;
+		cur_size = next_size;
+		src = (const char *)cur;
+		src_size = cur_size;
+	}
+
+	next = macsurf__rewrite_object_position(src, src_size, &next_size);
+	if (next != NULL) {
+		if (cur != NULL) free(cur);
+		cur = next;
+		cur_size = next_size;
+		src = (const char *)cur;
+		src_size = cur_size;
+	}
+
+	if (cur == NULL) {
+		return NULL;
+	}
+	*out_size_p = cur_size;
+	return cur;
+}
+
+
 static bool
 nscss_process_data(struct content *c, const char *data, unsigned int size)
 {

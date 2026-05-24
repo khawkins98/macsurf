@@ -32,4 +32,12 @@
  */
 css_error nscss_resolve_url(void *pw, const char *base, lwc_string *rel, lwc_string **abs);
 
+/* fixes202: run the inline-style-relevant rewrite passes against a buffer.
+ * Returns a freshly-allocated rewritten buffer (caller frees) and writes
+ * the new size to *out_size_p; returns NULL when no rewrite applies (the
+ * caller should use the original buffer). Defined in cssh_css.c. */
+#include <stddef.h>
+char *macsurf__rewrite_inline_style(const char *data, size_t in_size,
+		size_t *out_size_p);
+
 #endif
