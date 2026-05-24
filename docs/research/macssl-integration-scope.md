@@ -125,8 +125,9 @@ Per the macSSL doc:
 
 MacSurf's Carbon partition is 16 MB preferred / 8 MB minimum. NetSurf's
 default 8 concurrent fetches per host * ~50 KB = 400 KB — well under
-budget. **A hard cap of `MAX_HTTPS_FETCHES = 4` (per
-integration-handoff.md) keeps the worst-case ceiling at ~200 KB.**
+budget. **`MAX_HTTPS_FETCHES = 4` is locked for V1** (worst-case ceiling
+~200 KB). V1.1 may revisit upward to 6 if soak tests show no
+fragmentation. See §10 decision 3.
 
 ---
 
@@ -238,13 +239,19 @@ the existing `macos9_http_fetcher_register` registers itself for **both
 `macos9_https_fetcher_register` claims `https`. NetSurf's `fetch.c`
 matches scheme exactly, so the dispatch is unambiguous.
 
-**Phase 2 (fallback):** When `macos9_https_fetcher` returns
-`BR_ERR_X509_NOT_TRUSTED` AND the user opts in via a dialog ("This
-site's certificate chain isn't in MacSurf's trusted root list. Try
-the secure proxy instead?"), reissue the fetch as `http://...`
-through the proxy. The proxy already does upstream HTTPS via Go's
-`crypto/tls` with a full CA bundle. **Deferred** — V1 just returns
-the error.
+**Phase 2 (fallback): in V1 scope.** When `macos9_https_fetcher`
+returns `BR_ERR_X509_NOT_TRUSTED`, surface a prompt:
+
+> *"This site's certificate isn't in MacSurf's trusted list. Try the
+> secure proxy instead?"*
+> `[Yes, use proxy]` `[No, cancel]` `[Don't ask again for this host]`
+
+`[Yes]` reissues the fetch as `http://...` through the proxy (the
+proxy already does upstream HTTPS via Go's `crypto/tls` with a full
+CA bundle). `[Don't ask again]` records the host in a session-scope
+allow-list so sub-resources from the same site auto-fall-through.
+
+This is the V1 cert-not-trusted UX (§10 decision 4); not deferred.
 
 **Phase 3 (proxy retirement):** Once entropy + CA bundle work lands
 (see §5), `http://` URLs can also route through the native HTTPS
@@ -439,15 +446,17 @@ This document + the `macSSL` branch. No code changes.
   same content as `http://mactrove.com/advanced.html` does today
   through the proxy.
 
-### Phase 5 — Error translation + clock dialog (1 round)
+### Phase 5 — Error translation + dialogs (1-2 rounds)
 
 - BearSSL/OSTLS error code → `nserror` mapping.
 - Clock-before-2000 dialog.
-- "Cert not trusted" dialog with a one-time-bypass option (V1) or
-  hard-fail (V0).
-- **Acceptance:** `https://example-with-non-baked-root.com` shows a
-  clear error; setting the Mac clock to 1999 and reloading any HTTPS
-  URL surfaces the clock dialog.
+- Cert-not-trusted prompt with `[Yes, use proxy]` / `[No, cancel]` /
+  `[Don't ask again for this host]` (§10 decision 4). Session-scope
+  per-host allow-list for sub-resource fall-through.
+- **Acceptance:** `https://example-with-non-baked-root.com` surfaces
+  the prompt; `[Yes]` reissues as `http://` through the proxy and
+  the page renders. Setting the Mac clock to 1999 and reloading any
+  HTTPS URL surfaces the clock dialog (not the cert prompt).
 
 ### Phase 6 — Stability + smoke (1 round)
 
@@ -478,8 +487,10 @@ This document + the `macSSL` branch. No code changes.
 - [ ] README entry: "MacSurf v0.6 — Native HTTPS"
 - [ ] HARDWARE-VERIFIED log file from a G3 fetch of `https://mactrove.com/advanced.html`
 - [ ] `OSTLS_CollectEntropy()` wired into the fetcher poll tick (every tick, not just per-handshake)
-- [ ] About box: "Native HTTPS via macSSL (BearSSL + production entropy)"
-- [ ] Optional first-run / beta marker in About box (NOT a "preview crypto" disclaimer — production entropy already shipped in macssl17)
+- [ ] About box: **"Native HTTPS (Beta) via macSSL"** (per §10 decision 2)
+- [ ] `MAX_HTTPS_FETCHES = 4` enforced in the fetcher (§10 decision 3)
+- [ ] Cert-not-trusted prompt with the 3-button shape (§10 decision 4)
+- [ ] Session-scope per-host allow-list for proxy fall-through
 
 ---
 
@@ -497,36 +508,37 @@ This document + the `macSSL` branch. No code changes.
 
 ---
 
-## 10. Open questions for the user
+## 10. V1 decisions (locked 2026-05-24)
 
-1. **Trust anchor breadth for V1.** Stay with the existing 10 roots, or
-   expand to ~50 roots from a Mozilla bundle in V1? The latter doubles
-   the binary size (~50 KB per RSA-4096 anchor) but cuts the "site
-   cert not trusted" rate ~3-5x. Recommendation: **ship V1 with 10**
-   and add the bundle in V1.1 once the cert-not-trusted dialog is real
-   so we can measure the failure rate.
+All five open questions resolved. Phase 1 may proceed.
 
-2. ~~**Stage A entropy disclosure**~~ — **resolved.** Production entropy
-   shipped in macssl17 (see §5.1). No "preview crypto" disclaimer
-   required. A "beta feature" marker in the About box for V1 is still
-   reasonable while the stack stabilizes, but should be framed as a
-   new-feature note ("Native HTTPS — please report issues"), not a
-   security warning.
+1. **Trust anchor breadth: 10 roots for V1.** Ship the existing baked-in
+   set. Expanding to a ~50-root Mozilla bundle requires running PEM
+   conversion + new arena layout audit; defers shipping for marginal
+   coverage. V1.1 revisits with real-world failure-rate data from the
+   "cert not trusted" dialog (decision 4).
 
-3. **HTTPS fetcher cap.** `MAX_HTTPS_FETCHES = 4` per integration-
-   handoff. Acceptable? Lower (2) would protect heap harder. Higher
-   (6-8) matches NetSurf core's expectation and may reduce page-load
-   latency at the cost of memory headroom.
+2. **Entropy disclosure: no security warning; quiet "Beta" tag only.**
+   Production entropy is shipped (§5.1). About-box text: *"Native
+   HTTPS (Beta) via macSSL"*. No first-run dialog, no title-bar
+   marker, no preview-crypto warning. A scary disclaimer would push
+   users back to plaintext HTTP-via-proxy, which is strictly worse.
 
-4. **Proxy fallback on cert-not-trusted.** If we hit
-   `BR_ERR_X509_NOT_TRUSTED`, do we:
-   - hard-fail with the dialog (V0)
-   - auto-retry through the proxy silently (transparent)
-   - prompt the user to choose (V1 recommended)
-   - let the user disable native HTTPS in preferences entirely
+3. **HTTPS fetcher cap: `MAX_HTTPS_FETCHES = 4`.** Worst-case heap
+   ceiling ~200 KB (4 × 50 KB per fetch). Headroom for OS 9 partition
+   fragmentation; OS-level OOM is more lethal than slow page loads.
+   V1.1 may bump to 6 if prolonged-browsing soak tests pass without
+   fragmentation issues.
 
-5. **MacSSL repo location.** macSSL is currently a sub-directory under
-   `macsurf/macSSL/`. Stay that way (vendored), or move to a separate
-   repo and add as a submodule? Vendoring is simpler for the CW8 build
-   workflow; submodule would let macSSL release independently. Recommendation:
-   **stay vendored** through V1, evaluate after.
+4. **Cert-not-trusted: prompt the user.** Dialog:
+   > *"This site's certificate isn't in MacSurf's trusted list. Try
+   > the secure proxy instead?"*
+   with buttons `[Yes, use proxy]` / `[No, cancel]` / `[Don't ask
+   again for this host]`. Hard-fail breaks pages; silent fallback
+   hides the boundary. Prompt teaches users where the native-HTTPS
+   limit is, and stays useful while we expand the anchor set.
+
+5. **macSSL stays vendored.** Git submodules don't survive the
+   tar → scp → CW8 import workflow cleanly. Vendoring keeps the
+   build pipeline flat; revisit after V1 ships if macSSL starts
+   releasing independently.
