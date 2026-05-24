@@ -560,6 +560,10 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	        0,
 	},
 	{
+	        PROPERTY_FUNCS(macsurf_object_position),
+	        0,
+	},
+	{
 	        PROPERTY_FUNCS(text_overflow),
 	        0,
 	},

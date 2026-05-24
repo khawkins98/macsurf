@@ -63,6 +63,7 @@
 #include "html/form_internal.h"
 #include "html/private.h"
 #include "html/layout.h"
+#include "html/layout_safe.h"
 
 /* fixes195 — inline SVG renderer lives in the macos9 frontend so it
  * can use Mac-specific debugging hooks (it dispatches through the
@@ -257,12 +258,12 @@ static void macsurf_gradient_unpack(int32_t packed_signed,
  *
  *   FILL       — leave the rect as-is (default; stretches to cell).
  *   CONTAIN    — scale the image down to fit the cell, preserving
- *                aspect ratio; centre within the cell.
+ *                aspect ratio; align within the cell per object-position.
  *   COVER      — scale the image up to cover the cell, preserving
- *                aspect ratio; centre and let it overflow. QuickDraw's
+ *                aspect ratio; align and let it overflow. QuickDraw's
  *                clipRgn — already set to the cell rect by html_redraw_box
  *                before content_redraw fires — clips the overflow.
- *   NONE       — render at intrinsic size, centred in the cell.
+ *   NONE       — render at intrinsic size, aligned in the cell.
  *   SCALE_DOWN — `none` or `contain`, whichever yields a smaller image.
  *
  * Integer math throughout: int64_t intermediates ARE NOT used (CW8 PPC
@@ -273,10 +274,14 @@ static void html_redraw_apply_object_fit(struct box *box,
 		struct content_redraw_data *obj)
 {
 	uint8_t fit;
+	uint8_t pos;
+	uint8_t pos_x;
+	uint8_t pos_y;
 	int nat_w, nat_h;
 	int cell_w, cell_h;
 	int cell_x, cell_y;
 	int new_w, new_h;
+	int free_x, free_y;
 
 	if (box == NULL || box->style == NULL || box->object == NULL)
 		return;
@@ -301,6 +306,23 @@ static void html_redraw_apply_object_fit(struct box *box,
 		return;
 	}
 
+	pos = css_computed_macsurf_object_position(box->style);
+	pos_x = (uint8_t)((pos >> 2) & 0x3);
+	pos_y = (uint8_t)(pos & 0x3);
+	if (pos_x < CSS_MACSURF_OBJECT_POSITION_START ||
+			pos_x > CSS_MACSURF_OBJECT_POSITION_END) {
+		pos_x = CSS_MACSURF_OBJECT_POSITION_CENTER;
+	}
+	if (pos_y < CSS_MACSURF_OBJECT_POSITION_START ||
+			pos_y > CSS_MACSURF_OBJECT_POSITION_END) {
+		pos_y = CSS_MACSURF_OBJECT_POSITION_CENTER;
+	}
+
+#define MACSURF_ALIGN_POS(axis_free, axis_pos) \
+	(((axis_pos) == CSS_MACSURF_OBJECT_POSITION_START) ? 0 : \
+	 ((axis_pos) == CSS_MACSURF_OBJECT_POSITION_END) ? (axis_free) : \
+	 ((axis_free) / 2))
+
 	switch (fit) {
 	case CSS_OBJECT_FIT_CONTAIN:
 		/* min(cell_w/nat_w, cell_h/nat_h). Compare ratios via
@@ -315,8 +337,10 @@ static void html_redraw_apply_object_fit(struct box *box,
 		}
 		obj->width = new_w;
 		obj->height = new_h;
-		obj->x = cell_x + (cell_w - new_w) / 2;
-		obj->y = cell_y + (cell_h - new_h) / 2;
+		free_x = cell_w - new_w;
+		free_y = cell_h - new_h;
+		obj->x = cell_x + MACSURF_ALIGN_POS(free_x, pos_x);
+		obj->y = cell_y + MACSURF_ALIGN_POS(free_y, pos_y);
 		break;
 
 	case CSS_OBJECT_FIT_COVER:
@@ -331,15 +355,19 @@ static void html_redraw_apply_object_fit(struct box *box,
 		}
 		obj->width = new_w;
 		obj->height = new_h;
-		obj->x = cell_x + (cell_w - new_w) / 2;
-		obj->y = cell_y + (cell_h - new_h) / 2;
+		free_x = cell_w - new_w;
+		free_y = cell_h - new_h;
+		obj->x = cell_x + MACSURF_ALIGN_POS(free_x, pos_x);
+		obj->y = cell_y + MACSURF_ALIGN_POS(free_y, pos_y);
 		break;
 
 	case CSS_OBJECT_FIT_NONE:
 		obj->width = nat_w;
 		obj->height = nat_h;
-		obj->x = cell_x + (cell_w - nat_w) / 2;
-		obj->y = cell_y + (cell_h - nat_h) / 2;
+		free_x = cell_w - nat_w;
+		free_y = cell_h - nat_h;
+		obj->x = cell_x + MACSURF_ALIGN_POS(free_x, pos_x);
+		obj->y = cell_y + MACSURF_ALIGN_POS(free_y, pos_y);
 		break;
 
 	case CSS_OBJECT_FIT_SCALE_DOWN:
@@ -347,8 +375,10 @@ static void html_redraw_apply_object_fit(struct box *box,
 		if (nat_w <= cell_w && nat_h <= cell_h) {
 			obj->width = nat_w;
 			obj->height = nat_h;
-			obj->x = cell_x + (cell_w - nat_w) / 2;
-			obj->y = cell_y + (cell_h - nat_h) / 2;
+			free_x = cell_w - nat_w;
+			free_y = cell_h - nat_h;
+			obj->x = cell_x + MACSURF_ALIGN_POS(free_x, pos_x);
+			obj->y = cell_y + MACSURF_ALIGN_POS(free_y, pos_y);
 		} else {
 			if (nat_w * cell_h < nat_h * cell_w) {
 				new_h = cell_h;
@@ -359,14 +389,18 @@ static void html_redraw_apply_object_fit(struct box *box,
 			}
 			obj->width = new_w;
 			obj->height = new_h;
-			obj->x = cell_x + (cell_w - new_w) / 2;
-			obj->y = cell_y + (cell_h - new_h) / 2;
+			free_x = cell_w - new_w;
+			free_y = cell_h - new_h;
+			obj->x = cell_x + MACSURF_ALIGN_POS(free_x, pos_x);
+			obj->y = cell_y + MACSURF_ALIGN_POS(free_y, pos_y);
 		}
 		break;
 
 	default:
 		break;
 	}
+
+#undef MACSURF_ALIGN_POS
 }
 
 
@@ -588,7 +622,9 @@ text_redraw(const char *utf8_text,
 			    (ctx->plot->text(ctx,
 					     &plot_fstyle,
 					     x,
-					     y + (int)(height * 0.75 * scale),
+					     y + font_plot_style_baseline(
+						     &plot_fstyle,
+						     (int)(height * scale)),
 					     utf8_text,
 					     start_idx) != NSERROR_OK))
 				return false;
@@ -634,7 +670,9 @@ text_redraw(const char *utf8_text,
 			    (ctx->plot->text(ctx,
 					     &fstyle_hback,
 					     x,
-					     y + (int)(height * 0.75 * scale),
+					     y + font_plot_style_baseline(
+						     &fstyle_hback,
+						     (int)(height * scale)),
 					     utf8_text,
 					     endtxt_idx) != NSERROR_OK)) {
 				return false;
@@ -659,7 +697,9 @@ text_redraw(const char *utf8_text,
 					res = ctx->plot->text(ctx,
 							      &plot_fstyle,
 							      x,
-							      y + (int)(height * 0.75 * scale),
+							      y + font_plot_style_baseline(
+								      &plot_fstyle,
+								      (int)(height * scale)),
 							      utf8_text,
 							      utf8_len);
 					if (res != NSERROR_OK) {
@@ -680,7 +720,9 @@ text_redraw(const char *utf8_text,
 		res = ctx->plot->text(ctx,
 				      &plot_fstyle,
 				      x,
-				      y + (int) (height * 0.75 * scale),
+				      y + font_plot_style_baseline(
+					      &plot_fstyle,
+					      (int)(height * scale)),
 				      utf8_text,
 				      utf8_len);
 		if (res != NSERROR_OK) {
@@ -904,7 +946,9 @@ static bool html_redraw_file(int x, int y, int width, int height,
 		x = x + 4;
 	}
 
-	res = ctx->plot->text(ctx, &fstyle, x, y + height * 0.75, text, length);
+	res = ctx->plot->text(ctx, &fstyle, x,
+			y + font_plot_style_baseline(&fstyle, height),
+			text, length);
 	if (res != NSERROR_OK) {
 		return false;
 	}
@@ -2116,7 +2160,9 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 			 * same baseline math text_redraw uses. */
 			(void) ctx->plot->text(ctx, &fstyle,
 					ell_x,
-					y + (int)(box->height * 0.75 * scale),
+					y + font_plot_style_baseline(
+						&fstyle,
+						(int)(box->height * scale)),
 					marker, marker_len);
 		}
 	}
@@ -2232,6 +2278,48 @@ static bool html_redraw_multicol_resolve(
 	return true;
 }
 
+static bool html_redraw_multicol_rule_segment(
+		const struct box *box,
+		int x,
+		int y,
+		float scale,
+		const struct rect *clip,
+		const struct redraw_context *ctx,
+		const plot_style_t *rule_style,
+		int count,
+		int gap,
+		int column_width,
+		int top,
+		int bottom)
+{
+	struct rect line_rect;
+	int i;
+
+	if (bottom <= top)
+		return true;
+
+	for (i = 1; i < count; i++) {
+		int line_x;
+
+		line_x = x + box->padding[LEFT] +
+				i * column_width + (i - 1) * gap + gap / 2;
+		line_rect.x0 = line_x * scale;
+		line_rect.x1 = line_rect.x0;
+		line_rect.y0 = (y + top) * scale;
+		line_rect.y1 = (y + bottom) * scale;
+
+		if (line_rect.x0 < clip->x0 || line_rect.x0 > clip->x1)
+			continue;
+		if (line_rect.y1 < clip->y0 || line_rect.y0 > clip->y1)
+			continue;
+
+		if (ctx->plot->line(ctx, rule_style, &line_rect) != NSERROR_OK)
+			return false;
+	}
+
+	return true;
+}
+
 static bool html_redraw_multicol_rules(
 		const html_content *html,
 		struct box *box,
@@ -2248,12 +2336,12 @@ static bool html_redraw_multicol_rules(
 	css_unit rule_unit;
 	css_color rule_color;
 	plot_style_t rule_style;
-	struct rect line_rect;
+	struct box *child;
 	int count;
 	int gap;
 	int column_width;
 	int rule_width_px;
-	int i;
+	unsigned int segment_index;
 
 	if (!html_redraw_multicol_resolve(box, &html->unit_len_ctx, &count,
 			&gap, &column_width)) {
@@ -2320,24 +2408,27 @@ static bool html_redraw_multicol_rules(
 	rule_style.transform = 0;
 	rule_style.transform_b = 0;
 
-	for (i = 1; i < count; i++) {
-		int line_x;
+	if (layout_multicol_segment_count(box) > 0) {
+		int segment_top;
+		int segment_bottom;
 
-		line_x = x + box->padding[LEFT] +
-				i * column_width + (i - 1) * gap + gap / 2;
-		line_rect.x0 = line_x * scale;
-		line_rect.x1 = line_rect.x0;
-		line_rect.y0 = (y + box->padding[TOP]) * scale;
-		line_rect.y1 = (y + box->padding[TOP] + box->height) * scale;
-
-		if (line_rect.x0 < clip->x0 || line_rect.x0 > clip->x1)
-			continue;
-		if (line_rect.y1 < clip->y0 || line_rect.y0 > clip->y1)
-			continue;
-
-		if (ctx->plot->line(ctx, &rule_style, &line_rect) != NSERROR_OK)
-			return false;
+		for (segment_index = 0;
+				layout_multicol_segment_bounds(box, segment_index,
+				&segment_top, &segment_bottom);
+				segment_index++) {
+			if (!html_redraw_multicol_rule_segment(box, x, y, scale,
+					clip, ctx, &rule_style, count, gap,
+					column_width, segment_top, segment_bottom)) {
+				return false;
+			}
+		}
+		return true;
 	}
+
+	if (!html_redraw_multicol_rule_segment(box, x, y, scale, clip,
+			ctx, &rule_style, count, gap, column_width,
+			box->padding[TOP], box->padding[TOP] + box->height))
+		return false;
 
 	return true;
 }
@@ -3374,7 +3465,10 @@ bool html_redraw_box(const html_content *html, struct box *box,
 
 			if (ctx->plot->text(ctx,
 					    plot_fstyle_broken_object,
-					    obj_x, y + padding_top + (int)(height * 0.75),
+					    obj_x, y + padding_top +
+						    font_plot_style_baseline(
+							    plot_fstyle_broken_object,
+							    height),
 					    obj, sizeof(obj) - 1) != NSERROR_OK)
 				return false;
 		}

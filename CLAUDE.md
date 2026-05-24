@@ -242,6 +242,15 @@ Added to MacSurf.mcp:
 ### Adding new .c files
 When a change introduces a new `.c` file, mention it plainly so the user can add it to the project. **Do NOT edit `MacSurf.mcp` and do NOT include it in fix zips**, the user maintains the project file list on the Mac side through the CW8 IDE, and a Linux-edited `.mcp` will clobber their local changes. Just list the new filename(s) in the handoff and let the user add them.
 
+Most recent additions:
+- `browser/libcss/src/parse/properties/p_macsurf_object_position.c` (fixes191g)
+- `browser/libcss/src/select/properties/s_macsurf_object_position.c` (fixes191g)
+
+### Shipping discipline
+- Deliverables for a fix round are: delta tar with full tree preserved, `MacSurf.mcp` add/remove list, and `Access Paths.xml` add/remove list.
+- Standard transfer path is: build `fixesNN.tar`, place it in `~/Documents/macfiles/`, then `scp -P 2222 -i ~/.ssh/macsurf_push ~/Documents/macfiles/fixesNN.tar patrick@localhost:Documents/macfiles/`.
+- Do not stop at "tar created locally" when the user asked to send it.
+
 ### Library Dependency Chain, COMPLETE
 
 All five NetSurf core libraries are ported and C89-clean:
@@ -390,6 +399,7 @@ Native support landed or in progress:
 
 - CSS custom properties (`var()`), **fixes133-139, shipped.**
 - `gap` / `row-gap`, **fixes148, shipped with single-value fidelity (97% of MacTrove uses); two-value `gap: A B` degrades to column-gap=B.** Full-fidelity row-gap requires the bit-packing round deferred earlier.
+- `object-position` keyword alignment, **fixes191g, shipped.** Standard `object-position:` rewrites to `-macsurf-object-position:` in `cssh_css.c`; libcss stores a packed 4-bit x/y alignment in unused word-15 bits of computed style; the existing `object-fit` redraw path now aligns replaced elements for keyword values `left|center|right` and `top|center|bottom`. Percentages and lengths remain deferred.
 - Flex alignment (`justify-content`, `align-content`, `order`) reads, queued fixes149.
 - `border-radius` via QuickDraw `PaintRoundRect` / `FrameRoundRect`, queued fixes143.
 - Image content handlers (GIF/PNG/JPEG), queued fixes144.

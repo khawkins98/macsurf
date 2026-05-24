@@ -40,4 +40,7 @@ void font_plot_style_from_css(const css_unit_ctx *unit_len_ctx,
 			      const css_computed_style *css,
 			      struct plot_font_style *fstyle);
 
+int font_plot_style_baseline(const struct plot_font_style *fstyle,
+			     int line_height);
+
 #endif

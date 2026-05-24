@@ -60,6 +60,7 @@ PROPERTY_FUNCS(macsurf_grid);
 PROPERTY_FUNCS(macsurf_animation_opacity);
 PROPERTY_FUNCS(macsurf_animation_rotate);
 PROPERTY_FUNCS(object_fit);
+PROPERTY_FUNCS(macsurf_object_position);
 PROPERTY_FUNCS(text_overflow);
 PROPERTY_FUNCS(word_break);
 PROPERTY_FUNCS(overflow_wrap);

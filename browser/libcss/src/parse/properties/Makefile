@@ -61,6 +61,7 @@ DIR_SOURCES :=				\
 	overflow.c			\
 	padding.c			\
 	pause.c				\
+	p_macsurf_object_position.c	\
 	play_during.c			\
 	properties.c			\
 	quotes.c			\

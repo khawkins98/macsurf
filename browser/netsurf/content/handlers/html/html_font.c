@@ -255,3 +255,39 @@ void font_plot_style_from_css(
 			fstyle->foreground = 0x00000000;
 	}
 }
+
+int font_plot_style_baseline(const plot_font_style_t *fstyle, int line_height)
+{
+	int size = 12;
+	int baseline;
+	int family_floor;
+
+	if (fstyle != NULL) {
+		size = (int)(fstyle->size >> PLOT_STYLE_RADIX);
+		if (size <= 0) {
+			size = 12;
+		}
+	}
+
+	if (line_height <= 0) {
+		line_height = size;
+	}
+
+	baseline = (line_height * 3 + 2) / 4;
+
+	if (fstyle != NULL &&
+			fstyle->family == PLOT_FONT_FAMILY_MONOSPACE) {
+		family_floor = size;
+	} else {
+		family_floor = (size * 3 + 3) / 4;
+	}
+
+	if (baseline < family_floor) {
+		baseline = family_floor;
+	}
+	if (baseline < 1) {
+		baseline = 1;
+	}
+
+	return baseline;
+}
