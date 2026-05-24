@@ -17,6 +17,7 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -158,6 +159,10 @@ css_stylesheet *nscss_create_inline_style(const uint8_t *data, size_t len,
 	css_stylesheet_params params;
 	css_stylesheet *sheet;
 	css_error error;
+	char *rewritten = NULL;
+	size_t rewritten_size = 0;
+	const uint8_t *final_data = data;
+	size_t final_len = len;
 
 	params.params_version = CSS_STYLESHEET_PARAMS_VERSION_1;
 	params.level = CSS_LEVEL_DEFAULT;
@@ -181,7 +186,25 @@ css_stylesheet *nscss_create_inline_style(const uint8_t *data, size_t len,
 		return NULL;
 	}
 
-	error = css_stylesheet_append_data(sheet, data, len);
+	/* fixes202 — rewrite vendor-aliased property names in the
+	 * inline-style buffer so author CSS like
+	 *   style="transform: rotate(30deg); text-shadow: 2px 2px 3px #888"
+	 * reaches the existing vendor parsers. External stylesheets get
+	 * this treatment in nscss_process_data; inline-style attributes
+	 * previously bypassed it and silently dropped these declarations.
+	 * macsurf__rewrite_inline_style returns NULL when no rewrite
+	 * applies, in which case we feed the original buffer to libcss. */
+	rewritten = macsurf__rewrite_inline_style((const char *)data,
+			(size_t)len, &rewritten_size);
+	if (rewritten != NULL) {
+		final_data = (const uint8_t *)rewritten;
+		final_len = rewritten_size;
+	}
+
+	error = css_stylesheet_append_data(sheet, final_data, final_len);
+	if (rewritten != NULL) {
+		free(rewritten);
+	}
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		NSLOG(netsurf, INFO, "failed appending data: %d", error);
 		css_stylesheet_destroy(sheet);

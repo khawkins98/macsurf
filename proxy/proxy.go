@@ -41,6 +41,22 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	host := r.URL.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+
+	if host == "loonlang.org" {
+		newURL := *r.URL
+		if _, p, err := net.SplitHostPort(newURL.Host); err == nil {
+			newURL.Host = net.JoinHostPort("loonlang.com", p)
+		} else {
+			newURL.Host = "loonlang.com"
+		}
+		http.Redirect(w, r, newURL.String(), http.StatusMovedPermanently)
+		return
+	}
+
 	outReq, err := http.NewRequestWithContext(r.Context(), r.Method, r.URL.String(), r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
