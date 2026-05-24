@@ -27,52 +27,62 @@
 #include "parse/properties/utils.h"
 
 css_error css__parse_macsurf_text_shadow(css_language *c,
-		const parserutils_vector *vector, int32_t *ctx,
-		css_style *result)
+                const parserutils_vector *vector, int32_t *ctx,
+                css_style *result)
 {
-	int32_t orig_ctx = *ctx;
-	css_error error;
-	const css_token *token;
-	css_fixed hoff = 0, voff = 0;
-	uint32_t hoff_u = 0, voff_u = 0;
-	css_color color = 0;
-	uint16_t color_type = 0;
-	enum flag_value flag_value;
+        int32_t orig_ctx = *ctx;
+        css_error error;
+        const css_token *token;
+        css_fixed hoff = 0, voff = 0, blur = 0;
+        uint32_t hoff_u = 0, voff_u = 0, blur_u = 0;
+        css_color color = 0;
+        uint16_t color_type = 0;
+        enum flag_value flag_value;
 
-	token = parserutils_vector_peek(vector, *ctx);
-	if (token == NULL) return CSS_INVALID;
+        token = parserutils_vector_peek(vector, *ctx);
+        if (token == NULL) return CSS_INVALID;
 
-	flag_value = get_css_flag_value(c, token);
-	if (flag_value != FLAG_VALUE__NONE) {
-		parserutils_vector_iterate(vector, ctx);
-		return css_stylesheet_style_flag_value(result, flag_value,
-				CSS_PROP_MACSURF_TEXT_SHADOW);
-	}
+        flag_value = get_css_flag_value(c, token);
+        if (flag_value != FLAG_VALUE__NONE) {
+                parserutils_vector_iterate(vector, ctx);
+                return css_stylesheet_style_flag_value(result, flag_value,
+                                CSS_PROP_MACSURF_TEXT_SHADOW);
+        }
 
-	consumeWhitespace(vector, ctx);
+        consumeWhitespace(vector, ctx);
 
-	/* h-offset */
-	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
-			&hoff, &hoff_u);
-	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
+        /* h-offset */
+        error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
+                        &hoff, &hoff_u);
+        if (error != CSS_OK) { *ctx = orig_ctx; return error; }
 
-	consumeWhitespace(vector, ctx);
+        consumeWhitespace(vector, ctx);
 
-	/* v-offset */
-	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
-			&voff, &voff_u);
-	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
+        /* v-offset */
+        error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
+                        &voff, &voff_u);
+        if (error != CSS_OK) { *ctx = orig_ctx; return error; }
 
-	consumeWhitespace(vector, ctx);
+        consumeWhitespace(vector, ctx);
 
-	/* colour (required) */
-	error = css__parse_colour_specifier(c, vector, ctx, &color_type, &color);
-	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
+        /* Optional blur or required colour */
+        token = parserutils_vector_peek(vector, *ctx);
+        if (token != NULL && (token->type == CSS_TOKEN_DIMENSION ||
+                        token->type == CSS_TOKEN_NUMBER)) {
+                error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
+                                &blur, &blur_u);
+                if (error != CSS_OK) { *ctx = orig_ctx; return error; }
+                consumeWhitespace(vector, ctx);
+        }
 
-	error = css__stylesheet_style_appendOPV(result,
-			CSS_PROP_MACSURF_TEXT_SHADOW, 0, 0x0080 /* SET */);
-	if (error != CSS_OK) return error;
+        /* colour (required) */
+        error = css__parse_colour_specifier(c, vector, ctx, &color_type, &color);
+        if (error != CSS_OK) { *ctx = orig_ctx; return error; }
 
-	return css__stylesheet_style_vappend(result, 3,
-			(css_fixed)hoff, (css_fixed)voff, (css_fixed)color);
+        error = css__stylesheet_style_appendOPV(result,
+                        CSS_PROP_MACSURF_TEXT_SHADOW, 0, 0x0080 /* SET */);
+        if (error != CSS_OK) return error;
+
+        return css__stylesheet_style_vappend(result, 4,
+                        (css_fixed)hoff, (css_fixed)voff, (css_fixed)blur, (css_fixed)color);
 }

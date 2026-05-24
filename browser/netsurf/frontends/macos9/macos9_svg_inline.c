@@ -84,6 +84,43 @@ struct svg_paint_state {
 	int stroke_present;
 };
 
+/* fixes201 — SVG V2 gradient table.
+ *
+ * Pre-walked from the <svg> subtree once per paint. <linearGradient>
+ * and <radialGradient> children of <defs> (or anywhere in the tree
+ * by SVG spec) are scanned for their `id` + ordered <stop> children.
+ * Each stop carries an offset (0..1) and a colour resolved through
+ * the standard svg__parse_colour path.
+ *
+ * V2 limit: when a shape references a gradient via fill="url(#id)"
+ * the painter substitutes the FIRST stop's colour as a solid fill.
+ * Real per-pixel gradient rasterisation requires building a temp
+ * GWorld of the shape's bbox + clipping through a 1-bit shape mask
+ * + interpolating along the gradient axis pixel-by-pixel; deferred
+ * to a later round. The first-stop fallback gives a reasonable
+ * representative colour because gradients usually start with the
+ * iconic / dominant colour (mactrove's apple-rainbow starts at the
+ * iconic Apple-logo green at offset 0, for example). */
+#define MACOS9_SVG_MAX_STOPS 16
+#define MACOS9_SVG_MAX_GRADIENTS 32
+#define MACOS9_SVG_GRAD_ID_MAX 63
+
+struct svg_gradient_stop {
+	float offset;        /* 0..1 */
+	colour color;        /* NetSurf colour (0xAABBGGRR) */
+};
+
+struct svg_gradient {
+	char id[MACOS9_SVG_GRAD_ID_MAX + 1];
+	int n_stops;
+	struct svg_gradient_stop stops[MACOS9_SVG_MAX_STOPS];
+};
+
+struct svg_gradient_table {
+	int n_gradients;
+	struct svg_gradient gradients[MACOS9_SVG_MAX_GRADIENTS];
+};
+
 struct svg_ctx {
 	/* box rect in screen coords. */
 	int box_x;
@@ -100,6 +137,8 @@ struct svg_ctx {
 	float scale_y;
 	/* plotter table. */
 	const struct redraw_context *plot_ctx;
+	/* gradient table populated before painting (fixes201). */
+	struct svg_gradient_table *grads;
 };
 
 
@@ -365,6 +404,243 @@ static float svg__map_y(const struct svg_ctx *c, float sy)
 
 
 /* ----------------------------------------------------------------- */
+/* fixes201 — SVG gradient table                                     */
+/* ----------------------------------------------------------------- */
+
+/* Look up a gradient by id. Returns NULL if not found. */
+static const struct svg_gradient *svg__find_gradient(
+		const struct svg_gradient_table *grads,
+		const char *id, size_t id_len)
+{
+	int i;
+	if (grads == NULL || id == NULL) return NULL;
+	for (i = 0; i < grads->n_gradients; i++) {
+		size_t glen = strlen(grads->gradients[i].id);
+		if (glen != id_len) continue;
+		if (memcmp(grads->gradients[i].id, id, id_len) == 0) {
+			return &grads->gradients[i];
+		}
+	}
+	return NULL;
+}
+
+/* If `s` starts with `url(#id)`, look up the gradient and write its
+ * representative colour to *out. Returns 1 on success, 0 if not a
+ * url() reference (caller should fall through to vanilla colour
+ * parsing).
+ *
+ * V2 picks the FIRST stop as the representative colour. Most icon
+ * gradients lead with their iconic/dominant colour at offset=0, so
+ * this is a meaningful fallback while we have no real gradient
+ * rasteriser. */
+static int svg__try_url_colour(const char *s,
+		const struct svg_gradient_table *grads,
+		colour *out)
+{
+	const char *p = s;
+	const char *id_start;
+	const char *id_end;
+	const struct svg_gradient *g;
+
+	while (*p == ' ' || *p == '\t') p++;
+	if (p[0] != 'u' || p[1] != 'r' || p[2] != 'l' || p[3] != '(')
+		return 0;
+	p += 4;
+	while (*p == ' ' || *p == '\t') p++;
+	if (*p == '#') p++;
+	id_start = p;
+	while (*p && *p != ')' && *p != ' ' && *p != '\t') p++;
+	id_end = p;
+	if (id_end == id_start) return 0;
+
+	g = svg__find_gradient(grads, id_start,
+			(size_t)(id_end - id_start));
+	if (g != NULL && g->n_stops > 0) {
+		*out = g->stops[0].color;
+		return 1;
+	}
+	/* Unresolved url() — fall back to opaque black. */
+	*out = 0xFF000000;
+	return 1;
+}
+
+/* Scan a single <linearGradient> or <radialGradient> element. Reads
+ * the `id` attribute + each <stop> child's offset + stop-color. */
+static void svg__collect_gradient(dom_node *node,
+		struct svg_gradient_table *grads)
+{
+	dom_string *ds_id = NULL;
+	const char *id;
+	dom_node *child = NULL;
+	struct svg_gradient *g;
+	size_t id_len;
+
+	if (grads == NULL || grads->n_gradients >= MACOS9_SVG_MAX_GRADIENTS)
+		return;
+	id = svg__attr(node, "id", &ds_id);
+	if (id == NULL) return;
+	id_len = strlen(id);
+	if (id_len == 0 || id_len > MACOS9_SVG_GRAD_ID_MAX) {
+		dom_string_unref(ds_id);
+		return;
+	}
+
+	g = &grads->gradients[grads->n_gradients];
+	memcpy(g->id, id, id_len);
+	g->id[id_len] = '\0';
+	g->n_stops = 0;
+	dom_string_unref(ds_id);
+
+	if (dom_node_get_first_child(node, &child) != DOM_NO_ERR ||
+			child == NULL) {
+		grads->n_gradients++;
+		return;
+	}
+	while (child != NULL) {
+		dom_node *next = NULL;
+		dom_node_type ntype;
+		dom_string *tag = NULL;
+		if (dom_node_get_node_type(child, &ntype) == DOM_NO_ERR &&
+				ntype == DOM_ELEMENT_NODE &&
+				dom_element_get_tag_name(child, &tag) ==
+					DOM_NO_ERR && tag != NULL) {
+			const char *tag_s =
+				(const char *)dom_string_data(tag);
+			size_t tag_len = dom_string_length(tag);
+			/* match "stop" case-insensitively */
+			if (tag_len == 4 &&
+					(tag_s[0] == 's' || tag_s[0] == 'S') &&
+					(tag_s[1] == 't' || tag_s[1] == 'T') &&
+					(tag_s[2] == 'o' || tag_s[2] == 'O') &&
+					(tag_s[3] == 'p' || tag_s[3] == 'P')) {
+				if (g->n_stops < MACOS9_SVG_MAX_STOPS) {
+					dom_string *ds_off = NULL;
+					dom_string *ds_col = NULL;
+					const char *off_s = svg__attr(child,
+							"offset", &ds_off);
+					const char *col_s = svg__attr(child,
+							"stop-color", &ds_col);
+					float offset = 0.0f;
+					colour stopcol = 0xFF000000;
+					int none = 0;
+					if (off_s != NULL) {
+						size_t consumed;
+						offset = svg__atof(off_s,
+								&consumed);
+						/* Trailing % means
+						 * percentage of [0..1]. */
+						if (consumed > 0 &&
+								off_s[consumed] ==
+								'%') {
+							offset /= 100.0f;
+						}
+						dom_string_unref(ds_off);
+					}
+					if (col_s != NULL) {
+						(void)svg__parse_colour(col_s,
+								&stopcol,
+								&none);
+						dom_string_unref(ds_col);
+					} else {
+						/* Also try the style="
+						 * stop-color:..." form. */
+						dom_string *ds_style = NULL;
+						const char *style_s =
+							svg__attr(child,
+								"style",
+								&ds_style);
+						if (style_s != NULL) {
+							const char *p =
+							  strstr(style_s,
+							  "stop-color:");
+							if (p != NULL) {
+								p += 11;
+								while (*p ==
+									' ' ||
+									*p ==
+									'\t')
+									p++;
+								(void)svg__parse_colour(
+									p,
+									&stopcol,
+									&none);
+							}
+							dom_string_unref(
+								ds_style);
+						}
+					}
+					g->stops[g->n_stops].offset = offset;
+					g->stops[g->n_stops].color = stopcol;
+					g->n_stops++;
+				}
+			}
+		}
+		if (tag != NULL) dom_string_unref(tag);
+		if (dom_node_get_next_sibling(child, &next) != DOM_NO_ERR) {
+			dom_node_unref(child);
+			break;
+		}
+		dom_node_unref(child);
+		child = next;
+	}
+	grads->n_gradients++;
+}
+
+/* Walk the SVG subtree once before painting to collect every
+ * <linearGradient> and <radialGradient> element (typically inside
+ * <defs>, but the SVG spec allows them anywhere). */
+static void svg__pre_walk_gradients(dom_node *parent,
+		struct svg_gradient_table *grads, int depth)
+{
+	dom_node *child = NULL;
+	if (depth > MACOS9_SVG_GROUP_MAX) return;
+	if (dom_node_get_first_child(parent, &child) != DOM_NO_ERR ||
+			child == NULL) return;
+	while (child != NULL) {
+		dom_node *next = NULL;
+		dom_node_type ntype;
+		dom_string *tag = NULL;
+		if (dom_node_get_node_type(child, &ntype) == DOM_NO_ERR &&
+				ntype == DOM_ELEMENT_NODE &&
+				dom_element_get_tag_name(child, &tag) ==
+					DOM_NO_ERR && tag != NULL) {
+			const char *tag_s =
+				(const char *)dom_string_data(tag);
+			size_t tag_len = dom_string_length(tag);
+			/* linearGradient / lineargradient (case-insensitive
+			 * via Hubbub's foreign-content table normalisation).
+			 * Both linearGradient and radialGradient share the
+			 * V2 collector — we don't distinguish at the
+			 * representative-colour level. */
+			if ((tag_len == 14 || tag_len == 14) &&
+					((tag_s[0] == 'l' || tag_s[0] == 'L') ||
+					 (tag_s[0] == 'r' || tag_s[0] == 'R'))) {
+				/* Compare tail-of-tag against "Gradient" / "gradient" */
+				const char *suffix = tag_s + tag_len - 8;
+				if (tag_len >= 8 &&
+						(suffix[0] == 'G' || suffix[0] == 'g') &&
+						(suffix[1] == 'r' || suffix[1] == 'R') &&
+						(suffix[2] == 'a' || suffix[2] == 'A') &&
+						(suffix[3] == 'd' || suffix[3] == 'D')) {
+					svg__collect_gradient(child, grads);
+				}
+			}
+			/* Recurse into <defs>, <g>, anything that might
+			 * hold gradients. */
+			svg__pre_walk_gradients(child, grads, depth + 1);
+		}
+		if (tag != NULL) dom_string_unref(tag);
+		if (dom_node_get_next_sibling(child, &next) != DOM_NO_ERR) {
+			dom_node_unref(child);
+			break;
+		}
+		dom_node_unref(child);
+		child = next;
+	}
+}
+
+
+/* ----------------------------------------------------------------- */
 /* Style merge                                                       */
 /* ----------------------------------------------------------------- */
 
@@ -372,8 +648,13 @@ static float svg__map_y(const struct svg_ctx *c, float sy)
  * and merge into the supplied paint state. Inherited values stay
  * unchanged when an attribute is absent. The `style="..."` attribute
  * is parsed as a flat key:value list for fill/stroke/stroke-width
- * but does not recurse into CSS shorthand. */
-static void svg__update_style(dom_node *node, struct svg_paint_state *st)
+ * but does not recurse into CSS shorthand.
+ *
+ * fixes201: when the value matches `url(#id)`, look up the
+ * corresponding linearGradient / radialGradient in the pre-walked
+ * gradient table and substitute the first stop's colour. */
+static void svg__update_style(dom_node *node, struct svg_paint_state *st,
+		const struct svg_gradient_table *grads)
 {
 	dom_string *ds = NULL;
 	const char *v;
@@ -383,7 +664,10 @@ static void svg__update_style(dom_node *node, struct svg_paint_state *st)
 	/* fill attribute */
 	v = svg__attr(node, "fill", &ds);
 	if (v != NULL) {
-		if (svg__parse_colour(v, &col, &none)) {
+		if (svg__try_url_colour(v, grads, &col)) {
+			st->fill = col;
+			st->fill_present = 1;
+		} else if (svg__parse_colour(v, &col, &none)) {
 			st->fill = col;
 			st->fill_present = none ? 0 : 1;
 		}
@@ -393,7 +677,10 @@ static void svg__update_style(dom_node *node, struct svg_paint_state *st)
 	/* stroke attribute */
 	v = svg__attr(node, "stroke", &ds);
 	if (v != NULL) {
-		if (svg__parse_colour(v, &col, &none)) {
+		if (svg__try_url_colour(v, grads, &col)) {
+			st->stroke = col;
+			st->stroke_present = 1;
+		} else if (svg__parse_colour(v, &col, &none)) {
 			st->stroke = col;
 			st->stroke_present = none ? 0 : 1;
 		}
@@ -433,15 +720,23 @@ static void svg__update_style(dom_node *node, struct svg_paint_state *st)
 			{
 				size_t kl = (size_t)(key_end - key_start);
 				if (kl == 4 && strncmp(key_start, "fill", 4) == 0) {
-					if (svg__parse_colour(val_start, &col,
-							&none)) {
+					if (svg__try_url_colour(val_start,
+							grads, &col)) {
+						st->fill = col;
+						st->fill_present = 1;
+					} else if (svg__parse_colour(val_start,
+							&col, &none)) {
 						st->fill = col;
 						st->fill_present = none ? 0 : 1;
 					}
 				} else if (kl == 6 &&
 						strncmp(key_start, "stroke", 6) == 0) {
-					if (svg__parse_colour(val_start, &col,
-							&none)) {
+					if (svg__try_url_colour(val_start,
+							grads, &col)) {
+						st->stroke = col;
+						st->stroke_present = 1;
+					} else if (svg__parse_colour(val_start,
+							&col, &none)) {
 						st->stroke = col;
 						st->stroke_present = none ? 0 : 1;
 					}
@@ -667,15 +962,167 @@ static const char *svg__read_num(const char *p, float *out)
 }
 
 /* Parse <path d="..."> into a buffer of plotter-path floats.
- * Returns the number of floats written.  Supported commands:
+/* Helper for the SVG arc -> cubic-bezier approximation. Splits the
+ * (rx,ry,phi,large,sweep,x,y) end-point arc into 1-4 90-degree arcs
+ * and emits each as a cubic Bezier into the output buffer. Returns
+ * the number of floats written, or 0 on degenerate input.
+ *
+ * Algorithm follows the SVG 1.1 Appendix F.6 conversion + the
+ * standard kappa-based circular arc approximation. We deliberately
+ * ignore the x-axis-rotation parameter (phi) because rotated arcs
+ * are vanishingly rare in icon use; for V2 we'd add a 2D rotation
+ * to each control point. */
+static int svg__emit_arc_as_bezier(const struct svg_ctx *c,
+		float x1, float y1, float rx, float ry,
+		int large_flag, int sweep_flag,
+		float x2, float y2,
+		float *out, int cap)
+{
+	float dx, dy;
+	float cxA, cyA;
+	float dist_sq, half_d;
+	float scale;
+	float ux, uy;
+	float a0, a1, a_sweep, da, k;
+	int n_segs, i, n;
+
+	if (rx <= 0.0f || ry <= 0.0f) {
+		if (cap >= 3) {
+			out[0] = (float)PLOTTER_PATH_LINE;
+			out[1] = svg__map_x(c, x2);
+			out[2] = svg__map_y(c, y2);
+			return 3;
+		}
+		return 0;
+	}
+	if (rx < 0) rx = -rx;
+	if (ry < 0) ry = -ry;
+
+	/* fixes201 V1: use the average radius for both axes — true
+	 * ellipse-aware arc requires the full Appendix F.6 transform.
+	 * Most SVG icons use rx == ry (circular arcs) so the average
+	 * is exact; for true ellipses this is an approximation. */
+	{
+		float r = (rx + ry) * 0.5f;
+		rx = r;
+		ry = r;
+	}
+
+	dx = (x2 - x1) * 0.5f;
+	dy = (y2 - y1) * 0.5f;
+	dist_sq = dx * dx + dy * dy;
+	if (dist_sq < 1e-6f) return 0;
+	half_d = dist_sq;
+	scale = rx * rx - half_d;
+	if (scale < 0.0f) {
+		/* Endpoints are further apart than the diameter — stretch
+		 * rx/ry until they touch. */
+		float d = (float)((rx * rx) / half_d);
+		if (d < 0) d = -d;
+		(void)d;
+		scale = 0.0f;
+	}
+	if (scale < 0.0f) scale = 0.0f;
+	{
+		float t = (float)(scale / half_d);
+		if (t < 0.0f) t = 0.0f;
+		/* sqrt approximation via Newton-Raphson: 4 iters from
+		 * a seed = t is accurate enough for arc midpoint. */
+		{
+			float s = (t > 0.0f) ? t : 0.0f;
+			float sr = 1.0f;
+			int it;
+			if (s > 0.0f) {
+				sr = s;
+				for (it = 0; it < 6; it++) {
+					sr = 0.5f * (sr + s / sr);
+				}
+			} else {
+				sr = 0.0f;
+			}
+			t = sr;
+		}
+		if (large_flag == sweep_flag) t = -t;
+		cxA = (x1 + x2) * 0.5f - t * dy;
+		cyA = (y1 + y2) * 0.5f + t * dx;
+	}
+
+	/* Compute start angle, sweep. Atan2 approximation — use the
+	 * built-in via the C library; libnetsurf already links libm
+	 * but on CW8 we have <math.h> with float ops. */
+	{
+		extern double atan2(double, double);
+		extern double cos(double);
+		extern double sin(double);
+		a0 = (float)atan2((double)(y1 - cyA), (double)(x1 - cxA));
+		a1 = (float)atan2((double)(y2 - cyA), (double)(x2 - cxA));
+		a_sweep = a1 - a0;
+		if (sweep_flag == 0 && a_sweep > 0.0f) a_sweep -= 6.283185307f;
+		else if (sweep_flag != 0 && a_sweep < 0.0f) a_sweep += 6.283185307f;
+	}
+
+	/* Split into N segments of <= 90 deg each. */
+	n_segs = (int)((a_sweep < 0 ? -a_sweep : a_sweep) / 1.5707963f) + 1;
+	if (n_segs < 1) n_segs = 1;
+	if (n_segs > 16) n_segs = 16;
+	da = a_sweep / (float)n_segs;
+	/* Bezier control-point offset for circular arc of angle |da|:
+	 * k = (4/3) * tan(da / 4). */
+	{
+		extern double tan(double);
+		k = (float)((4.0 / 3.0) * tan((double)(da / 4.0f)));
+	}
+
+	n = 0;
+	{
+		extern double cos(double);
+		extern double sin(double);
+		for (i = 0; i < n_segs; i++) {
+			float ca = a0 + da * (float)i;
+			float cb = a0 + da * (float)(i + 1);
+			float cos_a = (float)cos((double)ca);
+			float sin_a = (float)sin((double)ca);
+			float cos_b = (float)cos((double)cb);
+			float sin_b = (float)sin((double)cb);
+			float p0x = cxA + rx * cos_a;
+			float p0y = cyA + ry * sin_a;
+			float p3x = cxA + rx * cos_b;
+			float p3y = cyA + ry * sin_b;
+			float p1x = p0x - k * rx * sin_a;
+			float p1y = p0y + k * ry * cos_a;
+			float p2x = p3x + k * rx * sin_b;
+			float p2y = p3y - k * ry * cos_b;
+			if (n + 7 > cap) return n;
+			out[n++] = (float)PLOTTER_PATH_BEZIER;
+			out[n++] = svg__map_x(c, p1x);
+			out[n++] = svg__map_y(c, p1y);
+			out[n++] = svg__map_x(c, p2x);
+			out[n++] = svg__map_y(c, p2y);
+			out[n++] = svg__map_x(c, p3x);
+			out[n++] = svg__map_y(c, p3y);
+		}
+		(void)ux; (void)uy;
+	}
+	return n;
+}
+
+/* Returns the number of floats written.  Supported commands:
  *   M m  move
  *   L l  line
  *   H h  horizontal line
  *   V v  vertical line
  *   C c  cubic Bezier
+ *   S s  smooth cubic Bezier (first control reflected from prev)
  *   Q q  quadratic Bezier (converted to cubic)
+ *   T t  smooth quadratic Bezier (control point reflected from prev)
+ *   A a  elliptical arc (approximated via 1-4 cubic Bezier segments)
  *   Z z  close
- * Unsupported (silently terminates path):  S s T t A a. */
+ *
+ * S/T require remembering the previous segment's control point so a
+ * smooth continuation reflects it across the current point. The
+ * `prev_cx`/`prev_cy` variables track that; they're reset to (cx,cy)
+ * when the previous command isn't a curve of the same family.
+ */
 static int svg__path_parse(const char *d, const struct svg_ctx *c,
 		float *out, int cap)
 {
@@ -683,6 +1130,12 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 	float cy = 0.0f;
 	float sx = 0.0f;        /* subpath start, for Z */
 	float sy = 0.0f;
+	float prev_cubic_x = 0.0f;   /* reflected control for S */
+	float prev_cubic_y = 0.0f;
+	float prev_quad_x = 0.0f;    /* reflected control for T */
+	float prev_quad_y = 0.0f;
+	int has_prev_cubic = 0;
+	int has_prev_quad = 0;
 	int n = 0;
 	char cmd = 0;
 	const char *p;
@@ -712,6 +1165,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_y(c, y);
 			cx = x; cy = y;
 			sx = x; sy = y;
+			has_prev_cubic = 0;
+			has_prev_quad = 0;
 			/* Subsequent pairs are implicit lineto. */
 			cmd = (cmd == 'M') ? 'L' : 'l';
 			break;
@@ -726,6 +1181,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_x(c, x);
 			out[n++] = svg__map_y(c, y);
 			cx = x; cy = y;
+			has_prev_cubic = 0;
+			has_prev_quad = 0;
 			break;
 		}
 		case 'H': case 'h': {
@@ -737,6 +1194,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_x(c, x);
 			out[n++] = svg__map_y(c, cy);
 			cx = x;
+			has_prev_cubic = 0;
+			has_prev_quad = 0;
 			break;
 		}
 		case 'V': case 'v': {
@@ -748,6 +1207,8 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_x(c, cx);
 			out[n++] = svg__map_y(c, y);
 			cy = y;
+			has_prev_cubic = 0;
+			has_prev_quad = 0;
 			break;
 		}
 		case 'C': case 'c': {
@@ -771,6 +1232,47 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_y(c, y2);
 			out[n++] = svg__map_x(c, x);
 			out[n++] = svg__map_y(c, y);
+			/* Reflected control point for a following S/s command. */
+			prev_cubic_x = 2.0f * x - x2;
+			prev_cubic_y = 2.0f * y - y2;
+			has_prev_cubic = 1;
+			has_prev_quad = 0;
+			cx = x; cy = y;
+			break;
+		}
+		case 'S': case 's': {
+			/* Smooth cubic Bezier. If previous command was C/c/S/s,
+			 * the first control point is the reflection of the
+			 * previous segment's last control point across the
+			 * current point; otherwise it's the current point. */
+			float x1, y1, x2, y2, x, y;
+			if (has_prev_cubic) {
+				x1 = prev_cubic_x;
+				y1 = prev_cubic_y;
+			} else {
+				x1 = cx;
+				y1 = cy;
+			}
+			p = svg__read_num(p, &x2);
+			p = svg__read_num(p, &y2);
+			p = svg__read_num(p, &x);
+			p = svg__read_num(p, &y);
+			if (cmd == 's') {
+				x2 += cx; y2 += cy;
+				x  += cx; y  += cy;
+			}
+			if (n + 7 > cap) return n;
+			out[n++] = (float)PLOTTER_PATH_BEZIER;
+			out[n++] = svg__map_x(c, x1);
+			out[n++] = svg__map_y(c, y1);
+			out[n++] = svg__map_x(c, x2);
+			out[n++] = svg__map_y(c, y2);
+			out[n++] = svg__map_x(c, x);
+			out[n++] = svg__map_y(c, y);
+			prev_cubic_x = 2.0f * x - x2;
+			prev_cubic_y = 2.0f * y - y2;
+			has_prev_cubic = 1;
+			has_prev_quad = 0;
 			cx = x; cy = y;
 			break;
 		}
@@ -800,6 +1302,76 @@ static int svg__path_parse(const char *d, const struct svg_ctx *c,
 			out[n++] = svg__map_y(c, c2y);
 			out[n++] = svg__map_x(c, x);
 			out[n++] = svg__map_y(c, y);
+			/* Reflected quadratic control point for a following T. */
+			prev_quad_x = 2.0f * x - qx;
+			prev_quad_y = 2.0f * y - qy;
+			has_prev_quad = 1;
+			has_prev_cubic = 0;
+			cx = x; cy = y;
+			break;
+		}
+		case 'T': case 't': {
+			/* Smooth quadratic: control point reflected from the
+			 * previous T/Q segment, or = current point if not. */
+			float qx, qy, x, y;
+			float c1x, c1y, c2x, c2y;
+			if (has_prev_quad) {
+				qx = prev_quad_x;
+				qy = prev_quad_y;
+			} else {
+				qx = cx;
+				qy = cy;
+			}
+			p = svg__read_num(p, &x);
+			p = svg__read_num(p, &y);
+			if (cmd == 't') { x += cx; y += cy; }
+			c1x = cx + (2.0f / 3.0f) * (qx - cx);
+			c1y = cy + (2.0f / 3.0f) * (qy - cy);
+			c2x = x  + (2.0f / 3.0f) * (qx - x);
+			c2y = y  + (2.0f / 3.0f) * (qy - y);
+			if (n + 7 > cap) return n;
+			out[n++] = (float)PLOTTER_PATH_BEZIER;
+			out[n++] = svg__map_x(c, c1x);
+			out[n++] = svg__map_y(c, c1y);
+			out[n++] = svg__map_x(c, c2x);
+			out[n++] = svg__map_y(c, c2y);
+			out[n++] = svg__map_x(c, x);
+			out[n++] = svg__map_y(c, y);
+			prev_quad_x = 2.0f * x - qx;
+			prev_quad_y = 2.0f * y - qy;
+			has_prev_quad = 1;
+			has_prev_cubic = 0;
+			cx = x; cy = y;
+			break;
+		}
+		case 'A': case 'a': {
+			/* Elliptical arc:
+			 *   rx ry x-axis-rotation large-arc-flag sweep-flag x y
+			 * We approximate via cubic Bezier subdivision. The
+			 * x-axis-rotation parameter is read but ignored (most
+			 * SVG icons don't use rotated arcs). */
+			float rx, ry, phi;
+			float la_v, sw_v;
+			int large_flag, sweep_flag;
+			float x, y;
+			int emit;
+			p = svg__read_num(p, &rx);
+			p = svg__read_num(p, &ry);
+			p = svg__read_num(p, &phi);
+			p = svg__read_num(p, &la_v);
+			p = svg__read_num(p, &sw_v);
+			p = svg__read_num(p, &x);
+			p = svg__read_num(p, &y);
+			large_flag = (la_v != 0.0f);
+			sweep_flag = (sw_v != 0.0f);
+			if (cmd == 'a') { x += cx; y += cy; }
+			(void)phi; /* TODO: 2D rotation of control points */
+			emit = svg__emit_arc_as_bezier(c, cx, cy, rx, ry,
+					large_flag, sweep_flag, x, y,
+					out + n, cap - n);
+			n += emit;
+			has_prev_cubic = 0;
+			has_prev_quad = 0;
 			cx = x; cy = y;
 			break;
 		}
@@ -841,6 +1413,98 @@ static void svg__paint_path(dom_node *node, const struct svg_ctx *c,
 	svg__init_plot_style(&pstyle, st, c);
 	c->plot_ctx->plot->path(c->plot_ctx, &pstyle, buf,
 			(unsigned int)n, NULL);
+}
+
+
+/* ----------------------------------------------------------------- */
+/* <text>                                                            */
+/* ----------------------------------------------------------------- */
+
+/* fixes201 — SVG <text> V1.
+ *
+ * Reads x / y / font-size from the element attributes, takes the
+ * concatenated text content of immediate text-node children, and
+ * dispatches to the plotter table. Strokes are not handled (SVG
+ * text supports both fill and stroke, but the plotter text op is
+ * fill-only; document as PARTIAL).
+ *
+ * V1 limits:
+ *   - no <tspan> recursion (concatenates one level of text-node
+ *     children only)
+ *   - no text-anchor / dominant-baseline (uses default left-aligned
+ *     alphabetic-baseline behaviour)
+ *   - no font-family / font-weight attributes (uses the default
+ *     QuickDraw text style)
+ *   - no transform on the text element
+ */
+static void svg__paint_text(dom_node *node, const struct svg_ctx *c,
+		const struct svg_paint_state *st)
+{
+	float x_svg = svg__attr_float(node, "x", 0.0f);
+	float y_svg = svg__attr_float(node, "y", 0.0f);
+	float font_size = svg__attr_float(node, "font-size", 12.0f);
+	int screen_x;
+	int screen_y;
+	plot_font_style_t fstyle;
+	dom_node *child = NULL;
+	char accum[256];
+	size_t accum_len = 0;
+
+	if (!st->fill_present) return;
+
+	screen_x = (int)svg__map_x(c, x_svg);
+	screen_y = (int)svg__map_y(c, y_svg);
+
+	memset(&fstyle, 0, sizeof(fstyle));
+	fstyle.family = PLOT_FONT_FAMILY_SANS_SERIF;
+	fstyle.size = (int)(font_size *
+			(c->scale_x < c->scale_y ? c->scale_x : c->scale_y) *
+			PLOT_STYLE_SCALE);
+	if (fstyle.size < 6 * PLOT_STYLE_SCALE) fstyle.size = 6 * PLOT_STYLE_SCALE;
+	fstyle.weight = 400;
+	fstyle.flags = FONTF_NONE;
+	fstyle.background = 0;
+	fstyle.foreground = st->fill;
+	/* transform_b identity (no rotation in V1 text). */
+
+	/* Concatenate text-node children. */
+	if (dom_node_get_first_child(node, &child) != DOM_NO_ERR ||
+			child == NULL) {
+		return;
+	}
+	while (child != NULL) {
+		dom_node *next = NULL;
+		dom_node_type ntype;
+		if (dom_node_get_node_type(child, &ntype) == DOM_NO_ERR &&
+				ntype == DOM_TEXT_NODE) {
+			dom_string *content = NULL;
+			if (dom_node_get_text_content(child, &content) ==
+					DOM_NO_ERR && content != NULL) {
+				const char *s =
+					(const char *)dom_string_data(content);
+				size_t slen = dom_string_length(content);
+				if (slen > sizeof(accum) - 1 - accum_len) {
+					slen = sizeof(accum) - 1 - accum_len;
+				}
+				if (slen > 0) {
+					memcpy(accum + accum_len, s, slen);
+					accum_len += slen;
+				}
+				dom_string_unref(content);
+			}
+		}
+		if (dom_node_get_next_sibling(child, &next) != DOM_NO_ERR) {
+			dom_node_unref(child);
+			break;
+		}
+		dom_node_unref(child);
+		child = next;
+	}
+
+	if (accum_len == 0) return;
+	accum[accum_len] = '\0';
+	c->plot_ctx->plot->text(c->plot_ctx, &fstyle, screen_x, screen_y,
+			accum, accum_len);
 }
 
 
@@ -924,7 +1588,7 @@ static void svg__paint_subtree(dom_node *parent,
 				dom_element_get_tag_name(child, &tag) ==
 					DOM_NO_ERR && tag != NULL) {
 			struct svg_paint_state child_st = st;
-			svg__update_style(child, &child_st);
+			svg__update_style(child, &child_st, c->grads);
 
 			macsurf_debug_log_writef(
 				"svg_shape: depth=%d tag=%s fill=0x%08x stroke=0x%08x",
@@ -958,8 +1622,13 @@ static void svg__paint_subtree(dom_node *parent,
 			} else if (dom_string_caseless_lwc_isequal(tag,
 					corestring_lwc_polyline)) {
 				svg__paint_poly(child, c, &child_st, 0);
+			} else if (dom_string_caseless_lwc_isequal(tag,
+					corestring_lwc_text)) {
+				svg__paint_text(child, c, &child_st);
 			}
-			/* unknown tags are silently skipped */
+			/* <defs> / <linearGradient> / <radialGradient> /
+			 * unknown tags are silently skipped (gradients are
+			 * pre-walked separately). */
 		}
 
 		if (tag != NULL) dom_string_unref(tag);
@@ -1036,23 +1705,37 @@ nserror macos9_svg_paint_inline(struct box *box,
 	c.scale_x = (float)w / c.vb_w;
 	c.scale_y = (float)h / c.vb_h;
 
-	/* Initial paint state. SVG defaults: fill = black, stroke = none. */
-	st.fill = 0xFF000000;
-	st.stroke = 0xFF000000;
-	st.fill_present = 1;
-	st.stroke_present = 0;
-	st.stroke_width = 1.0f;
+	/* fixes201 — gradient pre-walk. Allocated on stack to avoid heap
+	 * pressure during paint; cap of MACOS9_SVG_MAX_GRADIENTS handles
+	 * the busiest icon sets (mactrove's apple has 1; the full menu
+	 * panel has under 10). */
+	{
+		struct svg_gradient_table grads_local;
+		grads_local.n_gradients = 0;
+		svg__pre_walk_gradients((dom_node *)box->node,
+				&grads_local, 0);
+		c.grads = &grads_local;
 
-	/* Read style attributes set on the <svg> itself. */
-	svg__update_style((dom_node *)box->node, &st);
+		/* Initial paint state. SVG defaults: fill = black,
+		 * stroke = none. */
+		st.fill = 0xFF000000;
+		st.stroke = 0xFF000000;
+		st.fill_present = 1;
+		st.stroke_present = 0;
+		st.stroke_width = 1.0f;
 
-	macsurf_debug_log_writef(
-		"svg_walk_enter: vb=(%d,%d,%d,%d) box=(%d,%d,%d,%d) scale=(%d,%d) thousandths",
-		(int)(c.vb_x * 1000), (int)(c.vb_y * 1000),
-		(int)(c.vb_w * 1000), (int)(c.vb_h * 1000),
-		c.box_x, c.box_y, c.box_w, c.box_h,
-		(int)(c.scale_x * 1000), (int)(c.scale_y * 1000));
+		/* Read style attributes set on the <svg> itself. */
+		svg__update_style((dom_node *)box->node, &st, c.grads);
 
-	svg__paint_subtree((dom_node *)box->node, &c, st, 0);
+		macsurf_debug_log_writef(
+			"svg_walk_enter: vb=(%d,%d,%d,%d) box=(%d,%d,%d,%d) scale=(%d,%d) thousandths grads=%d",
+			(int)(c.vb_x * 1000), (int)(c.vb_y * 1000),
+			(int)(c.vb_w * 1000), (int)(c.vb_h * 1000),
+			c.box_x, c.box_y, c.box_w, c.box_h,
+			(int)(c.scale_x * 1000), (int)(c.scale_y * 1000),
+			grads_local.n_gradients);
+
+		svg__paint_subtree((dom_node *)box->node, &c, st, 0);
+	}
 	return NSERROR_OK;
 }

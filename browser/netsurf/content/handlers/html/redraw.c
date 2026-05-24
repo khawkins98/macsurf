@@ -1119,31 +1119,27 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                }
 	        }
 	        if (css_computed_box_shadow(background->style, &bsh) == CSS_BOX_SHADOW_SET) {
-	                /* MacSurf fixes48 -- bsh is now a packed value:
-	                 *   bits 31..24 h-offset px (int8_t signed)
-	                 *   bits 23..16 v-offset px (int8_t signed)
-	                 *   bits 15..0  RGB565 shadow colour (0 = default grey) */
-	                int8_t hoff_px =
-	                        (int8_t)((((uint32_t)bsh) >> 24) & 0xff);
-	                int8_t voff_px =
-	                        (int8_t)((((uint32_t)bsh) >> 16) & 0xff);
-	                uint16_t rgb565 =
-	                        (uint16_t)(((uint32_t)bsh) & 0xffff);
+	                /* MacSurf fixes48/200 -- packed v2: h/v/inset/rgb555. */
+	                int8_t hoff_px = (int8_t)((((uint32_t)bsh) >> 24) & 0xff);
+	                int8_t voff_px = (int8_t)((((uint32_t)bsh) >> 16) & 0xff);
+	                bool inset = (((uint32_t)bsh) & 0x8000) != 0;
+	                uint16_t rgb555 = (uint16_t)(((uint32_t)bsh) & 0x7fff);
 	                pstyle_fill_bg.box_shadow =
 	                        ((plot_style_fixed)hoff_px) << PLOT_STYLE_RADIX;
 	                pstyle_fill_bg.box_shadow_y =
 	                        ((plot_style_fixed)voff_px) << PLOT_STYLE_RADIX;
-	                if (rgb565 != 0) {
-	                        uint8_t r5 = (uint8_t)((rgb565 >> 11) & 0x1f);
-	                        uint8_t g6 = (uint8_t)((rgb565 >>  5) & 0x3f);
-	                        uint8_t b5 = (uint8_t)((rgb565      ) & 0x1f);
+	                pstyle_fill_bg.box_shadow_inset = inset;
+	                if (rgb555 != 0) {
+	                        uint8_t r5 = (uint8_t)((rgb555 >> 10) & 0x1f);
+	                        uint8_t g5 = (uint8_t)((rgb555 >>  5) & 0x1f);
+	                        uint8_t b5 = (uint8_t)((rgb555      ) & 0x1f);
 	                        uint8_t r = (uint8_t)((r5 << 3) | (r5 >> 2));
-	                        uint8_t g = (uint8_t)((g6 << 2) | (g6 >> 4));
+	                        uint8_t g = (uint8_t)((g5 << 3) | (g5 >> 2));
 	                        uint8_t b = (uint8_t)((b5 << 3) | (b5 >> 2));
 	                        /* NetSurf colour: R in low byte. */
 	                        pstyle_fill_bg.box_shadow_color =
 	                                (colour)(((uint32_t)b << 16) |
-	                                         ((uint32_t)g << 8) |
+	                                         ((uint32_t)g <<  8) |
 	                                          (uint32_t)r);
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
@@ -1674,28 +1670,26 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                }
 	        }
 	        if (css_computed_box_shadow(box->style, &bsh) == CSS_BOX_SHADOW_SET) {
-	                /* MacSurf fixes48 -- mirror the html_redraw_background
-	                 * unpack: h-offset / v-offset / RGB565 colour. */
-	                int8_t hoff_px =
-	                        (int8_t)((((uint32_t)bsh) >> 24) & 0xff);
-	                int8_t voff_px =
-	                        (int8_t)((((uint32_t)bsh) >> 16) & 0xff);
-	                uint16_t rgb565 =
-	                        (uint16_t)(((uint32_t)bsh) & 0xffff);
+	                /* MacSurf fixes48/200 -- packed v2: h/v/inset/rgb555. */
+	                int8_t hoff_px = (int8_t)((((uint32_t)bsh) >> 24) & 0xff);
+	                int8_t voff_px = (int8_t)((((uint32_t)bsh) >> 16) & 0xff);
+	                bool inset = (((uint32_t)bsh) & 0x8000) != 0;
+	                uint16_t rgb555 = (uint16_t)(((uint32_t)bsh) & 0x7fff);
 	                pstyle_fill_bg.box_shadow =
 	                        ((plot_style_fixed)hoff_px) << PLOT_STYLE_RADIX;
 	                pstyle_fill_bg.box_shadow_y =
 	                        ((plot_style_fixed)voff_px) << PLOT_STYLE_RADIX;
-	                if (rgb565 != 0) {
-	                        uint8_t r5 = (uint8_t)((rgb565 >> 11) & 0x1f);
-	                        uint8_t g6 = (uint8_t)((rgb565 >>  5) & 0x3f);
-	                        uint8_t b5 = (uint8_t)((rgb565      ) & 0x1f);
+	                pstyle_fill_bg.box_shadow_inset = inset;
+	                if (rgb555 != 0) {
+	                        uint8_t r5 = (uint8_t)((rgb555 >> 10) & 0x1f);
+	                        uint8_t g5 = (uint8_t)((rgb555 >>  5) & 0x1f);
+	                        uint8_t b5 = (uint8_t)((rgb555      ) & 0x1f);
 	                        uint8_t r = (uint8_t)((r5 << 3) | (r5 >> 2));
-	                        uint8_t g = (uint8_t)((g6 << 2) | (g6 >> 4));
+	                        uint8_t g = (uint8_t)((g5 << 3) | (g5 >> 2));
 	                        uint8_t b = (uint8_t)((b5 << 3) | (b5 >> 2));
 	                        pstyle_fill_bg.box_shadow_color =
 	                                (colour)(((uint32_t)b << 16) |
-	                                         ((uint32_t)g << 8) |
+	                                         ((uint32_t)g <<  8) |
 	                                          (uint32_t)r);
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
@@ -2777,54 +2771,128 @@ bool html_redraw_box(const html_content *html, struct box *box,
 			box->descendant_y1 = box->descendant_y0 + 200000;
 	}
 
-	/* fixes191c — position: sticky vertical clamp (V1).
+	/* fixes191c + fixes201 — position: sticky clamp (V2).
 	 *
-	 * Sticky is laid out exactly like position: relative, then at paint
-	 * time we shift the box (and all descendants, by adjusting y_parent
-	 * BEFORE the x/y computation below) so the painted y never goes
-	 * above `top` in viewport coordinates.
+	 * Sticky lays out exactly like position: relative, then at paint
+	 * time we shift the box (and all descendants, by adjusting
+	 * x_parent / y_parent BEFORE the x/y computation below) so the
+	 * painted position respects the `top` / `bottom` / `left` / `right`
+	 * offset that names a viewport edge to pin against.
 	 *
-	 * NetSurf calls browser_window_redraw with y_offset = -scroll_y; by
-	 * the time we reach this function, y_parent + box->y is already in
-	 * VIEWPORT coordinates (0 = first painted row of the content area).
-	 * That means top:32px wants to pin the box at viewport-y = 32. If
-	 * (y_parent + box->y) < 32, we shift down by the delta; otherwise
-	 * the box paints at its normal relative position.
+	 * NetSurf calls browser_window_redraw with x_offset/y_offset =
+	 * -scroll_x/-scroll_y; by the time we reach this function,
+	 * (x_parent + box->x, y_parent + box->y) is already in VIEWPORT
+	 * coordinates (0,0 = first painted pixel of the content area).
+	 * top:32px wants y = max(normal_y, 32). bottom:8px wants
+	 * (y + box->height) <= (viewport_h - 8). left/right are
+	 * symmetric on x.
 	 *
-	 * V1 limits:
-	 *   - vertical only (`top`); `bottom`/`left`/`right` deferred.
+	 * V2 limits remaining:
 	 *   - no containing-block-bottom clamp (sticky never "lets go" at
-	 *     parent's bottom edge). For sidebars/headers in modern themes
+	 *     its parent's bottom edge — it pins to the viewport for the
+	 *     full document height). For sidebars/headers in modern themes
 	 *     the parent is usually tall enough that this is invisible.
-	 *   - no nested-scroll-container support (sticky pins to viewport).
+	 *   - no nested-scroll-container support (sticky always pins to
+	 *     the page viewport, not the closest scrolling ancestor).
 	 *   - hit-testing uses the shifted painted position because the
-	 *     downstream walker takes y_parent into account.
+	 *     downstream walker takes x_parent/y_parent into account.
 	 */
 	if (box->style != NULL &&
 			css_computed_position(box->style) ==
 				CSS_POSITION_STICKY) {
-		css_fixed t_v = 0;
-		css_unit t_u = CSS_UNIT_PX;
-		uint8_t t_type;
-		t_type = css_computed_top(box->style, &t_v, &t_u);
-		if (t_type == CSS_TOP_SET) {
+		css_fixed off_v = 0;
+		css_unit off_u = CSS_UNIT_PX;
+		uint8_t off_type;
+		int viewport_w = 0, viewport_h = 0;
+		int normal_x, normal_y;
+		int box_w, box_h;
+
+		/* Resolve viewport dimensions for bottom/right anchors.
+		 * unit_len_ctx stores viewport_w/h as css_fixed (value <<
+		 * 10); convert to integer pixels for comparison with the
+		 * normal_x/y already in pixel coords. */
+		viewport_w = FIXTOINT(html->unit_len_ctx.viewport_width);
+		viewport_h = FIXTOINT(html->unit_len_ctx.viewport_height);
+
+		normal_x = x_parent + box->x;
+		normal_y = y_parent + box->y;
+		box_w = box->width + box->padding[LEFT] + box->padding[RIGHT];
+		box_h = box->height + box->padding[TOP] + box->padding[BOTTOM];
+
+		/* top: */
+		off_type = css_computed_top(box->style, &off_v, &off_u);
+		if (off_type == CSS_TOP_SET) {
 			int top_px;
-			int normal_y;
-			if (t_u == CSS_UNIT_PCT) {
-				/* Percentage of containing block height; if
-				 * containing block isn't trivially available,
-				 * fall back to 0. Modern themes use px values
-				 * for sticky anchors. */
+			if (off_u == CSS_UNIT_PCT) {
 				top_px = 0;
 			} else {
 				top_px = FIXTOINT(css_unit_len2device_px(
 						box->style,
 						&html->unit_len_ctx,
-						t_v, t_u));
+						off_v, off_u));
 			}
-			normal_y = y_parent + box->y;
 			if (normal_y < top_px) {
 				y_parent += (top_px - normal_y);
+				normal_y = y_parent + box->y;
+			}
+		}
+
+		/* bottom: pin so (normal_y + box_h) <= viewport_h - bottom_px.
+		 * If the natural position is already inside that bound, no
+		 * shift; if it has scrolled past, pull upward. */
+		off_type = css_computed_bottom(box->style, &off_v, &off_u);
+		if (off_type == CSS_BOTTOM_SET && viewport_h > 0) {
+			int bot_px;
+			int max_y;
+			if (off_u == CSS_UNIT_PCT) {
+				bot_px = 0;
+			} else {
+				bot_px = FIXTOINT(css_unit_len2device_px(
+						box->style,
+						&html->unit_len_ctx,
+						off_v, off_u));
+			}
+			max_y = viewport_h - bot_px - box_h;
+			if (normal_y > max_y) {
+				y_parent -= (normal_y - max_y);
+				normal_y = y_parent + box->y;
+			}
+		}
+
+		/* left: */
+		off_type = css_computed_left(box->style, &off_v, &off_u);
+		if (off_type == CSS_LEFT_SET) {
+			int left_px;
+			if (off_u == CSS_UNIT_PCT) {
+				left_px = 0;
+			} else {
+				left_px = FIXTOINT(css_unit_len2device_px(
+						box->style,
+						&html->unit_len_ctx,
+						off_v, off_u));
+			}
+			if (normal_x < left_px) {
+				x_parent += (left_px - normal_x);
+				normal_x = x_parent + box->x;
+			}
+		}
+
+		/* right: */
+		off_type = css_computed_right(box->style, &off_v, &off_u);
+		if (off_type == CSS_RIGHT_SET && viewport_w > 0) {
+			int right_px;
+			int max_x;
+			if (off_u == CSS_UNIT_PCT) {
+				right_px = 0;
+			} else {
+				right_px = FIXTOINT(css_unit_len2device_px(
+						box->style,
+						&html->unit_len_ctx,
+						off_v, off_u));
+			}
+			max_x = viewport_w - right_px - box_w;
+			if (normal_x > max_x) {
+				x_parent -= (normal_x - max_x);
 			}
 		}
 	}

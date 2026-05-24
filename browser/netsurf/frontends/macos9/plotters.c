@@ -756,19 +756,16 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 #endif
 
 	/* box-shadow: paint a slightly-offset grey rect BEHIND the fill.
-	 * The shadow size comes from css_computed_box_shadow simplified
-	 * to a single fixed-point integer (see plot_style_s.box_shadow).
 	 * QuickDraw has no blur primitive, so we approximate with a
 	 * solid offset rect at 50% grey -- the recognisable Mac OS
 	 * floating-window shadow look. */
 #ifdef __MACOS9__
 	if ((pstyle->box_shadow != 0 || pstyle->box_shadow_y != 0) &&
-	    pstyle->fill_type != PLOT_OP_TYPE_NONE) {
+	    pstyle->fill_type != PLOT_OP_TYPE_NONE &&
+	    !pstyle->box_shadow_inset) {
 		short hoff = (short)(pstyle->box_shadow   >> PLOT_STYLE_RADIX);
 		short voff = (short)(pstyle->box_shadow_y >> PLOT_STYLE_RADIX);
-		/* fixes48 -- defensive clamp; pages with absurd offsets
-		 * (e.g. inset shadows we don't render specially) still
-		 * shouldn't blow past the visible window. */
+		/* fixes48 -- defensive clamp. */
 		if (hoff < -16) hoff = -16;
 		if (hoff >  16) hoff =  16;
 		if (voff < -16) voff = -16;
@@ -971,6 +968,33 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 			PaintRect(&r);
 			macos9_pop_clip(saved_clip);
 		}
+#ifdef __MACOS9__
+		/* fixes200: inset box-shadow. Paint the offset grey rect
+		 * INSIDE the main rect r, clipped to r. */
+		if (pstyle->box_shadow_inset &&
+		    (pstyle->box_shadow != 0 || pstyle->box_shadow_y != 0)) {
+			short hoff = (short)(pstyle->box_shadow   >> PLOT_STYLE_RADIX);
+			short voff = (short)(pstyle->box_shadow_y >> PLOT_STYLE_RADIX);
+			RGBColor sh;
+			Rect s;
+			RgnHandle saved_clip;
+			if (pstyle->box_shadow_color != 0) {
+				macos9_colour_to_rgb(pstyle->box_shadow_color, &sh);
+			} else {
+				sh.red = sh.green = sh.blue = 0x6666;
+			}
+			s = r;
+			s.left  = (short)(s.left  + hoff);
+			s.right = (short)(s.right + hoff);
+			s.top    = (short)(s.top    + voff);
+			s.bottom = (short)(s.bottom + voff);
+			RGBForeColor(&sh);
+			saved_clip = macos9_push_clip();
+			ClipRect(&r);
+			PaintRect(&s);
+			macos9_pop_clip(saved_clip);
+		}
+#endif
 #else
 		PaintRect(&r);
 #endif
@@ -1499,29 +1523,39 @@ macos9_plot_text(const struct redraw_context *ctx,
 			RGBColor shadow_rgb;
 			short clamped_sx = (short)sx;
 			short clamped_sy = (short)sy;
+			int pass;
+			int passes = (fstyle->shadow_blur > 0) ? 3 : 1;
 			if (clamped_sx < -16) clamped_sx = -16;
 			if (clamped_sx >  16) clamped_sx =  16;
 			if (clamped_sy < -16) clamped_sy = -16;
 			if (clamped_sy >  16) clamped_sy =  16;
 			macos9_colour_to_rgb(fstyle->shadow_color, &shadow_rgb);
 			RGBForeColor(&shadow_rgb);
-			if ((ls == 0 && ws == 0) || mac_len <= 1) {
-				MoveTo((short)(x + clamped_sx),
-				       (short)(y + clamped_sy));
-				DrawText(mac_buf, 0, (short)mac_len);
-			} else {
-				size_t i;
-				short pen_x = (short)(x + clamped_sx);
-				short cw;
-				int gap;
-				for (i = 0; i < mac_len; i++) {
-					MoveTo(pen_x,
-					       (short)(y + clamped_sy));
-					DrawText(mac_buf, (short)i, 1);
-					cw = (short)CharWidth(mac_buf[i]);
-					gap = ls;
-					if (mac_buf[i] == ' ') gap += ws;
-					pen_x = (short)(pen_x + cw + gap);
+
+			for (pass = 0; pass < passes; pass++) {
+				short cur_sx = clamped_sx;
+				short cur_sy = clamped_sy;
+				if (pass == 1) { cur_sx++; cur_sy++; }
+				if (pass == 2) { cur_sx--; cur_sy--; }
+
+				if ((ls == 0 && ws == 0) || mac_len <= 1) {
+					MoveTo((short)(x + cur_sx),
+					       (short)(y + cur_sy));
+					DrawText(mac_buf, 0, (short)mac_len);
+				} else {
+					size_t i;
+					short pen_x = (short)(x + cur_sx);
+					short cw;
+					int gap;
+					for (i = 0; i < mac_len; i++) {
+						MoveTo(pen_x,
+						       (short)(y + cur_sy));
+						DrawText(mac_buf, (short)i, 1);
+						cw = (short)CharWidth(mac_buf[i]);
+						gap = ls;
+						if (mac_buf[i] == ' ') gap += ws;
+						pen_x = (short)(pen_x + cw + gap);
+					}
 				}
 			}
 			/* Restore foreground for the main pass. */

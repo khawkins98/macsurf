@@ -63,6 +63,7 @@ DIR_SOURCES :=				\
 	pause.c				\
 	p_macsurf_object_position.c	\
 	play_during.c			\
+	p_pointer_events.c		\
 	properties.c			\
 	quotes.c			\
 	stroke_opacity.c		\

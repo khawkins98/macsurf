@@ -588,7 +588,11 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	        0,
 	},
 	{
-	        PROPERTY_FUNCS(background_size),
-	        0,
+		PROPERTY_FUNCS(background_size),
+		0,
+	},
+	{
+		PROPERTY_FUNCS(pointer_events),
+		0,
 	}
 	};

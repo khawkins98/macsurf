@@ -539,6 +539,12 @@ int32_t css_computed_background_size(
 	return style->i.background_size;
 }
 
+uint8_t css_computed_pointer_events(
+		const css_computed_style *style)
+{
+	return get_pointer_events(style);
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

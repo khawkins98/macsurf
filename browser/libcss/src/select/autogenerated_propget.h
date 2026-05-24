@@ -2197,6 +2197,30 @@ static inline uint8_t get_macsurf_object_position(
 
 	return (bits & 0xf);
 }
+
+#define POINTER_EVENTS_INDEX 15
+#define POINTER_EVENTS_SHIFT 15
+#define POINTER_EVENTS_MASK 0x18000
+static inline uint8_t get_pointer_events_bits(const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[POINTER_EVENTS_INDEX];
+	bits &= POINTER_EVENTS_MASK;
+	bits >>= POINTER_EVENTS_SHIFT;
+
+	return (bits & 0x3);
+}
+static inline uint8_t get_pointer_events(const css_computed_style *style)
+{
+	uint32_t bits = style->i.bits[POINTER_EVENTS_INDEX];
+	bits &= POINTER_EVENTS_MASK;
+	bits >>= POINTER_EVENTS_SHIFT;
+
+	return (bits & 0x3);
+}
+#undef POINTER_EVENTS_INDEX
+#undef POINTER_EVENTS_SHIFT
+#undef POINTER_EVENTS_MASK
+
 #undef OBJECT_FIT_INDEX
 #undef OBJECT_FIT_SHIFT
 #undef OBJECT_FIT_MASK

@@ -156,8 +156,8 @@ enum css_properties_e {
 	CSS_PROP_MACSURF_GRID_ROWS		= 0x08B,
 	CSS_PROP_MACSURF_GRID_COL_SPAN		= 0x08C,
 	CSS_PROP_ASPECT_RATIO			= 0x08D,
-	CSS_PROP_BACKGROUND_SIZE		= 0x08E,
-
+	CSS_PROP_BACKGROUND_SIZE                = 0x08e,
+	CSS_PROP_POINTER_EVENTS                 = 0x08f,
 	CSS_N_PROPERTIES
 };
 
@@ -170,6 +170,12 @@ enum css_box_shadow_e {
 	CSS_BOX_SHADOW_INHERIT			= 0x0,
 	CSS_BOX_SHADOW_NONE			= 0x1,
 	CSS_BOX_SHADOW_SET			= 0x2
+};
+
+enum css_pointer_events_e {
+	CSS_POINTER_EVENTS_INHERIT              = 0x0,
+	CSS_POINTER_EVENTS_AUTO                 = 0x1,
+	CSS_POINTER_EVENTS_NONE                 = 0x2
 };
 
 enum css_macsurf_gradient_e {

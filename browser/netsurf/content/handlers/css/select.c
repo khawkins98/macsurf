@@ -31,6 +31,12 @@
 #include "css/internal.h"
 #include "css/hints.h"
 #include "css/select.h"
+#include "dom/html/html_input_element.h"
+#include "dom/html/html_button_element.h"
+#include "dom/html/html_select_element.h"
+#include "dom/html/html_text_area_element.h"
+#include "dom/html/html_option_element.h"
+#include "dom/html/html_opt_group_element.h"
 
 static css_error node_name(void *pw, void *node, css_qname *qname);
 static css_error node_classes(void *pw, void *node,
@@ -1633,9 +1639,41 @@ css_error node_is_focus(void *pw, void *node, bool *match)
  */
 css_error node_is_enabled(void *pw, void *node, bool *match)
 {
-	/** \todo Support enabled nodes */
+	bool disabled = false;
+	dom_node *n = node;
+	dom_string *s = NULL;
+	dom_exception exc;
 
 	*match = false;
+
+	exc = dom_node_get_node_name(n, &s);
+	if (exc != DOM_NO_ERR || s == NULL)
+		return CSS_OK;
+
+	if (dom_string_caseless_lwc_isequal(s, corestring_lwc_input)) {
+		dom_html_input_element_get_disabled((dom_html_input_element *)n, &disabled);
+		*match = !disabled;
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_button)) {
+		dom_html_button_element_get_disabled((dom_html_button_element *)n, &disabled);
+		*match = !disabled;
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_select)) {
+		dom_html_select_element_get_disabled((dom_html_select_element *)n, &disabled);
+		*match = !disabled;
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_textarea)) {
+		dom_html_text_area_element_get_disabled((dom_html_text_area_element *)n, &disabled);
+		*match = !disabled;
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_option)) {
+		dom_html_option_element_get_disabled((dom_html_option_element *)n, &disabled);
+		*match = !disabled;
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_optgroup)) {
+		dom_html_opt_group_element_get_disabled((dom_html_opt_group_element *)n, &disabled);
+		*match = !disabled;
+	} else {
+		/* Non-form elements are always enabled */
+		*match = true;
+	}
+
+	dom_string_unref(s);
 
 	return CSS_OK;
 }
@@ -1652,9 +1690,13 @@ css_error node_is_enabled(void *pw, void *node, bool *match)
  */
 css_error node_is_disabled(void *pw, void *node, bool *match)
 {
-	/** \todo Support disabled nodes */
+	css_error error;
 
-	*match = false;
+	error = node_is_enabled(pw, node, match);
+	if (error != CSS_OK)
+		return error;
+
+	*match = !*match;
 
 	return CSS_OK;
 }
@@ -1671,9 +1713,23 @@ css_error node_is_disabled(void *pw, void *node, bool *match)
  */
 css_error node_is_checked(void *pw, void *node, bool *match)
 {
-	/** \todo Support checked nodes */
+	dom_node *n = node;
+	dom_string *s = NULL;
+	dom_exception exc;
 
 	*match = false;
+
+	exc = dom_node_get_node_name(n, &s);
+	if (exc != DOM_NO_ERR || s == NULL)
+		return CSS_OK;
+
+	if (dom_string_caseless_lwc_isequal(s, corestring_lwc_input)) {
+		dom_html_input_element_get_checked((dom_html_input_element *)n, match);
+	} else if (dom_string_caseless_lwc_isequal(s, corestring_lwc_option)) {
+		dom_html_option_element_get_selected((dom_html_option_element *)n, match);
+	}
+
+	dom_string_unref(s);
 
 	return CSS_OK;
 }

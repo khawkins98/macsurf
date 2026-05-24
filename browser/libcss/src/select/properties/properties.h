@@ -68,6 +68,14 @@ PROPERTY_FUNCS(macsurf_grid_rows);
 PROPERTY_FUNCS(macsurf_grid_col_span);
 PROPERTY_FUNCS(aspect_ratio);
 PROPERTY_FUNCS(background_size);
+
+css_error css__cascade_pointer_events(uint32_t opv, css_style *style, css_select_state *state);
+css_error css__set_pointer_events_from_hint(const css_hint *hint, css_computed_style *style);
+css_error css__initial_pointer_events(css_select_state *state);
+css_error css__copy_pointer_events(const css_computed_style *from, css_computed_style *to);
+css_error css__compose_pointer_events(const css_computed_style *parent, const css_computed_style *child, css_computed_style *result);
+uint32_t destroy_pointer_events(void *bytecode);
+
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
 PROPERTY_FUNCS(break_after);

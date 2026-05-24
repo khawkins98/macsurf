@@ -193,9 +193,10 @@ void font_plot_style_from_css(
 			fstyle->word_spacing = 0;
 		}
 	}
-	/* fixes50: -macsurf-text-shadow packed value.
-	 *   bits 31..24 h-offset px (int8)
-	 *   bits 23..16 v-offset px (int8)
+	/* fixes50/200: -macsurf-text-shadow packed value.
+	 *   bits 31..26 h-offset px (6-bit signed, -32..31)
+	 *   bits 25..20 v-offset px (6-bit signed, -32..31)
+	 *   bits 19..16 blur radius px (4-bit unsigned, 0..15)
 	 *   bits 15..0  RGB565 colour (smear high bits down on decode) */
 	{
 		int32_t ts_packed = 0;
@@ -203,8 +204,9 @@ void font_plot_style_from_css(
 				&ts_packed);
 		if (ts_status == CSS_MACSURF_TEXT_SHADOW_SET) {
 			uint32_t u = (uint32_t)ts_packed;
-			int8_t hp = (int8_t)((u >> 24) & 0xff);
-			int8_t vp = (int8_t)((u >> 16) & 0xff);
+			int8_t hp = (int8_t)((u >> 26) & 0x3f);
+			int8_t vp = (int8_t)((u >> 20) & 0x3f);
+			uint8_t blur = (uint8_t)((u >> 16) & 0x0f);
 			uint16_t rgb565 = (uint16_t)(u & 0xffff);
 			uint8_t r5 = (uint8_t)((rgb565 >> 11) & 0x1f);
 			uint8_t g6 = (uint8_t)((rgb565 >>  5) & 0x3f);
@@ -212,8 +214,14 @@ void font_plot_style_from_css(
 			uint8_t r = (uint8_t)((r5 << 3) | (r5 >> 2));
 			uint8_t g = (uint8_t)((g6 << 2) | (g6 >> 4));
 			uint8_t b = (uint8_t)((b5 << 3) | (b5 >> 2));
+
+			/* sign extend 6-bit to 8-bit */
+			if (hp & 0x20) hp |= 0xc0;
+			if (vp & 0x20) vp |= 0xc0;
+
 			fstyle->shadow_x = (int)hp;
 			fstyle->shadow_y = (int)vp;
+			fstyle->shadow_blur = (int)blur;
 			fstyle->shadow_color =
 				(colour)(((uint32_t)b << 16) |
 				         ((uint32_t)g <<  8) |
@@ -221,6 +229,7 @@ void font_plot_style_from_css(
 		} else {
 			fstyle->shadow_x = 0;
 			fstyle->shadow_y = 0;
+			fstyle->shadow_blur = 0;
 			fstyle->shadow_color = 0;
 		}
 	}
