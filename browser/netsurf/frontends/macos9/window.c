@@ -406,7 +406,22 @@ static nserror macos9_gw_event(struct gui_window *g, enum gui_window_event e) {
 	}
 	return 0;
 }
-static void macos9_gw_set_title(struct gui_window *g, const char *t) { Str255 p; size_t l; if(!g||!g->window||!t) return; l=strlen(t); if(l>255) l=255; p[0]=(unsigned char)l; memcpy(p+1,t,l); SetWTitle(g->window,p); }
+static void macos9_gw_set_title(struct gui_window *g, const char *t) {
+	Str255 p;
+	size_t in_l;
+	size_t out_l;
+	char mac_buf[256];
+	if (!g || !g->window || !t) return;
+	in_l = strlen(t);
+	/* fixes219 — NetSurf hands us UTF-8; SetWTitle wants MacRoman.
+	 * Without the conversion en-dashes, smart quotes, etc. land as
+	 * mojibake in the title bar (",A," instead of "–"). */
+	out_l = macos9_utf8_to_macroman(t, in_l, mac_buf, sizeof mac_buf);
+	if (out_l > 255) out_l = 255;
+	p[0] = (unsigned char)out_l;
+	memcpy(p + 1, mac_buf, out_l);
+	SetWTitle(g->window, p);
+}
 static nserror macos9_gw_set_url(struct gui_window *g, struct nsurl *u) { const char *s; if(g&&u&&g->url_te&&(s=nsurl_access(u))) set_url_te_text(g,s); return 0; }
 static void macos9_gw_set_status(struct gui_window *g, const char *t) {
 	/* fixes109 — dedupe. NetSurf core fires set_status on every fetch

@@ -313,7 +313,7 @@ extern int   memcmp(const void *, const void *, size_t);
 #define _ALIGNED
 #endif
 
-/* macSSL Phase 1 — pull in BearSSL's CW8 build configuration so every
+/* macTLS Phase 1 — pull in BearSSL's CW8 build configuration so every
  * vendored BearSSL TU compiles with the right BR_* macros (32-bit
  * arithmetic, no autodetected platform paths, no GCC/MSC builtins, no
  * OS-side entropy/time). The prefix is __MWERKS__-gated internally so

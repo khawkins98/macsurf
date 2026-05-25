@@ -18,6 +18,7 @@
 #include "macsurf_debug.h"
 
 extern nserror macos9_http_fetcher_register(void);
+extern nserror macos9_https_fetcher_register(void);
 extern nserror fetch_resource_register(void);
 extern nserror fetch_about_register(void);
 extern nserror fetch_file_register(void);
@@ -29,6 +30,10 @@ nserror fetcher_init(void) {
 
 	err = macos9_http_fetcher_register();
 	MS_LOG("fetcher_init: http registered");
+	if (err != NSERROR_OK) return err;
+
+	err = macos9_https_fetcher_register();
+	MS_LOG("fetcher_init: https (macTLS) registered");
 	if (err != NSERROR_OK) return err;
 
 	err = fetch_resource_register();

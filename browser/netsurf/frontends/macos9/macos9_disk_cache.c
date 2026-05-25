@@ -1,0 +1,338 @@
+/*
+ * MacSurf - macos9_disk_cache.c
+ *
+ * Shared persistent body cache for the HTTP + HTTPS fetchers.
+ * Extracted from macos9_http_fetcher.c (fixes172) so the HTTPS fetcher
+ * can hit the same on-disk store. See macos9_disk_cache.h for the
+ * public API.
+ *
+ * Disk layout:
+ *   Folder: "MacSurf Cache" on the boot Desktop (auto-created).
+ *   File:   one per cached body, name = "h_xxxxxxxx" (FNV-1a hash of URL).
+ *   Format: [8 bytes ] magic 'MSCACHE\x01'
+ *           [4 bytes ] HTTP status (BE)
+ *           [4 bytes ] mime length (BE)
+ *           [4 bytes ] body length (BE)
+ *           [4 bytes ] reserved (zero)
+ *           [N bytes ] mime string (no NUL)
+ *           [M bytes ] body
+ *
+ * Cap any single cached body at MACSURF_CACHE_MAX_BYTES. Bigger
+ * responses are still served live, just not cached.
+ */
+
+#include "macos9_disk_cache.h"
+#include "macsurf_debug.h"
+
+#include <string.h>
+#include <stdlib.h>
+
+#ifdef __MACOS9__
+#include <Files.h>
+#include <Folders.h>
+#include <Script.h>
+#include <Types.h>
+#endif
+
+#define MACSURF_CACHE_MAGIC0 'M'
+#define MACSURF_CACHE_MAGIC1 'S'
+#define MACSURF_CACHE_MAGIC2 'C'
+#define MACSURF_CACHE_MAGIC3 'A'
+#define MACSURF_CACHE_MAGIC4 'C'
+#define MACSURF_CACHE_MAGIC5 'H'
+#define MACSURF_CACHE_MAGIC6 'E'
+#define MACSURF_CACHE_MAGIC7 0x01
+
+/* fixes181 — Reload sets this to 1 so the next lookup short-circuits
+ * to miss. Cleared after a successful store so sub-resources resume
+ * normal cache behaviour. */
+int macsurf_http_skip_next_cache = 0;
+
+/* ---- file-local helpers ---- */
+
+/* FNV-1a 32-bit. Cheap, well-distributed, no allocation. */
+static unsigned long cache_hash_url(const char *url)
+{
+	unsigned long h = 0x811c9dc5UL;
+	const unsigned char *p;
+	if (url == NULL) return h;
+	for (p = (const unsigned char *)url; *p != 0; p++) {
+		h ^= (unsigned long)(*p);
+		h = (h * 0x01000193UL) & 0xFFFFFFFFUL;
+	}
+	return h;
+}
+
+/* Pack URL hash into a 10-char Pascal-string filename. fname is
+ * at least 32 bytes. Format: "h_xxxxxxxx". */
+static void cache_filename_for_url(const char *url, unsigned char *fname)
+{
+	unsigned long h = cache_hash_url(url);
+	const char *hex = "0123456789abcdef";
+	char tmp[16];
+	int i;
+	tmp[0] = 'h';
+	tmp[1] = '_';
+	for (i = 0; i < 8; i++) {
+		tmp[2 + i] = hex[(h >> (28 - i * 4)) & 0xF];
+	}
+	tmp[10] = '\0';
+	fname[0] = 10;
+	memcpy(fname + 1, tmp, 10);
+}
+
+#ifdef __MACOS9__
+/* Resolve the cache folder FSSpec. Creates "MacSurf Cache" on the
+ * boot Desktop if missing. Returns noErr on success. */
+static OSErr cache_dir_get(short *vRef, long *dirID)
+{
+	OSErr err;
+	short desk_vref;
+	long desk_dir;
+	FSSpec spec;
+	unsigned char fname[32];
+	const char *name = "MacSurf Cache";
+	size_t nlen;
+	long new_dir;
+
+	err = FindFolder(kOnSystemDisk, kDesktopFolderType,
+			kDontCreateFolder, &desk_vref, &desk_dir);
+	if (err != noErr) return err;
+
+	nlen = strlen(name);
+	if (nlen > 31) nlen = 31;
+	fname[0] = (unsigned char)nlen;
+	memcpy(fname + 1, name, nlen);
+
+	err = FSMakeFSSpec(desk_vref, desk_dir, fname, &spec);
+	if (err == fnfErr) {
+		err = FSpDirCreate(&spec, smSystemScript, &new_dir);
+		if (err != noErr) return err;
+		err = FSMakeFSSpec(desk_vref, desk_dir, fname, &spec);
+		if (err != noErr) return err;
+	} else if (err != noErr) {
+		return err;
+	}
+
+	{
+		CInfoPBRec pb;
+		Str63 nm;
+		memcpy(nm, spec.name, spec.name[0] + 1);
+		memset(&pb, 0, sizeof(pb));
+		pb.dirInfo.ioNamePtr = nm;
+		pb.dirInfo.ioVRefNum = spec.vRefNum;
+		pb.dirInfo.ioDrDirID = spec.parID;
+		err = PBGetCatInfoSync(&pb);
+		if (err != noErr) return err;
+		*vRef = spec.vRefNum;
+		*dirID = pb.dirInfo.ioDrDirID;
+	}
+	return noErr;
+}
+#endif /* __MACOS9__ */
+
+static void cache_write_be32(unsigned char *p, unsigned long v)
+{
+	p[0] = (unsigned char)((v >> 24) & 0xFF);
+	p[1] = (unsigned char)((v >> 16) & 0xFF);
+	p[2] = (unsigned char)((v >>  8) & 0xFF);
+	p[3] = (unsigned char)( v        & 0xFF);
+}
+
+static unsigned long cache_read_be32(const unsigned char *p)
+{
+	return ((unsigned long)p[0] << 24) |
+	       ((unsigned long)p[1] << 16) |
+	       ((unsigned long)p[2] <<  8) |
+	       ((unsigned long)p[3]);
+}
+
+/* ---- public API ---- */
+
+int macos9_cache_mime_eligible(int status, const char *mime)
+{
+	if (status != 200) return 0;
+	if (mime == NULL || mime[0] == '\0') return 0;
+	if (strncmp(mime, "text/html", 9) == 0) return 1;
+	if (strncmp(mime, "text/css", 8) == 0) return 1;
+	if (strncmp(mime, "text/plain", 10) == 0) return 1;
+	if (strncmp(mime, "application/xhtml", 17) == 0) return 1;
+	if (strncmp(mime, "application/javascript", 22) == 0) return 1;
+	if (strncmp(mime, "application/json", 16) == 0) return 1;
+	return 0;
+}
+
+void macos9_cache_store(const char *url, int status, const char *mime,
+		const char *body_ptr, long body_len)
+{
+#ifdef __MACOS9__
+	OSErr err;
+	short vRef;
+	long dirID;
+	FSSpec spec;
+	unsigned char fname[32];
+	short ref = 0;
+	unsigned char hdr[24];
+	long count;
+	size_t mime_len;
+
+	if (url == NULL || body_ptr == NULL) return;
+	if (body_len <= 0 || body_len > MACSURF_CACHE_MAX_BYTES) return;
+	if (!macos9_cache_mime_eligible(status, mime)) return;
+
+	err = cache_dir_get(&vRef, &dirID);
+	if (err != noErr) return;
+
+	cache_filename_for_url(url, fname);
+	err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+	if (err == fnfErr) {
+		err = FSpCreate(&spec, '????', '????', smSystemScript);
+		if (err != noErr) return;
+		err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+	}
+	if (err != noErr) return;
+
+	if (FSpOpenDF(&spec, fsRdWrPerm, &ref) != noErr) return;
+	SetFPos(ref, fsFromStart, 0);
+
+	mime_len = strlen(mime);
+	if (mime_len > 127) mime_len = 127;
+
+	hdr[0] = MACSURF_CACHE_MAGIC0;
+	hdr[1] = MACSURF_CACHE_MAGIC1;
+	hdr[2] = MACSURF_CACHE_MAGIC2;
+	hdr[3] = MACSURF_CACHE_MAGIC3;
+	hdr[4] = MACSURF_CACHE_MAGIC4;
+	hdr[5] = MACSURF_CACHE_MAGIC5;
+	hdr[6] = MACSURF_CACHE_MAGIC6;
+	hdr[7] = MACSURF_CACHE_MAGIC7;
+	cache_write_be32(hdr + 8,  (unsigned long)status);
+	cache_write_be32(hdr + 12, (unsigned long)mime_len);
+	cache_write_be32(hdr + 16, (unsigned long)body_len);
+	cache_write_be32(hdr + 20, 0UL);
+
+	count = sizeof(hdr);
+	FSWrite(ref, &count, hdr);
+	if (mime_len > 0) {
+		count = (long)mime_len;
+		FSWrite(ref, &count, mime);
+	}
+	count = body_len;
+	FSWrite(ref, &count, body_ptr);
+	SetEOF(ref, (long)sizeof(hdr) + (long)mime_len + body_len);
+	FSClose(ref);
+	(void)FlushVol(NULL, vRef);
+
+	macsurf_debug_log_writef(
+		"CACHE store url=%s mime=%s len=%ld",
+		url, mime, body_len);
+	macsurf_http_skip_next_cache = 0;
+#else
+	(void)url; (void)status; (void)mime; (void)body_ptr; (void)body_len;
+#endif
+}
+
+int macos9_cache_lookup(const char *url, char **body_out,
+		long *body_len_out, char *mime_out, int mime_cap,
+		int *status_out)
+{
+#ifdef __MACOS9__
+	OSErr err;
+	short vRef;
+	long dirID;
+	FSSpec spec;
+	unsigned char fname[32];
+	short ref = 0;
+	unsigned char hdr[24];
+	long count;
+	unsigned long status_v;
+	unsigned long mime_len;
+	unsigned long body_len;
+	char mime_buf[128];
+	char *body;
+
+	*body_out = NULL;
+	*body_len_out = 0;
+	if (mime_out != NULL && mime_cap > 0) mime_out[0] = '\0';
+	*status_out = 0;
+
+	if (url == NULL) return 0;
+	if (macsurf_http_skip_next_cache) return 0;
+
+	err = cache_dir_get(&vRef, &dirID);
+	if (err != noErr) return 0;
+
+	cache_filename_for_url(url, fname);
+	err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+	if (err != noErr) return 0;
+
+	if (FSpOpenDF(&spec, fsRdPerm, &ref) != noErr) return 0;
+
+	count = sizeof(hdr);
+	if (FSRead(ref, &count, hdr) != noErr || count != sizeof(hdr)) {
+		FSClose(ref);
+		return 0;
+	}
+	if (hdr[0] != MACSURF_CACHE_MAGIC0 ||
+	    hdr[1] != MACSURF_CACHE_MAGIC1 ||
+	    hdr[2] != MACSURF_CACHE_MAGIC2 ||
+	    hdr[3] != MACSURF_CACHE_MAGIC3 ||
+	    hdr[4] != MACSURF_CACHE_MAGIC4 ||
+	    hdr[5] != MACSURF_CACHE_MAGIC5 ||
+	    hdr[6] != MACSURF_CACHE_MAGIC6 ||
+	    hdr[7] != MACSURF_CACHE_MAGIC7) {
+		FSClose(ref);
+		return 0;
+	}
+	status_v = cache_read_be32(hdr + 8);
+	mime_len = cache_read_be32(hdr + 12);
+	body_len = cache_read_be32(hdr + 16);
+	if (mime_len > 127 || body_len == 0 ||
+			body_len > MACSURF_CACHE_MAX_BYTES) {
+		FSClose(ref);
+		return 0;
+	}
+
+	if (mime_len > 0) {
+		count = (long)mime_len;
+		if (FSRead(ref, &count, mime_buf) != noErr ||
+				count != (long)mime_len) {
+			FSClose(ref);
+			return 0;
+		}
+	}
+	mime_buf[mime_len] = '\0';
+
+	body = (char *)malloc(body_len);
+	if (body == NULL) {
+		FSClose(ref);
+		return 0;
+	}
+	count = (long)body_len;
+	if (FSRead(ref, &count, body) != noErr ||
+			count != (long)body_len) {
+		free(body);
+		FSClose(ref);
+		return 0;
+	}
+	FSClose(ref);
+
+	*body_out = body;
+	*body_len_out = (long)body_len;
+	*status_out = (int)status_v;
+	if (mime_out != NULL && mime_cap > 0) {
+		size_t n = mime_len;
+		if (n >= (size_t)mime_cap) n = (size_t)mime_cap - 1;
+		memcpy(mime_out, mime_buf, n);
+		mime_out[n] = '\0';
+	}
+	macsurf_debug_log_writef(
+		"CACHE hit url=%s mime=%s len=%ld status=%d",
+		url, mime_buf, (long)body_len, (int)status_v);
+	return 1;
+#else
+	(void)url; (void)body_out; (void)body_len_out;
+	(void)mime_out; (void)mime_cap; (void)status_out;
+	return 0;
+#endif
+}

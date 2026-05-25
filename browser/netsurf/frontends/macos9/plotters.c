@@ -714,10 +714,11 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 			(int)((pstyle->fill_colour2 >> 16) & 0xff),
 			(int)r.left, (int)r.top, (int)r.right, (int)r.bottom);
 	}
-	/* Diagnostic: dump fill / stroke colour + rect for the first few
-	 * rectangles each redraw so we can compare what libcss decided
-	 * vs. what UA default would produce. */
-	if (macos9_plot_rect_count <= 8) {
+	/* Diagnostic: dump fill / stroke colour + rect. fixes219 raises
+	 * the cap from 8 to 300 so we can catch the body-bg paint colour
+	 * on real pages (mactrove emits ~188 rects per redraw). Flip back
+	 * to 8 once the grey-bg investigation is closed. */
+	if (macos9_plot_rect_count <= 300) {
 		unsigned int fr = (unsigned int)((pstyle->fill_colour >>  0) & 0xff);
 		unsigned int fg = (unsigned int)((pstyle->fill_colour >>  8) & 0xff);
 		unsigned int fb = (unsigned int)((pstyle->fill_colour >> 16) & 0xff);
@@ -725,10 +726,11 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 		unsigned int sg = (unsigned int)((pstyle->stroke_colour >>  8) & 0xff);
 		unsigned int sb = (unsigned int)((pstyle->stroke_colour >> 16) & 0xff);
 		macsurf_debug_log_writef(
-			"plot_rect[%d] fill=%d/%d/%d ft=%d stroke=%d/%d/%d st=%d at (%d,%d,%d,%d)",
+			"plot_rect[%d] fill=%d/%d/%d ft=%d stroke=%d/%d/%d st=%d op=%d at (%d,%d,%d,%d)",
 			(int)macos9_plot_rect_count,
 			(int)fr, (int)fg, (int)fb, (int)pstyle->fill_type,
 			(int)sr, (int)sg, (int)sb, (int)pstyle->stroke_type,
+			(int)pstyle->opacity,
 			(int)r.left, (int)r.top, (int)r.right, (int)r.bottom);
 	}
 
@@ -934,6 +936,12 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 #ifdef __MACOS9__
 		Pattern stipple_pat;
 #endif
+		/* fixes223 reverted: many code paths leave pstyle.opacity = 0
+		 * by default (calloc / memset of plot_style structs that
+		 * don't go through redraw.c's css_computed_opacity check),
+		 * and treating 0 as "skip" zeroes out borders and chrome.
+		 * Keep the uninit->opaque fallback. The dark-grey-on-mactrove
+		 * regression is not from this code path. */
 		if (op == 0) op = (plot_style_fixed)PLOT_STYLE_SCALE; /* uninit -> opaque */
 		if (op < (plot_style_fixed)(PLOT_STYLE_SCALE / 20)) {
 			/* < 5% -- skip painting entirely. */
@@ -957,10 +965,17 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 		RGBForeColor(&rgb);
 #ifdef __MACOS9__
 		if (stipple) {
-			/* Backcolor stays at whatever the port has — usually
-			 * white for body content. The pattern mixes fg + bg
-			 * at the dot level. */
+			/* fixes220 — explicitly set RGBBackColor to white before
+			 * the stipple FillRect. The pattern paints FG at 1 bits
+			 * and BG at 0 bits. If a prior DrawText / image-blit /
+			 * etc. left BackColor at black, a 50% stipple of #cc
+			 * over #00 averages to #66 dark grey instead of the
+			 * intended translucent-over-white look — which is the
+			 * "tables are too dark" bug. */
+			RGBColor wht;
 			RgnHandle saved_clip = macos9_push_clip();
+			wht.red = 0xFFFF; wht.green = 0xFFFF; wht.blue = 0xFFFF;
+			RGBBackColor(&wht);
 			FillRect(&r, &stipple_pat);
 			macos9_pop_clip(saved_clip);
 		} else {
@@ -970,8 +985,18 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 		}
 #ifdef __MACOS9__
 		/* fixes200: inset box-shadow. Paint the offset grey rect
-		 * INSIDE the main rect r, clipped to r. */
-		if (pstyle->box_shadow_inset &&
+		 * INSIDE the main rect r, clipped to r.
+		 *
+		 * fixes225 BISECT: gate behind MACSURF_INSET_BOX_SHADOW so
+		 * we can prove/disprove that this is what's painting the
+		 * dark wash on mactrove. Default 0 = disabled. Flip to 1
+		 * to re-enable if mactrove looks the same with this off
+		 * (meaning the bug is elsewhere). */
+#ifndef MACSURF_INSET_BOX_SHADOW
+#define MACSURF_INSET_BOX_SHADOW 0
+#endif
+		if (MACSURF_INSET_BOX_SHADOW &&
+		    pstyle->box_shadow_inset &&
 		    (pstyle->box_shadow != 0 || pstyle->box_shadow_y != 0)) {
 			short hoff = (short)(pstyle->box_shadow   >> PLOT_STYLE_RADIX);
 			short voff = (short)(pstyle->box_shadow_y >> PLOT_STYLE_RADIX);
@@ -1235,6 +1260,20 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 		}
 	}
 
+	/* fixes221 — kill switch for fixes203's box-filter pre-downscale.
+	 * Set MACSURF_BOX_FILTER_DOWNSCALE = 0 to disable and revert to
+	 * pure QuickDraw nearest-neighbor scaling (the pre-fixes203
+	 * behaviour). Useful for bisecting whether the box-filter swap-
+	 * the-GWorld path is darkening unrelated pixels through some
+	 * QuickDraw state leak. fixes221 ships with this DISABLED so the
+	 * user can confirm whether box-filter is the dark-grey culprit.
+	 * If still dark with this off, box-filter is innocent. If light,
+	 * we need a narrower fix that keeps the rainbow-streak repair
+	 * without the side effect. Flip to 1 to restore. */
+#ifndef MACSURF_BOX_FILTER_DOWNSCALE
+#define MACSURF_BOX_FILTER_DOWNSCALE 0
+#endif
+
 	/* fixes203 — box-filter pre-downscale for high-quality image
 	 * rendering. QuickDraw's CopyBits / CopyMask scale via nearest-
 	 * neighbor, which on large downscale ratios (3x+) produces severe
@@ -1260,7 +1299,8 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 				(((long)bw << 8) / (long)width);
 		long sy_ratio_q8 = (long)height <= 0 ? 0 :
 				(((long)bh << 8) / (long)height);
-		if ((sx_ratio_q8 >= (3L << 8) || sy_ratio_q8 >= (3L << 8)) &&
+		if (MACSURF_BOX_FILTER_DOWNSCALE &&
+				(sx_ratio_q8 >= (3L << 8) || sy_ratio_q8 >= (3L << 8)) &&
 				width >= 4 && height >= 4) {
 			GWorldPtr gw_small = NULL;
 			Rect small_rect;
