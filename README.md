@@ -33,13 +33,13 @@
 ---
 
 > [!WARNING]
-> **MacSurf is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, but **most websites in 2026 will not work** in it. Expect: crashes on heavy SPAs, broken layouts on sites that lean on modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
+> **MacSurf is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, **and as of 2026-05-25 it speaks TLS 1.2 natively** against real modern HTTPS sites (`mactrove.com` is the canonical hardware test target). **Most websites in 2026 will still not work** in it — heavy SPAs, modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
 >
 > **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it. Bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too**; there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
 >
-> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, a respectable subset of the CSS Grid spec, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
+> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, a respectable subset of the CSS Grid spec, native HTTPS with the full Mozilla CA bundle, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
 >
-> Released **2026-05-20** as the first numbered version. Release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
+> Released **2026-05-20** as the first numbered version. Native HTTPS first-light **2026-05-25** (fixes208-225). Release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
 
 ---
 
@@ -47,7 +47,7 @@
 
 The web outgrew Classic Mac OS twenty years ago. Modern HTTPS killed it for good around 2016. Today, an out-of-the-box G3 or G4 running OS 9 can barely reach a single live website.
 
-MacSurf brings the real web back. Not a screenshot proxy. Not a remote terminal session. A native browser, built with the tools that were on the platform—CodeWarrior, the Carbon API, QuickDraw, Open Transport—running real CSS3 layouts and real JavaScript inside the 64-megabyte memory floor of a 1999 iMac.
+MacSurf brings the real web back. Not a screenshot proxy. Not a remote terminal session. A native browser, built with the tools that were on the platform—CodeWarrior, the Carbon API, QuickDraw, Open Transport—running real CSS3 layouts and real JavaScript inside the 64-megabyte memory floor of a 1999 iMac. **As of 2026-05-25 it talks TLS 1.2 directly to the modern web**, through a BearSSL-based stack ([macTLS](https://github.com/mplsllc/macTLS)) that ships inside the browser binary with the full 121-anchor Mozilla CA bundle. No proxy required.
 
 It is, as far as we can find, the first serious [NetSurf](https://www.netsurf-browser.org/) port to Classic Mac OS, and the first browser shipped on Mac OS 9 with native CSS Grid, CSS custom properties, and ES5 JavaScript.
 
@@ -125,7 +125,7 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 <td>TLS-stripping HTTP proxy. Mac sends plain HTTP, proxy fetches via HTTPS, returns plain HTTP. Deploy on a VPS or run locally.</td>
 </tr>
 <tr>
-<td><code>macSSL</code><br><sub>sibling repo</sub></td>
+<td><code>macTLS</code><br><sub>sibling repo</sub></td>
 <td>C (CW8)</td>
 <td>Native TLS 1.2 library for OS 9, modern HTTPS straight from the Mac, no proxy required. Built on BearSSL with ten embedded root CAs.</td>
 </tr>
@@ -175,7 +175,7 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 - Open Transport TCP, plain non-`InContext` calls
 - HTTP/1.1 + chunked + keep-alive + 3xx follow
 - Connection pooling, 15s no-progress timeout
-- HTTPS via Go proxy or native macSSL
+- HTTPS via Go proxy or native macTLS
 
 **Chrome**
 - Address bar, back / forward / reload / home
