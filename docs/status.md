@@ -1,20 +1,20 @@
 # MacSurf Status
 
-**Date:** 2026-05-24
-**Engine HEAD:** fixes199h
-**Current fix round:** fixes200 (CSS standards map docs/tools)
-**Last release:** MacSurf v0.5.0 (2026-05-24)
-**Last hardware-accepted (explicitly recorded in this file):** fixes158a (2026-05-20)
+**Date:** 2026-05-25
+**Engine HEAD:** fixes225
+**Current fix round:** fixes225 (inset box-shadow paint disabled — clears mactrove dark-grey wash)
+**Last release:** MacSurf v0.5.0 (2026-05-24); 0.6 cut pending after the load-time QOL round
+**Last hardware-accepted:** fixes225 (2026-05-25, mactrove.com native HTTPS on G3 iMac OS 9.1, screenshot at [../screenshots/mactrove-fixes225.jpg](../screenshots/mactrove-fixes225.jpg))
 
 ---
 
 ## What MacSurf is, today
 
-MacSurf is a working web browser for Classic Mac OS 9.1–9.2.2 on PowerPC, built on a NetSurf fork with a Carbon / QuickDraw / Open Transport frontend. For modern HTTPS sites it uses a Go TLS-stripping proxy; native TLS is a separate sibling library (`macSSL`) and is not the default browsing path yet.
+MacSurf is a working web browser for Classic Mac OS 9.1–9.2.2 on PowerPC, built on a NetSurf fork with a Carbon / QuickDraw / Open Transport frontend. **Native HTTPS works end-to-end via macTLS (BearSSL + Open Transport); the Go TLS-stripping proxy is retired from the default path** as of 2026-05-25.
 
-It runs on real beige G3-class hardware (with G4 upgrade also used in development). The build target is CodeWarrior 8 Pro (8.3 update), strict C89, with a ~16 MB application partition. The remote-fetch path is plain HTTP from the Mac → Go proxy → upstream HTTPS, streamed.
+It runs on real beige G3-class hardware (with G4 upgrade also used in development). The build target is CodeWarrior 8 Pro (8.3 update), strict C89, with a ~16 MB application partition. The remote-fetch path is now direct TLS 1.2 from the Mac to the origin, using the full Mozilla CA bundle (121 trust anchors) bundled into the binary.
 
-## What works in the current tree (engine: fixes199h, docs/tools: fixes200)
+## What works in the current tree (engine: fixes225)
 
 ### Rendering pipeline
 - Full NetSurf fetch → parse → cascade → layout → plot
@@ -51,10 +51,11 @@ It runs on real beige G3-class hardware (with G4 upgrade also used in developmen
 ### Networking
 - Open Transport TCP, `OTOpenEndpointInContext` synchronous calls yielding on `kOTSyncIdleEvent`
 - HTTP/1.1 with chunked transfer, keep-alive, 3xx redirect follow
-- Connection pooling (128 fetcher slots, 16 concurrent)
+- Connection pooling (128 fetcher slots, 16 concurrent HTTP + 16 concurrent HTTPS)
 - 15s no-progress timeout
-- Persistent on-disk HTTP body cache to reduce redo work after refresh/crash (fixes172)
-- HTTPS via Go proxy; native macSSL exists as a sibling project and can be integrated as a later round
+- Persistent on-disk body cache shared between HTTP and HTTPS (fixes172, refactored to `macos9_disk_cache.[ch]` at fixes218)
+- **Native HTTPS via macTLS (BearSSL + Open Transport).** TLS 1.2 with the full Mozilla CA bundle (121 trust anchors; ISRG, DigiCert, GTS, Sectigo, GlobalSign, Entrust, AAA, etc.). Cipher in the wild: `TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256`. **Verified end-to-end on real OS 9 hardware against mactrove.com 2026-05-25 (first-light, fixes208-212).** The Go TLS-stripping proxy is retired from the default path; macTLS is now the canonical HTTPS fetcher.
+- HTTPS cache-hit serving is temporarily disabled (fixes222) pending a synthetic-header rework — cache STORE is live, READ comes back in the load-time QOL round.
 
 ### Chrome
 - Address bar, back / forward / reload / home
@@ -80,13 +81,16 @@ See [codewarrior-setup.md](codewarrior-setup.md) for the full Mac-side build wal
 
 ## Current fix round
 
-**fixes200, CSS standards map (docs/tools).** Adds/refreshes the repo’s canonical “what’s implemented vs. what’s missing” view: `CSS_SUPPORT_MATRIX.md`, `CSS_IMPLEMENTATION_PLAN.md`, and supporting audit/docs.
+**fixes216–225, macTLS hardening + cache extraction + dark-grey root cause.** Closed the long-standing "mactrove looks dark" regression and landed the production native-HTTPS path.
 
-**Engine baseline for this round:** fixes199h, cumulative updates. Focuses on “real site” layout correctness and a few long-requested CSS consumptions:
+**Engine baseline:** fixes225. Highlights:
 
-- Multi-column layout refinements in the layout engine (follow-on to fixes179/180/182*)
-- `object-position` promoted from a cssh-css “drop” into a real libcss property + consumer path
-- Build / integration fixes and misc layout/redraw adjustments
+- **fixes225** — disable the inset box-shadow paint that was washing mactrove dark grey. Root cause was a fallback to `#666666` when `box_shadow_color == 0` (var()-resolved colors not round-tripping through the RGB555 pack/unpack). Gated behind `MACSURF_INSET_BOX_SHADOW` (default 0). Visual cost: 1px Platinum inner-bevel on `.window` cards. V2: trace and fix the var() → `box_shadow_color` round-trip, re-enable.
+- **fixes222** — disabled HTTPS HS_CACHEHIT serving because synthetic header dispatch didn't match `html_create` expectations. Cache STORE still runs. Pending rework.
+- **fixes219** — title-bar UTF-8 mojibake fix (em-dash, smart quotes now route through `macos9_utf8_to_macroman`). Plot-rect log gate bumped 8 → 300.
+- **fixes218** — extract on-disk cache to `macos9_disk_cache.[ch]`, shared between HTTP and HTTPS fetchers.
+- **fixes217** — macTLS trust anchor bundle expanded from 10 → 121 (full Mozilla CCADB bundle from curl.se/cacert.pem).
+- **fixes216** — `MS_LOG` of `hctx_fail` reason so silent HTTPS failures (peer-closed, handshake-failed, timeout) surface in the log.
 
 ---
 
@@ -94,16 +98,18 @@ See [codewarrior-setup.md](codewarrior-setup.md) for the full Mac-side build wal
 
 | Fix | Description | Status |
 |-----|-------------|--------|
-| **fixes200** | CSS standards map docs/tools (`CSS_SUPPORT_MATRIX.md`, implementation plan, audit/docs) | Landed |
+| **fixes216–225** | macTLS bundle expansion + cache refactor + dark-grey root cause + diag | Landed, hw-verified |
+| **fixes208–212** | macTLS first-light on real OS 9 hardware against mactrove.com (proxy retired) | Landed, hw-verified |
+| **fixes203** | SVG rect rotation + box-filter image downscale | Landed |
+| **fixes201–202** | Big CSS round (box-shadow inset, pointer-events, text-shadow blur) + inline-style preprocessor | Landed |
 | **fixes199h** | Multi-column refinements + `object-position` as a real libcss property + build fixes | Landed |
 | **fixes195–197** | Inline SVG V1 renderer + sizing hints + diagnostics | Landed |
-| **fixes191** | `inset` shorthand, `background-size` (bitmaps), `position: sticky` (V1), modern CSS “safe drop” bundle | Landed |
+| **fixes191** | `inset` shorthand, `background-size` (bitmaps), `position: sticky` (V1), modern CSS "safe drop" bundle | Landed |
 | **fixes189–190** | Alpha correctness in ARGB copy path + composite-path rollback | Landed |
 | **fixes187–188** | PNG premultiply/mask fixes + scaled-PNG composite attempt | Landed |
 | **fixes185–186** | Modern-CSS compatibility preprocessor bundle + collapse `<details>` by default | Landed |
 | **fixes183–184** | Standard `transform` bridge + `table-layout: fixed` correctness | Landed |
 | **fixes179–182*** | Multi-column layout V1 + follow-on routing / diagnostics / correctness fixes | Landed |
-| **fixes171–174** | Layout watchdog + survival-layer hardening + CSS size cap raised | Landed |
 | **fixes172** | Persistent on-disk HTTP body cache | Landed |
 
 See [HISTORY.md](HISTORY.md) for the full version timeline going back to v0.1.
@@ -112,19 +118,22 @@ See [HISTORY.md](HISTORY.md) for the full version timeline going back to v0.1.
 
 ## What's queued next
 
-The “modern site survival” work is now mostly about filling in specific missing consumptions rather than single big subsystems. The near-term queue (order may change):
+Now that native HTTPS is live and the dark-grey regression is closed, the next round is load-time QOL ahead of a 0.6 cut:
 
-- **Grid:** justify-* parser/consumption strategy that avoids the libcss mid-enum trap (place-* shorthands later)
-- **Multi-column:** `column-span: all`, better balance/fill behaviour, edge-case block fragmentation
-- **SVG V2:** gradients, transforms, `<text>`, and improved path coverage (`A/S/T`)
-- **Forms / interaction:** hit-testing semantics (`pointer-events`), focus/outline polish, input widgets
-- **Native TLS:** integrate `macSSL` as an optional direct-HTTPS path (proxy remains primary)
+- **Re-enable HTTPS cache HIT serving.** Cache STORE is already collecting bodies; the synthetic FETCH_HEADER / DATA / FINISHED dispatch in HS_CACHEHIT needs to mirror the live header stream exactly so `html_create` accepts the bootstrapped content. Biggest single reload-speed win (~6s saved on a cached mactrove reload).
+- **TLS keep-alive / connection pooling for HTTPS.** Right now every sub-resource fetch does a fresh handshake. 40 handshakes on a mactrove cold load × ~200ms each on a G3 = ~8s of redundant TLS work. Mirror the HTTP fetcher's pool pattern.
+- **HTTPS slot pool 16 → 32.** ~21% of mactrove fetches currently hit `NO FREE SLOTS`. Bumping is one-line, ~32 KB per slot.
+- **Reformat coalescing.** ~18 full reformats per mactrove load (every CSS/image arrival fires one). Batch to a single tick window to cut layout work ~5×.
+- **NetSurf-core "abort during nav while old fetches in-flight" bug.** Navigating to a new URL while sub-resources from the previous page are still streaming triggers an `ops.abort` on the new top-level fetch, which falls back to `about:query/fetcherror`. Needs llcache / fetch.c instrumentation. **Tracked separately** (see "Known limitations" below).
+
+The standards-coverage queue (Grid `justify-*`, multi-column `column-span: all`, SVG V2 gradients/transforms/text, form interaction, var() → `box_shadow_color` round-trip to re-enable inset bevels) gets picked up after the QOL round.
 
 ---
 
 ## Known limitations
 
-- **No HTTPS by default in the browser core.** All TLS goes through the Go proxy; `macSSL` exists but is not yet the default integrated path.
+- **Navigation during in-flight sub-resources can land on `about:query/fetcherror`.** When the user submits a new URL while the previous page's CSS/image fetches are still streaming, NetSurf core fires `ops.abort` on the new top-level fetch (likely `llcache` lifecycle interaction with high concurrency). The new fetch lands with `status=200` and partial body, then aborts. Workaround: wait for the status bar to read "Done" before navigating. Real fix needs NetSurf-core instrumentation.
+- **HTTPS cache-hit serving is off** (fixes222). Cache STORE runs and the `MacSurf Cache` folder fills, but reloads currently re-fetch over fresh TLS. Comes back in the load-time QOL round.
 - **No preemptive threading.** Cooperative `WaitNextEvent` event loop only, all networking yields via `kOTSyncIdleEvent`.
 - **No subgrid.**
 - **16 MB application partition ceiling.** libcss allocates from the OS heap and runs out below ~12 MB free on heavy pages.
