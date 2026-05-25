@@ -634,30 +634,15 @@ static void hctx_poll(struct macos9_https_ctx *c)
 		hctx_fail(c, "https: handshake/transport failed");
 		return;
 	}
-	if (ev == kOSTLSEventClosed && c->state != HS_BODY) {
-		/* fixes228 — retry on "peer closed before complete" which
-		 * is what CF/Google CDN does when they close a freshly
-		 * handshaked connection before we get the response.
-		 *
-		 * fixes229 — allow retry while in HS_HEADERS too. fixes228's
-		 * condition `state != HS_HEADERS` was based on a stale enum
-		 * mental model: HS_CACHEHIT shifted HS_HEADERS to value 5
-		 * (= the state we saw in every Closed-before-body fail).
-		 * Since body_bytes is always 0 in HS_HEADERS by definition
-		 * (we only count body bytes after parse_headers succeeds),
-		 * retrying from HS_HEADERS can't duplicate data. */
-		if (c->retries < HTTPS_MAX_RETRIES) {
-			c->retries++;
-			macsurf_debug_log_writef(
-				"https: RETRY %d after Closed state=%d host=%s",
-				c->retries, c->state,
-				c->host[0] ? c->host : "(unset)");
-			hctx_reset_for_retry(c);
-			return;
-		}
-		hctx_fail(c, "https: peer closed before complete");
-		return;
-	}
+	/* fixes230 — close-retry decision DEFERRED to after the Read block.
+	 * Previously this fired here, before OSTLS_Read got a chance to drain
+	 * decrypted bytes BearSSL was already holding. nginx for small
+	 * responses (404 / 304 / redirects / short bodies) sends the full
+	 * response AND close_notify in one batch; BearSSL decrypts both,
+	 * pump reports kOSTLSEventClosed, the old code retried and threw
+	 * the response away. status stayed 0, retries exhausted, FETCH_ERROR
+	 * → about:fetcherror. The new post-read check below only retries if
+	 * Read truly produced nothing (state still pre-body, status still 0). */
 
 	if (c->state == HS_TLSING) {
 		if (ev == kOSTLSEventHandshakeDone ||
@@ -753,6 +738,30 @@ static void hctx_poll(struct macos9_https_ctx *c)
 			hctx_fail(c, "https: truncated body");
 			return;
 		}
+	}
+
+	/* fixes230 — close-retry, deferred from before-pump. After the Read
+	 * block has had a chance to consume pending decrypted bytes, we can
+	 * decide cleanly whether this close was "peer closed without sending
+	 * a response" (retry) or "peer closed mid-body" (handled inside the
+	 * Read block above). State == HS_BODY means parse_headers succeeded
+	 * this tick or earlier — that path is owned by the in-block check.
+	 * Any other not-yet-terminal state is genuine pre-body close. */
+	if (ev == kOSTLSEventClosed &&
+	    c->state != HS_BODY &&
+	    c->state != HS_DONE &&
+	    c->state != HS_FAIL) {
+		if (c->retries < HTTPS_MAX_RETRIES) {
+			c->retries++;
+			macsurf_debug_log_writef(
+				"https: RETRY %d after Closed state=%d host=%s",
+				c->retries, c->state,
+				c->host[0] ? c->host : "(unset)");
+			hctx_reset_for_retry(c);
+			return;
+		}
+		hctx_fail(c, "https: peer closed before complete");
+		return;
 	}
 
 	/* No-progress timeout. */
@@ -860,7 +869,9 @@ static void *macos9_https_setup(struct fetch *p, struct nsurl *u,
 	 * cache STORE side stays on (cached bodies just go unused).
 	 */
 
-	macsurf_debug_log_writef("https_setup OK host=%s port=%d path=%.40s",
+	/* macsurf_debug_log_writef supports only %d %ld %p %s %% — no precision
+	 * specifier. Print the path as a plain %s; if it's huge, so be it. */
+	macsurf_debug_log_writef("https_setup OK host=%s port=%d path=%s",
 		c->host, (int)c->port, c->path);
 	return c;
 }
