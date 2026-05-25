@@ -16,6 +16,8 @@
 #include <OpenTptInternet.h>
 #include <Movies.h>
 OTClientContextPtr macos9_ot_context = NULL;
+/* macTLS expects this symbol; aliased to our OT context after init. */
+OTClientContextPtr g_ostls_ot_context = NULL;
 #ifdef WITH_DUKTAPE
 #include "javascript/macsurf_js.h"
 #include "content/handlers/javascript/js.h"
@@ -626,6 +628,7 @@ int main(void) {
 	} else {
 		MS_LOG("InitOT OK");
 	}
+	g_ostls_ot_context = macos9_ot_context;
 	RegisterAppearanceClient();
 	MS_LOG("Appearance OK");
 

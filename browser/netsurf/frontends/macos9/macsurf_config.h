@@ -8,6 +8,6 @@
 #ifndef MACSURF_CONFIG_H
 #define MACSURF_CONFIG_H
 
-#define MACSURF_HOME_URL "http://mactrove.com/advanced.html"
+#define MACSURF_HOME_URL "https://mactrove.com/"
 
 #endif /* MACSURF_CONFIG_H */
