@@ -190,7 +190,7 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 
 ## Download
 
-Latest release: **[MacSurf 0.1a1](https://github.com/mplsllc/macsurf/releases/tag/v0.1a1)** (alpha, 2026-05-20).
+Latest release: **[MacSurf v0.5.0](https://github.com/mplsllc/macsurf/releases/tag/v0.5.0)** (2026-05-24). First numbered alpha was [v0.1a1](https://github.com/mplsllc/macsurf/releases/tag/v0.1a1) (2026-05-20).
 
 - **[MacSurf.sit](https://github.com/mplsllc/macsurf/releases/download/v0.5.0/MacSurf.sit)** (latest binary, v0.5.0), ready-to-run. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
 - Building from source: clone this repo, then on the Mac side open `browser/netsurf/frontends/macos9/MacSurf.mcp` in CodeWarrior 8 and choose Build. The earliest release ships a [BuildPack.sit](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf-BuildPack.sit) snapshot with the CW8 project pre-wired; current builds work straight from the git clone.
