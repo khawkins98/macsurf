@@ -80,6 +80,15 @@ typedef struct css_select_state {
 					    * needed by deferred (var())
 					    * resolution to reach other
 					    * sheets. Set at state init. */
+	const css_stylesheet *inline_style;
+	/* fixes264 — inline style sheet for the current element, if any.
+	 * Per-element scope: holds custom-property declarations from
+	 * style="--name: value" attributes. The select_ctx walks doc-level
+	 * sheets only; without this, var() references in author CSS that
+	 * point at element-scoped custom properties (e.g. mactrove's
+	 * background-image: var(--header-tile) where --header-tile is set
+	 * inline on a single div) couldn't be resolved. lookup_var() now
+	 * consults this when present. */
 
 	/** UA and user styles for handling revert property value. */
 	struct revert_data *revert; /* Length: CSS_ORIGIN_AUTHOR */

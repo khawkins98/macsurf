@@ -1292,6 +1292,7 @@ css_error css_select_style(css_select_ctx *ctx, void *node,
 	/* So that cascade_style can resolve deferred (var()) declarations
 	 * against custom-property tables in sibling stylesheets. */
 	state.select_ctx = ctx;
+	state.inline_style = inline_style;   /* fixes264 — see header */
 
 	/* Fetch presentational hints */
 	error = handler->node_presentational_hint(pw, node, &nhints, &hints);
