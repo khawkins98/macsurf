@@ -1,10 +1,10 @@
 # MacSurf Status
 
 **Date:** 2026-05-25
-**Engine HEAD:** fixes229
-**Current fix round:** fixes216–229 (native HTTPS + retry + dark-grey root cause)
-**Last release:** **MacSurf v0.6 "Mac OS 9, meet TLS"** (2026-05-25). Full notes: [release-notes/MacSurf-0.6.md](release-notes/MacSurf-0.6.md)
-**Last hardware-accepted:** fixes229 (2026-05-25, mactrove.com + advanced.php loading natively over TLS 1.2 on G3 iMac OS 9.1)
+**Engine HEAD:** fixes230
+**Current fix round:** fixes230 (HTTPS close-retry deferred after Read — small-response delivery fix)
+**Last release:** **MacSurf v0.6.1 "small-response fix"** (2026-05-25). Full notes: [release-notes/MacSurf-0.6.1.md](release-notes/MacSurf-0.6.1.md)
+**Last hardware-accepted:** fixes230 (2026-05-25, mactrove.com home page renders on cold boot without about-page detour)
 
 ---
 
