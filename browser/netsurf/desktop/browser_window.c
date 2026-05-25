@@ -4259,7 +4259,20 @@ nserror browser_window_schedule_reformat(struct browser_window *bw)
 	}
 
 	MS_LOG("browser_window_schedule_reformat: entry");
-	return guit->misc->schedule(0, scheduled_reformat, bw);
+	/* fixes240 — 50ms coalescing delay (was 0). The scheduler dedups
+	 * pending entries with the same callback+param, but at delay=0 each
+	 * entry fires within one poll cycle, so resource-arrival bursts
+	 * during page load produce one reformat per resource. A short
+	 * delay lets bursts coalesce into a single reformat at the burst
+	 * tail. Measured: ~44 reformats * 250 ms = ~11 s of redundant box-
+	 * tree walks on a cold mactrove load. Pre-fixes240 perceived speed
+	 * was bottlenecked here. 50 ms is short enough that interactive
+	 * actions (hover, click) still feel immediate.
+	 *
+	 * Cross-platform note: this change is generic NetSurf core but
+	 * benefits any frontend whose scheduler dedups. RISC OS, Atari,
+	 * Amiga all use the same dedup-on-insert pattern. */
+	return guit->misc->schedule(50, scheduled_reformat, bw);
 }
 
 

@@ -558,6 +558,15 @@ static void macos9_handle_activate(const EventRecord *event) {
 
 void macos9_poll(void) {
 	EventRecord ev;
+	/* fixes234a — revert sleep=0 (fixes234). On Carbon CFM, sleep=0 in
+	 * WaitNextEvent yields effectively zero quantum to the OS scheduler.
+	 * OT's notifier callbacks (which set nf_data_pending) starve, so
+	 * even though packets arrive in the network buffer, our pump can't
+	 * see them. Captured diag: pumps=570737 ot_recv_calls=553581
+	 * nodata=553495 (99.98% no-data) — pure busy-spin. Going back to
+	 * sleep=1 gives 60 Hz polling, plenty for cooperative-MT delivery
+	 * cadence. The real wins from fixes234 (READ_CHUNK=8192,
+	 * PUMP_STEPS=32) stay. */
 	if (WaitNextEvent(MACOS9_EVENT_MASK, &ev, 1, NULL)) {
 		switch (ev.what) {
 			case updateEvt:   macos9_handle_update(&ev); break;
@@ -595,6 +604,8 @@ void macos9_poll(void) {
 void macos9_poll_mouse_hover(void) {
 #ifdef __MACOS9__
 	static Point last_pt = {-1, -1};
+	static unsigned long last_dispatch_tick = 0;
+	unsigned long now;
 	WindowRef win;
 	struct gui_window *gw;
 	Point p;
@@ -606,6 +617,16 @@ void macos9_poll_mouse_hover(void) {
 	SetPortWindowPort(win);
 	GetMouse(&p);
 	if (p.h == last_pt.h && p.v == last_pt.v) return;
+	/* fixes239 — debounce hover dispatch to ~10 Hz (6 ticks at 60 Hz).
+	 * browser_window_mouse_track walks the box tree to find the node
+	 * under the cursor on every call; firing per-pixel during mouse
+	 * movement burns 1000-box walks at 60 Hz. Node-boundary crossings
+	 * are the only events that trigger html_recascade_tree (the real
+	 * expensive work), so 10 Hz is plenty for responsive :hover styling
+	 * and status-bar link preview. */
+	now = (unsigned long)TickCount();
+	if (last_dispatch_tick != 0 && (now - last_dispatch_tick) < 6) return;
+	last_dispatch_tick = now;
 	last_pt = p;
 	if (!PtInRect(p, &gw->content_rect)) return;
 	x_ns = (int)p.h - gw->content_rect.left + gw->scroll_x;
@@ -717,7 +738,16 @@ int main(void) {
 	 * and so hangs. Raise the caps so the gate never bites; the proper
 	 * fix (start-gated mfs_open) lives in macos9_http_fetcher.c. */
 	nsoption_set_int(max_fetchers, 128);
-	nsoption_set_int(max_fetchers_per_host, 16);
+	/* fixes232 — drop per-host cap from 16 to 4 so the HTTPS keep-alive
+	 * pool (fixes231) actually catches reuses. Previously 16 parallel
+	 * fetches per host meant every cold-page-load issued 16+ cold
+	 * handshakes before any could finish and seed the pool; subsequent
+	 * fetches in the same load missed the pool because everything was
+	 * already in flight. With 4 parallel max, only the first 4 are cold;
+	 * fetches 5-30 dequeue as 1-4 complete and pull warm connections
+	 * out of the pool. Net win: ~25 saved TLS handshakes per cold page
+	 * load (~18s of BearSSL ECDHE on a 233 MHz G3). */
+	nsoption_set_int(max_fetchers_per_host, 4);
 	/* fixes106 — capped memory_cache_size at 2 MB on a 16 MB partition
 	 * to keep the live-page working set out of cache contention.
 	 *
@@ -761,14 +791,20 @@ int main(void) {
 		}
 	}
 	MS_LOG("initial window created");
-	/* fixes144a -- run the font-metric diagnostic probe once after the
-	 * initial window exists so TextWidth has a valid GrafPort. Writes to
-	 * MacSurf Debug.log; no behaviour change. */
+	/* fixes247 — font probes (fixes144a / fixes153) gated behind a
+	 * startup flag, default off. They were extremely useful when
+	 * diagnosing fixes144b sub-AA glyph spacing and fixes153 gui_layout
+	 * vmetric work, but now run on every launch writing ~420 lines of
+	 * diagnostic data (~84 ms of disk I/O) before the first fetch.
+	 * Flip MACSURF_FONT_PROBE_ON_STARTUP to 1 (or pass via preprocessor)
+	 * to re-enable when investigating font issues. */
+#ifndef MACSURF_FONT_PROBE_ON_STARTUP
+#define MACSURF_FONT_PROBE_ON_STARTUP 0
+#endif
+#if MACSURF_FONT_PROBE_ON_STARTUP
 	macos9_font_metric_probe_run();
-	/* fixes153 -- dump GetFontInfo per font/size/face. Ground truth
-	 * for the gui_layout_table per-font work and the font-family
-	 * alias retry deferred since fixes145b. */
 	macos9_font_vmetric_probe_run();
+#endif
 	while (!macos9_done) macos9_poll();
 	MS_LOG("event loop exited");
 	macos9_quitting = (bool)1; netsurf_exit();

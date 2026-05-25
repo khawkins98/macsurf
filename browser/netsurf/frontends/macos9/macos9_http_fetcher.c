@@ -1003,8 +1003,12 @@ static void macos9_http_poll(lwc_string *s) {
 		 * ticks (15s at 60Hz), the proxy / origin has stalled — fail
 		 * the slot so the URL bar comes back alive and NetSurf core
 		 * hears about the failure rather than waiting silently. */
+		/* fixes239 — aligned with HTTPS NO_PROGRESS_TICKS (fixes235).
+		 * Was 900 ticks (15s); now 240 ticks (4s). HTTP traffic is
+		 * almost entirely retired by HTTPS but consistency keeps the
+		 * fail latency the same for any legacy http:// fetch. */
 		if ((c->state == MFS_HEADERS || c->state == MFS_BODY) &&
-		    (now - c->progress_ticks) > 900) {
+		    (now - c->progress_ticks) > 240) {
 			macsurf_debug_log_writef(
 				"http: timeout slot=%d state=%d body=%ld",
 				i, (int)c->state, c->body_bytes);

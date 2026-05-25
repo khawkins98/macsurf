@@ -225,12 +225,19 @@ typedef enum {
 struct stub_fetch_ctx {
 	struct fetch *parent;
 	stub_scheme scheme;
-	char path[128];
+	char path[1024];
 	bool started;
 	bool aborted;
 	bool done;
 	struct stub_fetch_ctx *r_next;
 	struct stub_fetch_ctx *r_prev;
+	/* fixes242 — dynamic body for about: pages. about:query/fetcherror
+	 * encodes the failed URL in its query string; we generate a friendly
+	 * error page with the URL embedded so users don't see the bare
+	 * white "MacSurf" page on fetch failures. body_used is the length
+	 * actually populated; 0 means use the static fallback in stub_body_for. */
+	char body_buf[2048];
+	size_t body_used;
 };
 
 static struct stub_fetch_ctx *stub_ring = NULL;
@@ -330,6 +337,15 @@ stub_body_for(const struct stub_fetch_ctx *ctx,
 		return;
 
 	case SCH_ABOUT:
+		/* fixes242 — if setup populated a dynamic body (e.g. an error
+		 * page for about:query/fetcherror), serve it. Otherwise fall
+		 * back to the generic welcome page. */
+		if (ctx->body_used > 0) {
+			*body_out = ctx->body_buf;
+			*len_out = ctx->body_used;
+			*mime_out = "text/html";
+			return;
+		}
 		*body_out = "<html><head><title>about:</title></head>"
 			    "<body><h1>MacSurf</h1></body></html>";
 		*len_out = strlen(*body_out);
@@ -413,6 +429,61 @@ stub_setup_scheme(struct fetch *parent_fetch, struct nsurl *url,
 		copy = sizeof(ctx->path) - 1;
 	memcpy(ctx->path, url_str, copy);
 	ctx->path[copy] = '\0';
+
+	/* fixes242 — about:query/fetcherror gets a friendly explanation
+	 * page with the failed URL embedded, instead of the bare "MacSurf"
+	 * placeholder that confuses users. The query string carries the
+	 * failed URL as "url=..."; we extract it (URL-encoded, no decode
+	 * to dodge HTML-injection concerns) and embed it twice: once as
+	 * displayed text and once as a retry link. */
+	if (scheme == SCH_ABOUT &&
+	    strncmp(ctx->path, "query/fetcherror", 16) == 0) {
+		const char *url_param;
+		char failed_url[1024];
+		int rn;
+
+		failed_url[0] = '\0';
+		url_param = strstr(ctx->path, "url=");
+		if (url_param != NULL) {
+			size_t i = 0;
+			url_param += 4;   /* skip "url=" */
+			while (url_param[i] != '\0' &&
+			       url_param[i] != '&' &&
+			       i < sizeof(failed_url) - 1) {
+				failed_url[i] = url_param[i];
+				i++;
+			}
+			failed_url[i] = '\0';
+		}
+
+		rn = sprintf(ctx->body_buf,
+		    "<html><head><title>Couldn't load page</title>"
+		    "<style>body{font-family:Geneva,sans-serif;"
+		    "background:#dddddd;color:#222222;padding:48px;}"
+		    "h1{color:#003366;margin-bottom:24px;font-size:24pt;}"
+		    "p{font-size:14pt;line-height:1.5;}"
+		    "tt{background:#ffffff;padding:6px 10px;"
+		    "border:1px solid #999999;color:#003366;}"
+		    "ul{font-size:12pt;color:#444444;}"
+		    "a{color:#003366;}</style></head>"
+		    "<body><h1>Couldn't load that page.</h1>"
+		    "<p>MacSurf tried to reach:</p>"
+		    "<p><tt>%.512s</tt></p>"
+		    "<p>This usually means:</p>"
+		    "<ul>"
+		    "<li>The server didn't respond, or is offline.</li>"
+		    "<li>The site's TLS handshake rejected the connection "
+		    "(some sites block older clients).</li>"
+		    "<li>The network connection timed out.</li>"
+		    "</ul>"
+		    "<p>You can <a href=\"%.512s\">retry the same URL</a>, "
+		    "or pick another page from your bookmarks.</p>"
+		    "</body></html>",
+		    failed_url, failed_url);
+		if (rn > 0 && (size_t)rn < sizeof(ctx->body_buf)) {
+			ctx->body_used = (size_t)rn;
+		}
+	}
 
 	stub_ring_insert(ctx);
 	MS_LOG("stub setup");
