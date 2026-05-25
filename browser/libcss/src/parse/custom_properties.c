@@ -534,10 +534,18 @@ extern const css_stylesheet *css__select_ctx_sheet_at(
 
 /* Look up a name across all stylesheets in the select context. Later
  * sheets override earlier (matches source-order author cascade). When
- * ctx is NULL we fall back to origin_sheet only. */
+ * ctx is NULL we fall back to origin_sheet only.
+ *
+ * fixes264 — also consult the per-element inline_style sheet (when
+ * provided). Highest priority (CSS spec puts inline-style declarations
+ * above author cascade), so checked last — found = hit overwrites any
+ * earlier match. Lets `background-image: var(--header-tile)` in an
+ * author stylesheet resolve against `style="--header-tile: url(...)"`
+ * set inline on the matched element (mactrove's random-header bg). */
 static const css_cp_entry *lookup_var(lwc_string *name,
 		const css_stylesheet *origin_sheet,
-		const css_select_ctx *ctx)
+		const css_select_ctx *ctx,
+		const css_stylesheet *inline_sheet)
 {
 	const css_cp_entry *found;
 	const css_cp_entry *hit;
@@ -564,12 +572,19 @@ static const css_cp_entry *lookup_var(lwc_string *name,
 		found = css__sheet_find_custom_property(origin_sheet, name);
 	}
 
+	if (inline_sheet != NULL) {
+		hit = css__sheet_find_custom_property(inline_sheet, name);
+		if (hit != NULL)
+			found = hit;   /* inline wins over author cascade */
+	}
+
 	return found;
 }
 
 static css_error substitute_tokens(const css_cp_token *arr, uint32_t n,
 		const css_stylesheet *origin_sheet,
 		const css_select_ctx *ctx,
+		const css_stylesheet *inline_sheet,
 		int depth, cp_scratch *out, bool *ok)
 {
 	uint32_t i;
@@ -617,12 +632,13 @@ static css_error substitute_tokens(const css_cp_token *arr, uint32_t n,
 			}
 
 			entry = lookup_var(name_tok->idata,
-					origin_sheet, ctx);
+					origin_sheet, ctx, inline_sheet);
 			if (entry != NULL) {
 				error = substitute_tokens(
 						entry->tokens,
 						entry->n_tokens,
 						origin_sheet, ctx,
+						inline_sheet,
 						depth + 1, out, ok);
 				if (error != CSS_OK || !*ok)
 					return error;
@@ -630,6 +646,7 @@ static css_error substitute_tokens(const css_cp_token *arr, uint32_t n,
 				error = substitute_tokens(
 						arr + fb_s, fb_e - fb_s,
 						origin_sheet, ctx,
+						inline_sheet,
 						depth + 1, out, ok);
 				if (error != CSS_OK || !*ok)
 					return error;
@@ -740,7 +757,8 @@ css_error css__deferred_decl_resolve(const css_deferred_decl *dd,
 	ok = true;
 
 	error = substitute_tokens(dd->tokens, dd->n_tokens,
-			origin_sheet, ctx, 0, &scratch, &ok);
+			origin_sheet, ctx, state->inline_style,
+			0, &scratch, &ok);
 	if (error != CSS_OK) {
 		free(scratch.items);
 		return error;
