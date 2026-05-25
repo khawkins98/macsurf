@@ -89,13 +89,19 @@ struct macos9_qt_image_content {
 	 * oldest unreferenced entries until the new one fits. Evicted
 	 * entries keep their importer + compressed bytes, so a subsequent
 	 * redraw re-decodes them transparently. */
-	GraphicsImportComponent importer; /* NULL = PNG / non-deferred */
+	GraphicsImportComponent importer; /* NULL = PNG (eager OR deferred) */
 	int bitmap_w;                     /* display size of cached bitmap */
 	int bitmap_h;
 	bool wants_alpha;                 /* QT decode mode hint */
 	macos9_qt_image_content *lru_prev;
 	macos9_qt_image_content *lru_next;
 	bool in_lru;
+	/* fixes259 — deferred PNG. Mirrors the QT path: at convert time we
+	 * only run lodepng_inspect to extract dimensions; the actual decode
+	 * (full inflate + unfilter + box-filter downscale to display size)
+	 * happens on the first redraw when the layout's display dimensions
+	 * are known. Memory + paint-time box-filter wins same as QT. */
+	bool is_png_deferred;
 };
 
 /* fixes162 — global decoded image memory cache.
@@ -121,14 +127,16 @@ struct macos9_qt_image_content {
 #define MACOS9_DECODED_IMG_MAX_BYTES (32L * 1024L * 1024L)
 
 /* fixes162 — per-image hard ceiling. With display-size decode the
- * worst case is a single image filling the entire viewport, e.g.
- * 949x768 = 2.9 MB. 8 MB allows a 1448x1448 decode which is well
- * beyond any reasonable single-element display size on this
- * platform. Pages that try to decode a 4000x3000 hero at full
- * resolution still trip this gate and degrade to broken-image
- * rendering; pages that display the same image at typical content
- * widths sail through. */
-#define MACOS9_IMG_MAX_DECODED_BYTES (8L * 1024L * 1024L)
+ * worst case is a single image filling the entire viewport.
+ * fixes260 — bumped 8 MB -> 16 MB after observing mactrove's hero
+ * images request 1241x1754 display (~8.7 MB) and getting skipped
+ * under the 8 MB cap. 16 MB now covers ~2000x2000 displays. Pages
+ * trying to decode a true 4000x3000 hero at full resolution still
+ * trip this and degrade to broken-image; pages at typical content
+ * widths sail through. Cap stays well under the global 32 MB
+ * MACOS9_DECODED_IMG_MAX_BYTES so one outsize image can't starve
+ * the LRU. */
+#define MACOS9_IMG_MAX_DECODED_BYTES (16L * 1024L * 1024L)
 
 /* fixes162 — LRU list of all decoded macos9_qt_image_content
  * entries. lru_head is MRU (most recently redrawn), lru_tail is LRU
@@ -584,6 +592,163 @@ macos9_qt_decode_to_bitmap(GraphicsImportComponent gi,
 extern void macos9_bitmap_set_mask(void *bitmap, unsigned char *mask,
 		int mask_rowbytes);
 
+/* fixes259 — decode PNG at native via lodepng, then box-filter
+ * downscale to (target_w, target_h) into a single NetSurf bitmap +
+ * matching 1-bit mask. If target dims match native (or upscale would
+ * be needed), produces a 1:1 copy (no downscale work). Caller is
+ * responsible for releasing the bitmap when done.
+ *
+ * This is the deferred-PNG equivalent of the QT path's display-size
+ * decode (fixes162). The native RGBA buffer is allocated, populated,
+ * box-filtered, and freed all inside this function so the caller never
+ * holds the native-resolution buffer. */
+static nserror
+macos9_png_decode_target(const unsigned char *data, size_t size,
+		int target_w, int target_h,
+		void **out_bitmap)
+{
+	unsigned char *rgba;
+	unsigned src_w, src_h;
+	unsigned lerr;
+	LodePNGState state;
+	void *bm;
+	unsigned char *dst_buf;
+	unsigned char *mask;
+	long row_bytes;
+	int mask_rowbytes;
+	int dst_w, dst_h;
+	int dy, dx;
+
+	*out_bitmap = NULL;
+
+	rgba = NULL;
+	src_w = 0;
+	src_h = 0;
+	lodepng_state_init(&state);
+	state.info_raw.colortype  = LCT_RGBA;
+	state.info_raw.bitdepth   = 8;
+	state.decoder.ignore_crc  = 1;
+	state.decoder.zlibsettings.ignore_adler32 = 1;
+	lerr = lodepng_decode(&rgba, &src_w, &src_h, &state, data, size);
+	lodepng_state_cleanup(&state);
+	if (lerr != 0 || rgba == NULL) {
+		macsurf_debug_log_writef("png decode_target: lodepng err=%ld",
+				(long)lerr);
+		if (rgba != NULL) free(rgba);
+		return NSERROR_INVALID;
+	}
+	if (src_w == 0 || src_h == 0) {
+		free(rgba);
+		return NSERROR_INVALID;
+	}
+
+	/* Clamp target to <= native (upscale stays at native for QuickDraw
+	 * to handle via CopyBits; pre-upscaling here would only waste CPU
+	 * and degrade quality). */
+	dst_w = target_w;
+	dst_h = target_h;
+	if (dst_w <= 0 || dst_w > (int)src_w) dst_w = (int)src_w;
+	if (dst_h <= 0 || dst_h > (int)src_h) dst_h = (int)src_h;
+
+	bm = guit->bitmap->create(dst_w, dst_h, BITMAP_CLEAR);
+	if (bm == NULL) {
+		free(rgba);
+		return NSERROR_NOMEM;
+	}
+	dst_buf = (unsigned char *)guit->bitmap->get_buffer(bm);
+	row_bytes = (long)guit->bitmap->get_rowstride(bm);
+	if (dst_buf == NULL || row_bytes <= 0) {
+		free(rgba);
+		guit->bitmap->destroy(bm);
+		return NSERROR_NOMEM;
+	}
+
+	mask_rowbytes = ((dst_w + 15) / 16) * 2;
+	mask = calloc((size_t)mask_rowbytes * (size_t)dst_h, 1);
+	if (mask == NULL) {
+		free(rgba);
+		guit->bitmap->destroy(bm);
+		return NSERROR_NOMEM;
+	}
+
+	if (dst_w == (int)src_w && dst_h == (int)src_h) {
+		/* 1:1 — straight per-pixel copy + mask build. */
+		unsigned row, col;
+		for (row = 0; row < src_h; row++) {
+			unsigned char *src_row = rgba + (long)row * src_w * 4;
+			unsigned char *dst_row = dst_buf + (long)row * row_bytes;
+			unsigned char *mask_row = mask + (long)row * mask_rowbytes;
+			for (col = 0; col < src_w; col++) {
+				dst_row[col * 4 + 0] = src_row[col * 4 + 0];
+				dst_row[col * 4 + 1] = src_row[col * 4 + 1];
+				dst_row[col * 4 + 2] = src_row[col * 4 + 2];
+				dst_row[col * 4 + 3] = src_row[col * 4 + 3];
+				if (src_row[col * 4 + 3] >= 8) {
+					mask_row[col >> 3] |= (unsigned char)
+						(0x80 >> (col & 7));
+				}
+			}
+		}
+	} else {
+		/* Downscale via box-filter: each dst pixel averages a
+		 * (sx × sy) source block. Integer Q8 ratios. */
+		long sx_q8 = ((long)src_w << 8) / dst_w;
+		long sy_q8 = ((long)src_h << 8) / dst_h;
+		for (dy = 0; dy < dst_h; dy++) {
+			long sy0 = (long)dy * sy_q8;
+			long sy1 = sy0 + sy_q8;
+			int sy_start = (int)(sy0 >> 8);
+			int sy_end   = (int)((sy1 + 255) >> 8);
+			unsigned char *dst_row = dst_buf + (long)dy * row_bytes;
+			unsigned char *mask_row = mask + (long)dy * mask_rowbytes;
+			if (sy_end > (int)src_h) sy_end = (int)src_h;
+			if (sy_start >= sy_end) sy_start = sy_end - 1;
+			for (dx = 0; dx < dst_w; dx++) {
+				long sx0 = (long)dx * sx_q8;
+				long sx1 = sx0 + sx_q8;
+				int sx_start = (int)(sx0 >> 8);
+				int sx_end   = (int)((sx1 + 255) >> 8);
+				long r_acc = 0, g_acc = 0, b_acc = 0;
+				long a_acc = 0, n_acc = 0;
+				int sy, sx;
+				if (sx_end > (int)src_w) sx_end = (int)src_w;
+				if (sx_start >= sx_end) sx_start = sx_end - 1;
+				for (sy = sy_start; sy < sy_end; sy++) {
+					unsigned char *p = rgba +
+						(long)sy * src_w * 4 +
+						(long)sx_start * 4;
+					for (sx = sx_start; sx < sx_end; sx++) {
+						r_acc += p[0];
+						g_acc += p[1];
+						b_acc += p[2];
+						a_acc += p[3];
+						n_acc++;
+						p += 4;
+					}
+				}
+				if (n_acc > 0) {
+					dst_row[dx * 4 + 0] = (unsigned char)(r_acc / n_acc);
+					dst_row[dx * 4 + 1] = (unsigned char)(g_acc / n_acc);
+					dst_row[dx * 4 + 2] = (unsigned char)(b_acc / n_acc);
+					dst_row[dx * 4 + 3] = (unsigned char)(a_acc / n_acc);
+					if ((a_acc / n_acc) >= 8) {
+						mask_row[dx >> 3] |= (unsigned char)
+							(0x80 >> (dx & 7));
+					}
+				}
+			}
+		}
+	}
+
+	free(rgba);
+
+	guit->bitmap->set_opaque(bm, false);
+	macos9_bitmap_set_mask(bm, mask, mask_rowbytes);
+
+	*out_bitmap = bm;
+	return NSERROR_OK;
+}
+
 static nserror
 macos9_png_decode_to_bitmap(const unsigned char *data, size_t size,
 		void **out_bitmap, int *out_w, int *out_h)
@@ -600,13 +765,24 @@ macos9_png_decode_to_bitmap(const unsigned char *data, size_t size,
 	unsigned char *src_row;
 	unsigned char *dst_row;
 	unsigned char *mask_row;
+	LodePNGState state;
 
 	*out_bitmap = NULL;
 
 	rgba = NULL;
 	w = 0;
 	h = 0;
-	lerr = lodepng_decode32(&rgba, &w, &h, data, size);
+	/* fixes258 — skip CRC32 + Adler32 validation. On a 233 MHz G3,
+	 * those per-byte checksums add ~5-15% to PNG decode time for no
+	 * benefit on trusted-source images. lodepng_decode32 doesn't
+	 * expose state controls, so use the full lodepng_decode API. */
+	lodepng_state_init(&state);
+	state.info_raw.colortype  = LCT_RGBA;
+	state.info_raw.bitdepth   = 8;
+	state.decoder.ignore_crc  = 1;
+	state.decoder.zlibsettings.ignore_adler32 = 1;
+	lerr = lodepng_decode(&rgba, &w, &h, &state, data, size);
+	lodepng_state_cleanup(&state);
 	if (lerr != 0 || rgba == NULL) {
 		/* fixes160b — was "%u"; minimal formatter prints %u
 		 * literally without consuming the va_arg. Use %ld. */
@@ -783,43 +959,38 @@ macos9_qt_image_convert(struct content *c)
 				return false;
 			}
 		}
-		bw = 0;
-		bh = 0;
-		err = macos9_png_decode_to_bitmap(src_bytes,
-				(size_t)src_size, &qti->bitmap, &bw, &bh);
+		/* fixes259 — defer PNG decode to redraw time, mirror the QT
+		 * path (fixes162). At convert we already have the natural
+		 * dimensions from macos9_png_read_dims above; we don't decode
+		 * pixels here. qti->compressed stays alive until first redraw
+		 * decodes at display size with on-the-fly box-filter downscale.
+		 * Same total CPU as before (PNG can't truly partial-decode),
+		 * but page-load latency drops because the parse → layout phase
+		 * doesn't block on N PNG decodes, and memory drops because we
+		 * never materialise the native-resolution buffer in long-term
+		 * storage. */
 		HUnlock(qti->compressed);
-		DisposeHandle(qti->compressed);
-		qti->compressed = NULL;
-		if (err != NSERROR_OK || qti->bitmap == NULL) {
-			MS_LOG("img convert: lodepng FAIL");
-			{
-				extern long macsurf__site_img_fail;
-				macsurf__site_img_fail++;
-			}
-			content_broadcast_error(c, err, NULL);
-			return false;
-		}
+		bw = gate_w;
+		bh = gate_h;
+		qti->is_png_deferred = true;
+		qti->wants_alpha = true;   /* PNG path always builds 1-bit mask */
+		qti->bitmap_w = 0;
+		qti->bitmap_h = 0;
 		c->width = bw;
 		c->height = bh;
-		/* fixes161b — record decoded bytes for symmetric decrement. */
+		macsurf_debug_log_writef(
+			"img convert: %dx%d png, deferred to redraw",
+			bw, bh);
 		{
-			extern long macsurf__decoded_img_bytes_current;
-			extern long macsurf__site_decoded_img_bytes_peak;
-			qti->decoded_bytes = (long)bw * (long)bh * 4L;
-			macsurf__decoded_img_bytes_current += qti->decoded_bytes;
-			if (macsurf__decoded_img_bytes_current >
-					macsurf__site_decoded_img_bytes_peak) {
-				macsurf__site_decoded_img_bytes_peak =
-					macsurf__decoded_img_bytes_current;
-			}
+			extern long macsurf__site_img_ok;
+			macsurf__site_img_ok++;
 		}
-		macsurf_debug_log_writef("img decoded via lodepng %dx%d",
-				bw, bh);
 		content_set_ready(c);
 		content_set_done(c);
 		content_set_status(c, "");
 		return true;
 	}
+	/* (non-PNG falls through to the QT importer path below) */
 
 	wants_alpha = macos9_qt_format_has_alpha(src_bytes, src_size);
 	HUnlock(qti->compressed);
@@ -990,7 +1161,87 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 	 * decode wouldn't fit even with everything evicted (single
 	 * oversize image), we skip and the plot below no-ops on bitmap
 	 * NULL. */
-	if (qti->importer != NULL) {
+	/* fixes259 — PNG-deferred decode + display-size box-filter. Mirror
+	 * the QT-deferred branch below. The compressed PNG bytes are kept
+	 * alive in qti->compressed since fixes259's convert path. */
+	if (qti->is_png_deferred) {
+		bool needs_decode;
+		needs_decode = (qti->bitmap == NULL) ||
+				(qti->bitmap_w != dst_w) ||
+				(qti->bitmap_h != dst_h);
+		if (needs_decode && dst_w > 0 && dst_h > 0 &&
+		    qti->compressed != NULL) {
+			nserror derr;
+			long need_bytes;
+			extern long macsurf__decoded_img_bytes_current;
+			extern long macsurf__site_decoded_img_bytes_peak;
+
+			if (qti->bitmap != NULL) {
+				if (guit != NULL && guit->bitmap != NULL &&
+				    guit->bitmap->destroy != NULL) {
+					guit->bitmap->destroy(qti->bitmap);
+				}
+				qti->bitmap = NULL;
+				if (macsurf__decoded_img_bytes_current >=
+				    qti->decoded_bytes) {
+					macsurf__decoded_img_bytes_current -=
+						qti->decoded_bytes;
+				} else {
+					macsurf__decoded_img_bytes_current = 0;
+				}
+				macos9_qti_lru_total_bytes -=
+					qti->decoded_bytes;
+				if (macos9_qti_lru_total_bytes < 0) {
+					macos9_qti_lru_total_bytes = 0;
+				}
+				macos9_qti_lru_unlink(qti);
+				qti->decoded_bytes = 0;
+			}
+
+			need_bytes = (long)dst_w * (long)dst_h * 4L;
+			if (need_bytes > MACOS9_IMG_MAX_DECODED_BYTES) {
+				macsurf_debug_log_writef(
+					"img skip: per-image ceiling png %dx%d",
+					dst_w, dst_h);
+				return true;
+			}
+			if (!macos9_qti_lru_make_room(need_bytes)) {
+				macsurf_debug_log_writef(
+					"img skip: cache cap exceeded png %dx%d",
+					dst_w, dst_h);
+				return true;
+			}
+
+			HLock(qti->compressed);
+			derr = macos9_png_decode_target(
+					(const unsigned char *)*qti->compressed,
+					(size_t)GetHandleSize(qti->compressed),
+					dst_w, dst_h, &qti->bitmap);
+			HUnlock(qti->compressed);
+			if (derr != NSERROR_OK || qti->bitmap == NULL) {
+				MS_LOG("img redraw: png decode FAIL");
+				qti->bitmap = NULL;
+				return true;
+			}
+
+			qti->bitmap_w = dst_w;
+			qti->bitmap_h = dst_h;
+			qti->decoded_bytes = need_bytes;
+			macsurf__decoded_img_bytes_current += need_bytes;
+			macos9_qti_lru_total_bytes += need_bytes;
+			if (macsurf__decoded_img_bytes_current >
+			    macsurf__site_decoded_img_bytes_peak) {
+				macsurf__site_decoded_img_bytes_peak =
+					macsurf__decoded_img_bytes_current;
+			}
+			macos9_qti_lru_insert_mru(qti);
+			macsurf_debug_log_writef(
+				"img decoded@display png %dx%d -> %ld bytes",
+				dst_w, dst_h, need_bytes);
+		} else if (qti->bitmap != NULL) {
+			macos9_qti_lru_touch(qti);
+		}
+	} else if (qti->importer != NULL) {
 		bool needs_decode;
 		needs_decode = (qti->bitmap == NULL) ||
 				(qti->bitmap_w != dst_w) ||

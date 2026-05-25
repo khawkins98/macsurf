@@ -91,6 +91,7 @@ long macsurf__site_decoded_img_skip_budget = 0;
 #include <Script.h>
 #include <DateTimeUtils.h>
 #include <OSUtils.h>
+#include <Events.h>   /* fixes233 — TickCount() for log timestamps */
 
 /*
  * CW8's Folders.h generally defines these, but be defensive -- the
@@ -136,6 +137,11 @@ static int   g_log_open = 0;
 #include <stdio.h>
 
 #endif
+
+/* fixes261 — forward declaration so log_close / log_flush can call
+ * the buffer-flush helper before its definition (which lives near the
+ * log_write impl that owns the buffer). */
+static void macsurf_debug_log_buffer_flush(void);
 
 /* ------------------------------------------------------------------
  * Minimal formatter
@@ -337,9 +343,39 @@ macsurf_debug_log_close(void)
 #ifdef __MACOS9__
 	if (!g_log_open) return;
 	macsurf_debug_log_write("---- macsurf_debug_log_close ----");
+	macsurf_debug_log_buffer_flush();   /* fixes261 */
 	(void)FSClose(g_log_ref);
 	g_log_ref = 0;
 	g_log_open = 0;
+#endif
+}
+
+/* fixes261 — buffered log writes. Each MS_LOG previously fired 3
+ * separate FSWrite calls (timestamp, message, CR) at ~100-200 us
+ * Toolbox overhead each. ~3000 lines per cold load = ~1 s of FSWrite
+ * wall-clock. Buffering to 4 KB chunks collapses that to ~10 FSWrites
+ * total per load (~2 ms). Flush triggers: buffer full, or explicit
+ * macsurf_debug_log_flush (still calls FlushVol after for crash
+ * durability checkpoint), or session close.
+ *
+ * The buffer is line-oriented at append: we accumulate timestamp + msg
+ * + CR for each call, never splitting a line across two flushes. If
+ * the line would overflow, we flush what's there first, then write
+ * the new line. Pathologically-long messages (>buffer cap) write
+ * directly via FSWrite, bypassing the buffer. */
+#define LOG_BUF_CAP 4096
+static char g_log_buf[LOG_BUF_CAP];
+static long g_log_buf_pos = 0;
+
+static void
+macsurf_debug_log_buffer_flush(void)
+{
+#ifdef __MACOS9__
+	long count;
+	if (!g_log_open || g_log_buf_pos <= 0) return;
+	count = g_log_buf_pos;
+	(void)FSWrite(g_log_ref, &count, g_log_buf);
+	g_log_buf_pos = 0;
 #endif
 }
 
@@ -349,17 +385,111 @@ macsurf_debug_log_write(const char *msg)
 #ifdef __MACOS9__
 	long count;
 	size_t mlen;
+	char tbuf[20];
+	int tlen;
+	long line_total;
+	static unsigned long t0_ticks = 0;
+	unsigned long now;
 
 	if (!g_log_open || msg == NULL) return;
 
+	/* fixes250 — silence the layout-engine debug spam by default.
+	 * Cold mactrove loads produced ~7300 LAYOUTPHASE/MCOL/FLEXPHASE
+	 * lines per page (80% of total log volume), costing ~700-900 ms
+	 * of FSWrite overhead on real hardware. Re-enable with
+	 * MACSURF_VERBOSE_LAYOUT_LOG defined at compile time. */
+#ifndef MACSURF_VERBOSE_LAYOUT_LOG
+	if ((msg[0] == 'L' && strncmp(msg, "LAYOUTPHASE", 11) == 0) ||
+	    (msg[0] == 'M' && strncmp(msg, "MCOL", 4) == 0) ||
+	    (msg[0] == 'F' && strncmp(msg, "FLEXPHASE", 9) == 0)) {
+		return;
+	}
+#endif
+
+	/* fixes251 — silence the per-paint-element diagnostic spam. After
+	 * fixes250 silenced layout debug, the new top categories were
+	 * plot_rect[N] (1919/cold-load), plot_text[N] (549), svg_box (152),
+	 * slot[N] (142), GRADIENT (115), svg_shape (92). All per-element
+	 * paint or per-CSS-slot diagnostics, useful when debugging the
+	 * renderer/cascade, useless during normal operation. ~3000 more
+	 * lines saved per cold load. Re-enable with MACSURF_VERBOSE_PAINT_LOG. */
+#ifndef MACSURF_VERBOSE_PAINT_LOG
+	if ((msg[0] == 'p' &&
+	     (strncmp(msg, "plot_rect[", 10) == 0 ||
+	      strncmp(msg, "plot_text[", 10) == 0)) ||
+	    (msg[0] == 's' &&
+	     (strncmp(msg, "svg_box:", 8) == 0 ||
+	      strncmp(msg, "svg_shape:", 10) == 0 ||
+	      strncmp(msg, "svg_walk_enter:", 15) == 0 ||
+	      strncmp(msg, "svg_paint:", 10) == 0 ||
+	      strncmp(msg, "slot[", 5) == 0)) ||
+	    (msg[0] == 'G' && strncmp(msg, "GRADIENT", 8) == 0)) {
+		return;
+	}
+#endif
+
+	/* fixes253 — silence redraw entry context and gui-event spam. Each
+	 * redraw produces three "update:" lines (bw=, redraw_ready, and
+	 * bw_redraw done); the third has the actual walker counters and
+	 * is the only one operationally useful. gw_event: fires per
+	 * NetSurf-core GUI event (~200/cold-load). LAYOUT_CRUMB and SITE
+	 * url= are per-layout-document markers. All useful for debugging
+	 * navigation/redraw issues, not during normal use. ~600 more lines
+	 * saved per cold load. Re-enable with MACSURF_VERBOSE_REDRAW_LOG. */
+#ifndef MACSURF_VERBOSE_REDRAW_LOG
+	if (msg[0] == 'u' && strncmp(msg, "update: ", 8) == 0) {
+		/* Keep "update: bw_redraw done ..." (carries walker counters);
+		 * drop "update: bw=..." and "update: redraw_ready, ...". */
+		if (strncmp(msg + 8, "bw_redraw done", 14) != 0) return;
+	}
+	if (msg[0] == 'g' && strncmp(msg, "gw_event: e=", 12) == 0) return;
+	if (msg[0] == 'L' && strncmp(msg, "LAYOUT_CRUMB", 12) == 0) return;
+	if (msg[0] == 'S' && strncmp(msg, "SITE url=", 9) == 0) return;
+#endif
+
+	/* fixes233 — prepend ms-since-first-log to every line so we can
+	 * see where the wall-clock seconds actually go. TickCount is 60 Hz
+	 * on OS 9; multiply by 1000/60 = 17 (close enough) for a rough ms
+	 * approximation, or print raw ticks and let the reader divide. We
+	 * print raw ticks: smaller field, no math, exact. */
+	now = (unsigned long)TickCount();
+	if (t0_ticks == 0) t0_ticks = now;
+	tlen = sprintf(tbuf, "[%lu] ", now - t0_ticks);
+	if (tlen < 0) tlen = 0;
+
 	mlen = strlen(msg);
-	if (mlen > 0) {
-		count = (long)mlen;
-		(void)FSWrite(g_log_ref, &count, msg);
+	line_total = (long)tlen + (long)mlen + 1;   /* +1 for trailing CR */
+
+	/* fixes261 — buffered append. If the line fits, copy into buffer
+	 * (no FSWrite). If not, flush what's there and either re-buffer
+	 * or, for pathologically long lines, FSWrite straight through. */
+	if (line_total > LOG_BUF_CAP) {
+		macsurf_debug_log_buffer_flush();
+		if (tlen > 0) {
+			count = (long)tlen;
+			(void)FSWrite(g_log_ref, &count, tbuf);
+		}
+		if (mlen > 0) {
+			count = (long)mlen;
+			(void)FSWrite(g_log_ref, &count, msg);
+		}
+		count = 1;
+		(void)FSWrite(g_log_ref, &count, "\r");
+		return;
 	}
 
-	count = 1;
-	(void)FSWrite(g_log_ref, &count, "\r");
+	if (g_log_buf_pos + line_total > LOG_BUF_CAP) {
+		macsurf_debug_log_buffer_flush();
+	}
+	if (tlen > 0) {
+		memcpy(g_log_buf + g_log_buf_pos, tbuf, (size_t)tlen);
+		g_log_buf_pos += tlen;
+	}
+	if (mlen > 0) {
+		memcpy(g_log_buf + g_log_buf_pos, msg, mlen);
+		g_log_buf_pos += (long)mlen;
+	}
+	g_log_buf[g_log_buf_pos++] = '\r';
 
 	/*
 	 * fixes96 — per-write FlushVol REMOVED. It was synchronously
@@ -391,6 +521,7 @@ macsurf_debug_log_flush(void)
 {
 #ifdef __MACOS9__
 	if (!g_log_open) return;
+	macsurf_debug_log_buffer_flush();   /* fixes261 */
 	if (g_log_vref != 0) (void)FlushVol(NULL, g_log_vref);
 #endif
 }

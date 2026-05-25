@@ -714,6 +714,8 @@ attach MacsBug to.
 
 MacSurf is built on Linux but target-tested on real OS 9 hardware. SheepShaver (an OS 9 emulator) is a useful *partial* substitute, **not a full one**.
 
+**Confirmed-running on SheepShaver:** OS **9.0.4** runs MacSurf well as of 2026-05-25 — full Carbon init, UI smoke, navigation, and rendering all work. Networking is the limitation: SheepShaver's OT TCP can't reach the live internet without manual ethernet config, so HTTPS fetches hit `NO_PROGRESS_TICKS` and route to about:fetcherror. Good for build-smoke gating; not a substitute for hardware-side fetcher testing. (To be mentioned in v0.6.2 release notes.)
+
 - **SheepShaver setup lives at** `/home/patrick/Webs/MAC/sheepshaver/`, shared folder at `shared/`, prefs at `prefs`, Xvfb on `:99`. Shared folder uses `.finf/` (32-byte FInfo per file) + `.rsrc/` (raw resource fork) sidecars for Mac metadata.
 - **Run the SheepShaver AppImage** from `/tmp/squashfs-root/AppRun` with `DISPLAY=:99 APPIMAGE=/tmp/squashfs-root HOME=/home/patrick`.
 - **Decode a .hqx build into the shared folder** with `/tmp/binhex_decode.py <hqx> <shared-folder>`. Writes the file + `.finf/<name>` + `.rsrc/<name>` with correct APPL/MPLS type/creator and the full cfrg/carb/SIZE resource fork.

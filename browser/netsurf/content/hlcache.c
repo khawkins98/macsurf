@@ -401,9 +401,11 @@ static nserror hlcache_migrate_ctx(hlcache_retrieval_ctx *ctx,
 		/* Ensure caller knows we need data */
 		error = NSERROR_NEED_DATA;
 	} else {
-		static long unaccept_count = 0;
-		unaccept_count++;
-		macsurf_debug_log_int("unaccept #", unaccept_count);
+		/* fixes245 — silenced unaccept counter. Was useful during early
+		 * content-handler wiring; now zero diagnostic value to users
+		 * and was leaking to the title bar in some builds. The error
+		 * dispatch below still fires normally so NetSurf core handles
+		 * the unacceptable-type case correctly. */
 		/* Unacceptable type: report error */
 		if (ctx->handle->cb != NULL) {
 			hlcache_event hlevent;

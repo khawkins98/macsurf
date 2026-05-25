@@ -221,7 +221,16 @@ void macos9_cache_store(const char *url, int status, const char *mime,
 	FSWrite(ref, &count, body_ptr);
 	SetEOF(ref, (long)sizeof(hdr) + (long)mime_len + body_len);
 	FSClose(ref);
-	(void)FlushVol(NULL, vRef);
+	/* fixes248 — FlushVol REMOVED. Same rationale as fixes96 on the
+	 * log writer: synchronous volume flush costs 10-50 ms per call on
+	 * real hardware, and with ~20 cache stores per cold mactrove load
+	 * that was 200-1000 ms of pure disk-sync wait between sub-resource
+	 * deliveries. HFS's normal write cache flushes on its own cadence,
+	 * and the macsurf_debug_log's session-close FlushVol catches any
+	 * remaining buffered writes at app quit. Worst case if the app
+	 * crashes: a few cache files may be partially written and fail the
+	 * magic check at next lookup — which is exactly the "miss" path
+	 * (refetch from network). No data corruption risk. */
 
 	macsurf_debug_log_writef(
 		"CACHE store url=%s mime=%s len=%ld",
@@ -334,5 +343,128 @@ int macos9_cache_lookup(const char *url, char **body_out,
 	(void)url; (void)body_out; (void)body_len_out;
 	(void)mime_out; (void)mime_cap; (void)status_out;
 	return 0;
+#endif
+}
+
+/* fixes238 — dead-host file persistence. File "deadhosts.txt" lives in
+ * the same MacSurf Cache folder as the body cache. Plain text, one
+ * "host:port" entry per line. */
+
+long macos9_deadhost_load(char *out_buf, long buf_cap)
+{
+#ifdef __MACOS9__
+	OSErr err;
+	short vRef;
+	long dirID;
+	FSSpec spec;
+	unsigned char fname[16];
+	short ref = 0;
+	long count;
+	const char *name = "deadhosts.txt";
+	size_t nlen;
+
+	if (out_buf == NULL || buf_cap <= 0) return 0;
+	out_buf[0] = '\0';
+
+	err = cache_dir_get(&vRef, &dirID);
+	if (err != noErr) return 0;
+
+	nlen = strlen(name);
+	if (nlen > 15) nlen = 15;
+	fname[0] = (unsigned char)nlen;
+	memcpy(fname + 1, name, nlen);
+
+	err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+	if (err != noErr) return 0;
+	if (FSpOpenDF(&spec, fsRdPerm, &ref) != noErr) return 0;
+
+	count = buf_cap - 1;
+	if (FSRead(ref, &count, out_buf) != noErr && count == 0) {
+		FSClose(ref);
+		return 0;
+	}
+	FSClose(ref);
+	if (count < 0) count = 0;
+	if (count >= buf_cap) count = buf_cap - 1;
+	out_buf[count] = '\0';
+	macsurf_debug_log_writef(
+		"deadhost LOAD count=%ld bytes", count);
+	return count;
+#else
+	(void)out_buf; (void)buf_cap;
+	return 0;
+#endif
+}
+
+void macos9_deadhost_save(const char *buf, long len)
+{
+#ifdef __MACOS9__
+	OSErr err;
+	short vRef;
+	long dirID;
+	FSSpec spec;
+	unsigned char fname[16];
+	short ref = 0;
+	long count;
+	const char *name = "deadhosts.txt";
+	size_t nlen;
+
+	if (buf == NULL || len < 0) return;
+
+	err = cache_dir_get(&vRef, &dirID);
+	if (err != noErr) return;
+
+	nlen = strlen(name);
+	if (nlen > 15) nlen = 15;
+	fname[0] = (unsigned char)nlen;
+	memcpy(fname + 1, name, nlen);
+
+	err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+	if (err == fnfErr) {
+		err = FSpCreate(&spec, '????', '????', smSystemScript);
+		if (err != noErr) return;
+		err = FSMakeFSSpec(vRef, dirID, fname, &spec);
+		if (err != noErr) return;
+	} else if (err != noErr) {
+		return;
+	}
+
+	if (FSpOpenDF(&spec, fsWrPerm, &ref) != noErr) return;
+	(void)SetEOF(ref, 0);
+
+	if (len > 0) {
+		count = len;
+		(void)FSWrite(ref, &count, buf);
+	}
+	SetEOF(ref, len);
+	FSClose(ref);
+	(void)FlushVol(NULL, vRef);
+	macsurf_debug_log_writef(
+		"deadhost SAVE len=%ld", len);
+#else
+	(void)buf; (void)len;
+#endif
+}
+
+void macos9_deadhost_clear(void)
+{
+#ifdef __MACOS9__
+	OSErr err;
+	short vRef;
+	long dirID;
+	FSSpec spec;
+	unsigned char fname[16];
+	const char *name = "deadhosts.txt";
+	size_t nlen;
+
+	err = cache_dir_get(&vRef, &dirID);
+	if (err != noErr) return;
+	nlen = strlen(name);
+	if (nlen > 15) nlen = 15;
+	fname[0] = (unsigned char)nlen;
+	memcpy(fname + 1, name, nlen);
+	if (FSMakeFSSpec(vRef, dirID, fname, &spec) == noErr) {
+		(void)FSpDelete(&spec);
+	}
 #endif
 }

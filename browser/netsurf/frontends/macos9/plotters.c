@@ -1261,9 +1261,17 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 	}
 
 	/* fixes221 — kill switch for fixes203's box-filter pre-downscale.
-	 * Set MACSURF_BOX_FILTER_DOWNSCALE = 0 to disable and revert to
-	 * pure QuickDraw nearest-neighbor scaling (the pre-fixes203
-	 * behaviour). Useful for bisecting whether the box-filter swap-
+	 * fixes257 — flipped ON. The dark-grey-wash investigation that
+	 * caused fixes221 to disable this turned out to be a separate bug
+	 * (fixes225, inset box-shadow). Box-filter is the right call for
+	 * downscale: CopyMask's nearest-neighbor 1-bit mask scaling drops
+	 * pixels on non-integer ratios, producing the "faded" look that
+	 * has plagued every PNG with transparency since fixes128. With
+	 * box-filter pre-downscaling, the destination receives a properly
+	 * averaged mask that doesn't lose pixels — image is sharper AND
+	 * not faded.
+	 * Set MACSURF_BOX_FILTER_DOWNSCALE = 0 to revert to pure QuickDraw
+	 * nearest-neighbor scaling (the pre-fixes203
 	 * the-GWorld path is darkening unrelated pixels through some
 	 * QuickDraw state leak. fixes221 ships with this DISABLED so the
 	 * user can confirm whether box-filter is the dark-grey culprit.
@@ -1271,7 +1279,7 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 	 * we need a narrower fix that keeps the rainbow-streak repair
 	 * without the side effect. Flip to 1 to restore. */
 #ifndef MACSURF_BOX_FILTER_DOWNSCALE
-#define MACSURF_BOX_FILTER_DOWNSCALE 0
+#define MACSURF_BOX_FILTER_DOWNSCALE 1
 #endif
 
 	/* fixes203 — box-filter pre-downscale for high-quality image
@@ -1299,8 +1307,14 @@ macos9_plot_bitmap(const struct redraw_context *ctx,
 				(((long)bw << 8) / (long)width);
 		long sy_ratio_q8 = (long)height <= 0 ? 0 :
 				(((long)bh << 8) / (long)height);
+		/* fixes257 — threshold lowered from 3× to 1.5× (q8 = 384).
+		 * Below 1.5× the box-filter cost outweighs the visual win
+		 * (and the CopyMask fade is mild). Above 1.5× the fade is
+		 * visible and box-filter is a clear improvement. mactrove's
+		 * 1058x245 logo at 400x92 is 2.6× — under the old 3× gate
+		 * it stayed faded; under 1.5× it pre-downscales sharply. */
 		if (MACSURF_BOX_FILTER_DOWNSCALE &&
-				(sx_ratio_q8 >= (3L << 8) || sy_ratio_q8 >= (3L << 8)) &&
+				(sx_ratio_q8 >= (3L * 128L) || sy_ratio_q8 >= (3L * 128L)) &&
 				width >= 4 && height >= 4) {
 			GWorldPtr gw_small = NULL;
 			Rect small_rect;

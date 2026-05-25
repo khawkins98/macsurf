@@ -44,4 +44,21 @@ int macos9_cache_lookup(const char *url, char **body_out,
 void macos9_cache_store(const char *url, int status, const char *mime,
                         const char *body_ptr, long body_len);
 
+/* fixes238 — persistent dead-host list. The HTTPS fetcher's in-memory
+ * blocklist (host:port that timed out or peer-closed) is wiped on app
+ * restart, so the first attempt to fonts.googleapis.com (or any other
+ * fingerprint-blocked host) pays the full no-progress timeout on every
+ * cold launch. These helpers serialise that list to a plain-text file
+ * in the cache folder so subsequent sessions skip the timeout entirely.
+ *
+ * Format: one "host:port" per line, terminated by '\n'. Empty lines
+ * ignored. No timestamp / TTL — call macos9_deadhost_clear() to forget.
+ *
+ * macos9_deadhost_load fills out_buf with the file contents, NUL-
+ * terminated. Returns bytes read (excluding NUL), 0 on miss or error.
+ * macos9_deadhost_save writes len bytes verbatim. */
+long macos9_deadhost_load(char *out_buf, long buf_cap);
+void macos9_deadhost_save(const char *buf, long len);
+void macos9_deadhost_clear(void);
+
 #endif /* MACOS9_DISK_CACHE_H */
