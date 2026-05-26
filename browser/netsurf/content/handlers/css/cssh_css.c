@@ -2564,6 +2564,111 @@ macsurf__rewrite_calc_aspect(const char *data, size_t in_size)
 }
 
 
+/* fixes281 — fallback solid color for repeating-linear-gradient.
+ *
+ * mactrove's Platinum theme paints window title bars with
+ *   background: repeating-linear-gradient(to bottom,
+ *                 #ffffff 0, #ffffff 1px,
+ *                 #cccccc 1px, #cccccc 2px, ...);
+ * to get a horizontal 1-px-stripe pattern. fixes185's current handling
+ * is to strip the "repeating-" prefix, leaving a plain linear-gradient
+ * whose first two color stops are barely 1px apart — libcss collapses
+ * that to nearly solid white, and title bars appear empty.
+ *
+ * V1 fix: detect `repeating-linear-gradient(...)` / `repeating-radial-
+ * gradient(...)` (case-insensitive) and replace the entire call with a
+ * neutral platinum-grey hex color `#dddddd`. In the `background:`
+ * shorthand context this sets background-color, giving title bars a
+ * visible solid backdrop instead of being invisible.
+ *
+ * Trade-off: loses the striped texture but matches average tonal value
+ * and is far better than nothing. A real repeating-gradient plotter
+ * (QuickDraw pattern fill) is a separate round.
+ *
+ * In-place same-size rewrite (pads with trailing spaces). */
+static char *
+macsurf__rewrite_repeating_gradient_solid(const char *data, size_t in_size)
+{
+	char *out;
+	size_t i;
+	int changed = 0;
+
+	out = (char *)malloc(in_size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, in_size);
+
+	i = 0;
+	while (i + 26 < in_size) {
+		const char *p = out + i;
+		bool match_lin = false;
+		bool match_rad = false;
+		size_t j;
+		size_t span;
+		int paren;
+		static const char LIN[] = "repeating-linear-gradient(";
+		static const char RAD[] = "repeating-radial-gradient(";
+		static const size_t REPL_LEN = 7; /* "#dddddd" */
+
+		/* Case-insensitive match for both. */
+		{
+			size_t m;
+			match_lin = true;
+			for (m = 0; m < 26; m++) {
+				char a = p[m];
+				char b = LIN[m];
+				if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+				if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+				if (a != b) { match_lin = false; break; }
+			}
+			if (!match_lin) {
+				match_rad = true;
+				for (m = 0; m < 26; m++) {
+					char a = p[m];
+					char b = RAD[m];
+					if (a >= 'A' && a <= 'Z')
+						a = (char)(a - 'A' + 'a');
+					if (b >= 'A' && b <= 'Z')
+						b = (char)(b - 'A' + 'a');
+					if (a != b) {
+						match_rad = false;
+						break;
+					}
+				}
+			}
+		}
+		if (!match_lin && !match_rad) {
+			i++;
+			continue;
+		}
+
+		/* Find matching close paren. */
+		j = i + 26;
+		paren = 1;
+		while (j < in_size && paren > 0) {
+			if (out[j] == '(') paren++;
+			else if (out[j] == ')') {
+				paren--;
+				if (paren == 0) break;
+			}
+			j++;
+		}
+		if (j >= in_size) { i++; continue; }
+
+		span = j - i + 1;
+		if (span < REPL_LEN) { i = j + 1; continue; }
+
+		/* Replace with #dddddd + spaces. */
+		memcpy(out + i, "#dddddd", REPL_LEN);
+		memset(out + i + REPL_LEN, ' ', span - REPL_LEN);
+		i = j + 1;
+		changed = 1;
+	}
+
+	if (!changed) { free(out); return NULL; }
+	return out;
+}
+
+
 /* fixes185 — modern-CSS compatibility preprocessor. Rewrites unsupported
  * modern syntax into supported equivalents (or drops it) so author CSS
  * keeps cascading instead of having rules silently dropped by libcss.
@@ -4017,6 +4122,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_grid_flow = NULL;  /* fixes275 grid-auto-flow */
 	char *rewritten_logical = NULL;    /* fixes277 logical properties */
 	char *rewritten_calc = NULL;       /* fixes280 calc() arithmetic */
+	char *rewritten_rep_grad = NULL;   /* fixes281 repeating-gradient -> solid */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -4130,6 +4236,16 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	rewritten_calc = macsurf__rewrite_calc_aspect(data, (size_t)size);
 	if (rewritten_calc != NULL) {
 		data = (const char *)rewritten_calc;
+		/* In-place same-size rewrite. */
+	}
+
+	/* fixes281 — collapse repeating-{linear,radial}-gradient(...) to
+	 * a solid platinum-grey #dddddd. Visible fallback for striped
+	 * title-bar backgrounds. */
+	rewritten_rep_grad = macsurf__rewrite_repeating_gradient_solid(
+			data, (size_t)size);
+	if (rewritten_rep_grad != NULL) {
+		data = (const char *)rewritten_rep_grad;
 		/* In-place same-size rewrite. */
 	}
 
@@ -4299,6 +4415,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_grid_flow != NULL) free(rewritten_grid_flow); /* fixes275 */
 	if (rewritten_logical != NULL) free(rewritten_logical); /* fixes277 */
 	if (rewritten_calc != NULL) free(rewritten_calc); /* fixes280 */
+	if (rewritten_rep_grad != NULL) free(rewritten_rep_grad); /* fixes281 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
