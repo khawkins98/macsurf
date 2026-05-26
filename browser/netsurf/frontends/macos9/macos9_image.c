@@ -1130,8 +1130,6 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 	int nat_w;
 	int nat_h;
 
-	(void)clip;
-
 	if (ctx == NULL || ctx->plot == NULL || ctx->plot->bitmap == NULL) {
 		return true;
 	}
@@ -1140,6 +1138,44 @@ macos9_qt_image_redraw(struct content *c, struct content_redraw_data *data,
 	dst_h = data->height;
 	nat_w = (int)c->width;
 	nat_h = (int)c->height;
+
+	/* fixes269 (#8) — above-fold bias for lazy decode. If the image's
+	 * destination rect is entirely outside the redraw clip rect, skip
+	 * the decode entirely. NetSurf core's box-tree walker prunes most
+	 * below-fold boxes but occasionally descends into a parent whose
+	 * bbox intersects the clip while individual children don't (e.g.
+	 * during initial layout, recascade passes, or wide-bbox flex
+	 * parents). On long image-heavy pages this saves the cost of
+	 * decoding many below-fold images during initial paint, and
+	 * keeps below-fold images undecoded until the user scrolls into
+	 * them. Each scroll re-fires redraw with a new clip rect, so the
+	 * skipped image will decode naturally when visible.
+	 *
+	 * The early return path is taken BEFORE the decode block, so no
+	 * bitmap memory is allocated for off-screen images. Already-decoded
+	 * bitmaps (in qti->bitmap with matching dimensions) are left alone
+	 * — they'd be evicted via the LRU when memory pressure hits.
+	 *
+	 * `clip` is the (clip->x0, clip->y0, clip->x1, clip->y1)
+	 * rectangle. Image rect at this point is (data->x, data->y,
+	 * data->x + dst_w, data->y + dst_h). Standard rect-rect overlap
+	 * check: no overlap iff one rect is entirely left/right/above/
+	 * below the other. */
+	if (clip != NULL && dst_w > 0 && dst_h > 0) {
+		int img_x0 = data->x;
+		int img_y0 = data->y;
+		int img_x1 = data->x + dst_w;
+		int img_y1 = data->y + dst_h;
+		if (clip->x1 <= img_x0 || clip->x0 >= img_x1 ||
+		    clip->y1 <= img_y0 || clip->y0 >= img_y1) {
+			macsurf_debug_log_writef(
+				"img lazy-skip: off-fold img=(%d,%d,%d,%d) "
+				"clip=(%d,%d,%d,%d)",
+				img_x0, img_y0, img_x1, img_y1,
+				clip->x0, clip->y0, clip->x1, clip->y1);
+			return true;
+		}
+	}
 
 	/* fixes265 — scale-fit-to-cap for top-level image navigation.
 	 * When a user types e.g. https://example.com/photo.jpg directly in
