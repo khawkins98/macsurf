@@ -3527,6 +3527,103 @@ macsurf__rewrite_grid_auto_flow(const char *data, size_t in_size,
 }
 
 
+/* fixes277 (#61) — logical properties → physical aliases (LTR-only V1).
+ *
+ * CSS Logical Properties Level 1 lets authors write direction-agnostic
+ * declarations:
+ *   inline-size, block-size
+ *   padding-inline-{start,end}, padding-block-{start,end}
+ *   margin-inline-{start,end},  margin-block-{start,end}
+ *   inset-inline-{start,end},   inset-block-{start,end}
+ *   border-inline-{start,end},  border-block-{start,end}
+ *
+ * In LTR mode (the only writing mode MacSurf supports), these map 1:1 to
+ * the physical properties below. We rewrite the property name in the
+ * source before libcss sees it.
+ *
+ * All physical names are SHORTER than their logical equivalents, so this
+ * is an in-place rewrite (replace name + pad with trailing spaces inside
+ * the original declaration footprint).
+ *
+ * Limitations: this is LTR-only. When MacSurf gains RTL support, swap
+ * start/end for inline-axis writes. block-axis aliases are direction-
+ * agnostic and stay the same in RTL. */
+static const struct {
+	const char *logical;
+	size_t llen;
+	const char *physical;
+	size_t plen;
+} macsurf__logical_aliases[] = {
+	/* Order: longest first so substring matches don't fire (e.g.
+	 * "padding-inline-start" before "padding-inline"). */
+	{ "padding-inline-start", 20, "padding-left",     12 },
+	{ "padding-inline-end",   18, "padding-right",    13 },
+	{ "padding-block-start",  19, "padding-top",      11 },
+	{ "padding-block-end",    17, "padding-bottom",   14 },
+	{ "margin-inline-start",  19, "margin-left",      11 },
+	{ "margin-inline-end",    17, "margin-right",     12 },
+	{ "margin-block-start",   18, "margin-top",       10 },
+	{ "margin-block-end",     16, "margin-bottom",    13 },
+	{ "border-inline-start",  19, "border-left",      11 },
+	{ "border-inline-end",    17, "border-right",     12 },
+	{ "border-block-start",   18, "border-top",       10 },
+	{ "border-block-end",     16, "border-bottom",    13 },
+	{ "inset-inline-start",   18, "left",              4 },
+	{ "inset-inline-end",     16, "right",             5 },
+	{ "inset-block-start",    17, "top",               3 },
+	{ "inset-block-end",      15, "bottom",            6 },
+	{ "inline-size",          11, "width",             5 },
+	{ "block-size",           10, "height",            6 },
+	{ NULL, 0, NULL, 0 }
+};
+
+static char *
+macsurf__rewrite_logical_properties(const char *data, size_t size)
+{
+	char *out;
+	size_t i;
+	int changed = 0;
+
+	out = (char *)malloc(size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, size);
+
+	i = 0;
+	while (i < size) {
+		size_t a;
+		bool matched = false;
+
+		for (a = 0; macsurf__logical_aliases[a].logical != NULL; a++) {
+			const char *lname =
+				macsurf__logical_aliases[a].logical;
+			size_t llen = macsurf__logical_aliases[a].llen;
+			const char *pname =
+				macsurf__logical_aliases[a].physical;
+			size_t plen = macsurf__logical_aliases[a].plen;
+
+			if (!macsurf__match_prop_name(out, size, i,
+					lname, llen)) {
+				continue;
+			}
+			/* Replace name in place, pad with spaces. */
+			memcpy(out + i, pname, plen);
+			memset(out + i + plen, ' ', llen - plen);
+			i += llen;
+			matched = true;
+			changed = 1;
+			break;
+		}
+		if (!matched) i++;
+	}
+
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+	return out;
+}
+
+
 /* fixes202 — inline-style preprocessor.
  *
  * External stylesheets and <style> blocks run through nscss_process_data
@@ -3628,6 +3725,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_at_rules = NULL;   /* fixes273 — @supports/@layer */
 	char *rewritten_grid_align = NULL; /* fixes274 grid alignment */
 	char *rewritten_grid_flow = NULL;  /* fixes275 grid-auto-flow */
+	char *rewritten_logical = NULL;    /* fixes277 logical properties */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -3726,6 +3824,14 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 			data = (const char *)rewritten_grid_flow;
 			size = (unsigned int)gf_size;
 		}
+	}
+
+	/* fixes277 (#61) — logical → physical property aliases (LTR). */
+	rewritten_logical = macsurf__rewrite_logical_properties(data,
+			(size_t)size);
+	if (rewritten_logical != NULL) {
+		data = (const char *)rewritten_logical;
+		/* In-place rewrite: size unchanged. */
 	}
 
 	/* fixes115 — pre-process the CSS bytes to convert
@@ -3880,6 +3986,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_at_rules != NULL) free(rewritten_at_rules);   /* fixes273 */
 	if (rewritten_grid_align != NULL) free(rewritten_grid_align); /* fixes274 */
 	if (rewritten_grid_flow != NULL) free(rewritten_grid_flow); /* fixes275 */
+	if (rewritten_logical != NULL) free(rewritten_logical); /* fixes277 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
