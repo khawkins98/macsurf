@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <dom/dom.h>
-#include <regex.h>
 #include "utils/corestrings.h"
 #include "utils/log.h"
 #include "utils/messages.h"
@@ -2050,78 +2049,308 @@ void form_radio_set(struct form_control *radio)
 }
 
 
+/* HTML5 `pattern` attribute matcher.
+ *
+ * The original PR (#138) used POSIX <regex.h>. That header is not
+ * available on CW8 / Mac OS 9, and NetSurf's utils/regex.h shim
+ * stubs regexec() to REG_NOMATCH on platforms without HAVE_REGEX —
+ * which would reject every pattern unconditionally (worse than not
+ * validating at all).
+ *
+ * This is a minimal C89-clean recursive matcher covering the common
+ * HTML5 pattern syntax. HTML5 anchors patterns implicitly start-to-end.
+ *
+ * Supported:
+ *   - Literal characters (escape with \)
+ *   - .                  any non-NUL character
+ *   - \d \D              digit / non-digit
+ *   - \w \W              [A-Za-z0-9_] / inverse
+ *   - \s \S              whitespace / non-whitespace
+ *   - [abc] [a-z]        positive character class with ranges
+ *   - ? * +              quantifiers (greedy with backtracking)
+ *   - {n} {n,m}          counted repetition
+ *
+ * NOT supported (defer to a follow-up if a real-page pattern needs them):
+ *   - Alternation |
+ *   - Capture groups (...)
+ *   - Negated character class [^abc]
+ *   - Named classes [:alpha:] etc.
+ *   - Lookahead / lookbehind
+ *
+ * Author CSS patterns that exceed the supported subset will fail to
+ * parse (form_atom_parse returns false) and form_pattern_matches
+ * conservatively returns true (no validation rather than wrong
+ * validation).
+ */
+
+enum form_atom_kind {
+	FATOM_LITERAL,    /* a single literal char (in .literal) */
+	FATOM_ANY,        /* . */
+	FATOM_DIGIT,      /* \d */
+	FATOM_NONDIGIT,   /* \D */
+	FATOM_WORD,       /* \w */
+	FATOM_NONWORD,    /* \W */
+	FATOM_SPACE,      /* \s */
+	FATOM_NONSPACE,   /* \S */
+	FATOM_CLASS       /* [...] — class_start/class_end point into pattern */
+};
+
+struct form_atom {
+	int kind;
+	char literal;
+	const char *class_start;
+	size_t class_len;
+};
+
 static bool
-form_text_control_is_empty(struct form_control *control)
+form_atom_match(const struct form_atom *a, char c)
 {
-	dom_exception err;
-	dom_string *value = NULL;
-	bool empty = false;
+	const char *p;
+	const char *end;
+	bool is_digit;
+	bool is_word;
+	bool is_space;
 
-	if (control == NULL || control->node == NULL)
+	is_digit = (c >= '0' && c <= '9');
+	is_word = (is_digit || (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') || c == '_');
+	is_space = (c == ' ' || c == '\t' || c == '\n' ||
+			c == '\r' || c == '\f' || c == '\v');
+
+	switch (a->kind) {
+	case FATOM_LITERAL:
+		return c == a->literal;
+	case FATOM_ANY:
+		return c != '\0';
+	case FATOM_DIGIT:
+		return is_digit;
+	case FATOM_NONDIGIT:
+		return !is_digit;
+	case FATOM_WORD:
+		return is_word;
+	case FATOM_NONWORD:
+		return !is_word;
+	case FATOM_SPACE:
+		return is_space;
+	case FATOM_NONSPACE:
+		return !is_space;
+	case FATOM_CLASS:
+		p = a->class_start;
+		end = a->class_start + a->class_len;
+		while (p < end) {
+			if (*p == '\\' && p + 1 < end) {
+				char esc = p[1];
+				if (esc == 'd' && is_digit) return true;
+				if (esc == 'w' && is_word) return true;
+				if (esc == 's' && is_space) return true;
+				if (esc == 'D' && !is_digit) return true;
+				if (esc == 'W' && !is_word) return true;
+				if (esc == 'S' && !is_space) return true;
+				if (esc == c) return true;
+				p += 2;
+				continue;
+			}
+			if (p + 2 < end && p[1] == '-' && p[2] != ']') {
+				if (c >= p[0] && c <= p[2]) return true;
+				p += 3;
+				continue;
+			}
+			if (*p == c) return true;
+			p++;
+		}
 		return false;
+	}
+	return false;
+}
 
-	switch (control->type) {
-	case GADGET_TEXTBOX:
-	case GADGET_PASSWORD:
-		err = dom_html_input_element_get_value(
-			(dom_html_input_element *)control->node, &value);
-		break;
+/* Parse one atom from *p_io. On success returns true, advances *p_io
+ * past the atom, and fills *out. Returns false on a syntax we don't
+ * support (caller treats as pattern-unparseable). */
+static bool
+form_atom_parse(const char **p_io, const char *p_end, struct form_atom *out)
+{
+	const char *p = *p_io;
 
-	case GADGET_TEXTAREA:
-		err = dom_html_text_area_element_get_value(
-			(dom_html_text_area_element *)control->node, &value);
-		break;
+	if (p >= p_end) return false;
 
+	if (*p == '\\') {
+		if (p + 1 >= p_end) return false;
+		switch (p[1]) {
+		case 'd': out->kind = FATOM_DIGIT; *p_io = p + 2; return true;
+		case 'D': out->kind = FATOM_NONDIGIT; *p_io = p + 2; return true;
+		case 'w': out->kind = FATOM_WORD; *p_io = p + 2; return true;
+		case 'W': out->kind = FATOM_NONWORD; *p_io = p + 2; return true;
+		case 's': out->kind = FATOM_SPACE; *p_io = p + 2; return true;
+		case 'S': out->kind = FATOM_NONSPACE; *p_io = p + 2; return true;
+		default:
+			out->kind = FATOM_LITERAL;
+			out->literal = p[1];
+			*p_io = p + 2;
+			return true;
+		}
+	}
+	if (*p == '.') {
+		out->kind = FATOM_ANY;
+		*p_io = p + 1;
+		return true;
+	}
+	if (*p == '[') {
+		const char *start = p + 1;
+		const char *end = start;
+		while (end < p_end && *end != ']') {
+			if (*end == '\\' && end + 1 < p_end) end += 2;
+			else end++;
+		}
+		if (end >= p_end) return false;   /* unclosed [ */
+		out->kind = FATOM_CLASS;
+		out->class_start = start;
+		out->class_len = (size_t)(end - start);
+		*p_io = end + 1;
+		return true;
+	}
+	/* Anything that's not a quantifier or grouping char is a literal. */
+	if (*p == '?' || *p == '*' || *p == '+' || *p == '{' ||
+			*p == ')' || *p == '|' || *p == '^' || *p == '$') {
+		return false;
+	}
+	out->kind = FATOM_LITERAL;
+	out->literal = *p;
+	*p_io = p + 1;
+	return true;
+}
+
+/* Parse an optional quantifier following an atom. Sets *min/*max to
+ * 1/1 when no quantifier present. Returns true on success. */
+static bool
+form_quant_parse(const char **p_io, const char *p_end, int *min, int *max)
+{
+	const char *p = *p_io;
+
+	*min = 1;
+	*max = 1;
+	if (p >= p_end) return true;
+
+	switch (*p) {
+	case '?': *min = 0; *max = 1; *p_io = p + 1; return true;
+	case '*': *min = 0; *max = -1; *p_io = p + 1; return true;
+	case '+': *min = 1; *max = -1; *p_io = p + 1; return true;
+	case '{': {
+		int n = 0;
+		int m = -1;
+		const char *q = p + 1;
+		bool got_n = false;
+		while (q < p_end && *q >= '0' && *q <= '9') {
+			n = n * 10 + (*q - '0');
+			q++;
+			got_n = true;
+		}
+		if (!got_n) return false;
+		if (q < p_end && *q == ',') {
+			q++;
+			if (q < p_end && *q >= '0' && *q <= '9') {
+				m = 0;
+				while (q < p_end && *q >= '0' && *q <= '9') {
+					m = m * 10 + (*q - '0');
+					q++;
+				}
+			} else {
+				m = -1;   /* {n,} unbounded */
+			}
+		} else {
+			m = n;
+		}
+		if (q >= p_end || *q != '}') return false;
+		*min = n;
+		*max = m;
+		*p_io = q + 1;
+		return true;
+	}
 	default:
+		return true;
+	}
+}
+
+/* Recursive matcher. Pattern [p, p_end), input string s. */
+static bool
+form_match_here(const char *p, const char *p_end, const char *s)
+{
+	struct form_atom atom;
+	const char *p_after_atom;
+	int min;
+	int max;
+	int matched;
+	int i;
+
+	if (p >= p_end) return *s == '\0';
+
+	p_after_atom = p;
+	if (!form_atom_parse(&p_after_atom, p_end, &atom)) {
+		return false;   /* unsupported syntax — conservative reject */
+	}
+	if (!form_quant_parse(&p_after_atom, p_end, &min, &max)) {
 		return false;
 	}
 
-	if (err != DOM_NO_ERR)
-		return false;
-
-	empty = (value == NULL || dom_string_byte_length(value) == 0);
-
-	if (value != NULL)
-		dom_string_unref(value);
-
-	return empty;
+	/* Match atom min..max times, greedy with backtracking on tail. */
+	matched = 0;
+	while ((max < 0 || matched < max) && s[matched] != '\0' &&
+			form_atom_match(&atom, s[matched])) {
+		matched++;
+	}
+	if (matched < min) return false;
+	/* Try longest first; back off one at a time until tail matches. */
+	for (i = matched; i >= min; i--) {
+		if (form_match_here(p_after_atom, p_end, s + i)) return true;
+	}
+	return false;
 }
+
 static bool
 form_pattern_matches(const char *value, const char *pattern)
 {
-	regex_t re;
-	char *anchored;
-	size_t len;
-	bool ok;
-	int rc;
-
 	if (value == NULL || pattern == NULL || pattern[0] == '\0') {
 		return true;
 	}
+	return form_match_here(pattern, pattern + strlen(pattern), value);
+}
 
-	len = strlen(pattern) + 3; /* ^ + pattern + $ + '\0' */
-	anchored = malloc(len);
-	if (anchored == NULL) {
-		return false;
-	}
+/* Read the value of a boolean/string attribute on the element node via
+ * the generic attribute getter. The original PR (#138) used libdom
+ * typed accessors (dom_html_input_element_get_required, _get_pattern,
+ * etc.) that aren't part of our libdom port. dom_element_get_attribute
+ * is always available and reads the raw attribute string.
+ *
+ * For boolean attributes ("required"): present (any value, including
+ * empty string) => true; absent => false.
+ * For string attributes ("pattern"): returns the dom_string for the
+ * caller to inspect; caller must dom_string_unref it. */
+static bool
+form_get_attr_string(struct form_control *control, const char *attr_name,
+		dom_string **out)
+{
+	dom_exception err;
+	dom_string *name_str = NULL;
+	dom_string *value = NULL;
 
-	snprintf(anchored, len, "^%s$", pattern);
+	*out = NULL;
+	if (control == NULL || control->node == NULL) return false;
 
-	ok = false;
-	rc = regcomp(&re, anchored, REG_EXTENDED | REG_NOSUB);
-	if (rc == 0) {
-		ok = (regexec(&re, value, 0, NULL, 0) == 0);
-		regfree(&re);
-	}
+	err = dom_string_create_interned((const uint8_t *)attr_name,
+			strlen(attr_name), &name_str);
+	if (err != DOM_NO_ERR) return false;
 
-	free(anchored);
-	return ok;
+	err = dom_element_get_attribute(control->node, name_str, &value);
+	dom_string_unref(name_str);
+	if (err != DOM_NO_ERR) return false;
+
+	*out = value;   /* may be NULL if attribute absent */
+	return true;
 }
 
 static bool
 form_control_get_required(struct form_control *control, bool *required)
 {
-	dom_exception err;
+	dom_string *value = NULL;
 
 	*required = false;
 
@@ -2135,25 +2364,20 @@ form_control_get_required(struct form_control *control, bool *required)
 	case GADGET_FILE:
 	case GADGET_CHECKBOX:
 	case GADGET_RADIO:
-		err = dom_html_input_element_get_required(
-			(dom_html_input_element *)control->node, required);
-		break;
-
 	case GADGET_TEXTAREA:
-		err = dom_html_text_area_element_get_required(
-			(dom_html_text_area_element *)control->node, required);
-		break;
-
 	case GADGET_SELECT:
-		err = dom_html_select_element_get_required(
-			(dom_html_select_element *)control->node, required);
 		break;
-
 	default:
 		return true;
 	}
 
-	return (err == DOM_NO_ERR);
+	if (!form_get_attr_string(control, "required", &value)) {
+		return false;
+	}
+	/* HTML boolean attribute: presence (even with empty string) = true. */
+	*required = (value != NULL);
+	if (value != NULL) dom_string_unref(value);
+	return true;
 }
 
 static bool
@@ -2216,8 +2440,29 @@ form_control_value_is_empty(struct form_control *control, bool *ok)
 		}
 		return !checked;
 
-	case GADGET_SELECT:
-		return (control->data.select.num_selected == 0);
+	case GADGET_SELECT: {
+		/* HTML5: a required <select> is considered empty when no
+		 * option is selected, OR the selected option has an empty
+		 * value="" attribute (the canonical "-- choose --" sentinel
+		 * row pattern). num_selected alone isn't enough — single-
+		 * select always has num_selected == 1 because the first
+		 * option is auto-selected, even if its value is empty. */
+		struct form_option *o;
+		if (control->data.select.num_selected == 0) return true;
+		if (control->data.select.multiple) {
+			for (o = control->data.select.items; o != NULL;
+					o = o->next) {
+				if (o->selected && o->value != NULL &&
+						o->value[0] != '\0') {
+					return false;
+				}
+			}
+			return true;
+		}
+		o = control->data.select.current;
+		if (o == NULL) return true;
+		return (o->value == NULL || o->value[0] == '\0');
+	}
 
 	default:
 		return false;
@@ -2239,15 +2484,13 @@ form_control_pattern_valid(struct form_control *control, bool *ok)
 		return true;
 	}
 
-	/* Pattern only applies to text-like inputs here. */
+	/* Pattern only applies to text-like inputs. */
 	if (control->type != GADGET_TEXTBOX &&
 	    control->type != GADGET_PASSWORD) {
 		return true;
 	}
 
-	err = dom_html_input_element_get_pattern(
-		(dom_html_input_element *)control->node, &pattern);
-	if (err != DOM_NO_ERR) {
+	if (!form_get_attr_string(control, "pattern", &pattern)) {
 		*ok = false;
 		return true;
 	}
@@ -2259,6 +2502,7 @@ form_control_pattern_valid(struct form_control *control, bool *ok)
 		return true;
 	}
 
+	/* Value read still uses the typed getter (it IS in our libdom). */
 	err = dom_html_input_element_get_value(
 		(dom_html_input_element *)control->node, &value);
 	if (err != DOM_NO_ERR) {
@@ -2433,7 +2677,7 @@ form_submit(nsurl *page_url,
 	return res;
 }
 
-	
+
 /* exported interface documented in html/form_internal.h */
 void form_gadget_update_value(struct form_control *control, char *value)
 {
