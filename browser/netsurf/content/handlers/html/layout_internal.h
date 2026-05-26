@@ -26,14 +26,14 @@
 
 #define AUTO INT_MIN
 
-struct box_multicol_segment {
+struct box_multicol_seg_ns {
 	int top;
 	int bottom;
 };
 
-struct box_multicol_data {
+struct box_multicol_dat_ns {
 	unsigned int segment_count;
-	struct box_multicol_segment *segments;
+	struct box_multicol_seg_ns *segments;
 };
 
 /**
