@@ -148,6 +148,9 @@ css_error css__parse_background_size(css_language *c,
 css_error css__parse_pointer_events(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result);
+css_error css__parse_macsurf_grid_flow(css_language *c,
+		const parserutils_vector *vector, int32_t *ctx,
+		css_style *result);
 
 css_error css__parse_border_right(css_language *c,		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result);

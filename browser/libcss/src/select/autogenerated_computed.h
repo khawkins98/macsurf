@@ -378,6 +378,16 @@ struct css_computed_style_i {
 	 * (slot_dim - object_dim) per CSS spec; px values are
 	 * absolute offsets within the slot. */
 	int32_t macsurf_object_position_xy;
+	/* fixes275 (#65): grid-auto-flow stored as int32 for self-alignment
+	 * (fixes151b padding lesson). Values match enum css_macsurf_grid_flow_e:
+	 *   0 = inherit (treat as row at top-of-cascade)
+	 *   1 = row (sparse, default)
+	 *   2 = column
+	 *   3 = row dense
+	 *   4 = column dense
+	 * Field appended at struct end so existing field offsets in stale CW8
+	 * .o files don't shift (per project_libcss_struct_mid_insert_crash). */
+	int32_t macsurf_grid_flow;
 };
 
 struct css_computed_style {

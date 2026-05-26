@@ -462,12 +462,22 @@ macsurf__emit_one_track(char *out, size_t cap,
 		emit_len = 3;
 	}
 
-	if (emit_len + 1 > cap) return -1;
+	/* fixes275g: write value first; trailing space is optional. The
+	 * caller (emit_grid_tracks) trims any trailing space after the
+	 * last track anyway, so when we're short by exactly 1 byte we
+	 * can still emit the value and let the next caller's check decide.
+	 * This recovers the 3rd track in the in-place rewrite case where
+	 * `30px 30px 30px` (14 chars) needs to fit `30px 30px 30px ` (15
+	 * chars with naive trailing spaces). */
+	if (emit_len > cap) return -1;
 	for (i = 0; i < emit_len; i++) {
 		out[i] = tok_to_emit[i];
 	}
-	out[emit_len] = ' ';
-	return (int)(emit_len + 1);
+	if (emit_len + 1 <= cap) {
+		out[emit_len] = ' ';
+		return (int)(emit_len + 1);
+	}
+	return (int)emit_len;
 }
 
 /* Walk a flat (paren-free, repeat-free) chunk of track tokens, emitting
@@ -3334,6 +3344,189 @@ macsurf__rewrite_grid_alignment(const char *data, size_t in_size,
 }
 
 
+/* fixes275 (#65) — grid-auto-flow preprocessor.
+ *
+ * Rewrites standard CSS `grid-auto-flow: VALUE` declarations to
+ * `-macsurf-grid-flow: N` integer values for the vendor property:
+ *
+ *   row              → 1
+ *   column           → 2
+ *   row dense        → 3  (also bare `dense` per CSS spec default-axis = row)
+ *   dense row        → 3
+ *   column dense     → 4
+ *   dense column     → 4
+ *
+ * Standard CSS lets the two-keyword form appear in either order. We
+ * tokenize and dispatch on the keyword set.
+ *
+ * Output grows: source ~14 bytes ("grid-auto-flow"), output ~22 bytes
+ * ("-macsurf-grid-flow: N"). Allocates fresh buffer. */
+static char *
+macsurf__rewrite_grid_auto_flow(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	char *out;
+	size_t cap;
+	size_t out_pos = 0;
+	size_t i = 0;
+	int changed = 0;
+
+	cap = in_size + 256;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		size_t k;
+		size_t end;
+		size_t v_start;
+		size_t v_end;
+		bool has_row;
+		bool has_column;
+		bool has_dense;
+		int flow_val;
+		char emit[40];
+		size_t emit_len;
+
+		/* Comment pass-through. */
+		if (data[i] == '/' && i + 1 < in_size && data[i + 1] == '*') {
+			size_t kk = i + 2;
+			while (kk + 1 < in_size) {
+				if (data[kk] == '*' && data[kk + 1] == '/') {
+					kk += 2;
+					break;
+				}
+				kk++;
+			}
+			if (kk + 1 >= in_size) kk = in_size;
+			while (out_pos + (kk - i) + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + (kk - i) + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			memcpy(out + out_pos, data + i, kk - i);
+			out_pos += (kk - i);
+			i = kk;
+			continue;
+		}
+		/* String pass-through. */
+		if (data[i] == '"' || data[i] == '\'') {
+			char quote = data[i];
+			size_t kk = i + 1;
+			while (kk < in_size && data[kk] != quote) {
+				if (data[kk] == '\\' && kk + 1 < in_size) kk += 2;
+				else kk++;
+			}
+			if (kk < in_size) kk++;
+			while (out_pos + (kk - i) + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + (kk - i) + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			memcpy(out + out_pos, data + i, kk - i);
+			out_pos += (kk - i);
+			i = kk;
+			continue;
+		}
+
+		if (!macsurf__cc_prop_at(data, in_size, i,
+				"grid-auto-flow", 14)) {
+			if (out_pos + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			out[out_pos++] = data[i++];
+			continue;
+		}
+
+		k = i + 14;
+		while (k < in_size && (data[k] == ' ' || data[k] == '\t' ||
+				data[k] == '\n' || data[k] == '\r')) k++;
+		if (k >= in_size || data[k] != ':') {
+			out[out_pos++] = data[i++];
+			continue;
+		}
+		v_start = k + 1;
+		end = macsurf__cc_find_decl_end(data, in_size, v_start);
+		v_end = end;
+		macsurf__cc_trim(data, v_start, v_end, &v_start, &v_end);
+
+		/* Tokenise the value into row / column / dense detection. */
+		has_row = false;
+		has_column = false;
+		has_dense = false;
+		{
+			size_t p = v_start;
+			while (p < v_end) {
+				size_t tok_start;
+				size_t tok_end;
+				size_t tlen;
+				while (p < v_end && (data[p] == ' ' ||
+						data[p] == '\t')) p++;
+				tok_start = p;
+				while (p < v_end && data[p] != ' ' &&
+						data[p] != '\t') p++;
+				tok_end = p;
+				tlen = tok_end - tok_start;
+				if (tlen == 3 && memcmp(data + tok_start,
+						"row", 3) == 0) {
+					has_row = true;
+				} else if (tlen == 6 && memcmp(data + tok_start,
+						"column", 6) == 0) {
+					has_column = true;
+				} else if (tlen == 5 && memcmp(data + tok_start,
+						"dense", 5) == 0) {
+					has_dense = true;
+				}
+			}
+		}
+
+		if (has_column && has_dense) {
+			flow_val = 4;
+		} else if (has_column) {
+			flow_val = 2;
+		} else if (has_dense) {
+			flow_val = 3;
+		} else if (has_row) {
+			flow_val = 1;
+		} else {
+			/* No recognised keyword — drop and emit nothing. */
+			i = end;
+			changed = 1;
+			continue;
+		}
+
+		emit_len = (size_t)sprintf(emit,
+				"-macsurf-grid-flow: %d", flow_val);
+		while (out_pos + emit_len + 1 >= cap) {
+			char *bigger;
+			cap = cap * 2 + emit_len + 64;
+			bigger = (char *)realloc(out, cap);
+			if (bigger == NULL) { free(out); return NULL; }
+			out = bigger;
+		}
+		memcpy(out + out_pos, emit, emit_len);
+		out_pos += emit_len;
+
+		changed = 1;
+		i = end;
+	}
+
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+	*out_size_p = out_pos;
+	return out;
+}
+
+
 /* fixes202 — inline-style preprocessor.
  *
  * External stylesheets and <style> blocks run through nscss_process_data
@@ -3434,6 +3627,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_inset = NULL;
 	char *rewritten_at_rules = NULL;   /* fixes273 — @supports/@layer */
 	char *rewritten_grid_align = NULL; /* fixes274 grid alignment */
+	char *rewritten_grid_flow = NULL;  /* fixes275 grid-auto-flow */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -3519,6 +3713,18 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 				ga_size <= (size_t)0x7fffffff) {
 			data = (const char *)rewritten_grid_align;
 			size = (unsigned int)ga_size;
+		}
+	}
+
+	/* fixes275 (#65) — grid-auto-flow → -macsurf-grid-flow rewrite. */
+	{
+		size_t gf_size = 0;
+		rewritten_grid_flow = macsurf__rewrite_grid_auto_flow(data,
+				(size_t)size, &gf_size);
+		if (rewritten_grid_flow != NULL &&
+				gf_size <= (size_t)0x7fffffff) {
+			data = (const char *)rewritten_grid_flow;
+			size = (unsigned int)gf_size;
 		}
 	}
 
@@ -3673,6 +3879,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten != NULL) free(rewritten);
 	if (rewritten_at_rules != NULL) free(rewritten_at_rules);   /* fixes273 */
 	if (rewritten_grid_align != NULL) free(rewritten_grid_align); /* fixes274 */
+	if (rewritten_grid_flow != NULL) free(rewritten_grid_flow); /* fixes275 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);

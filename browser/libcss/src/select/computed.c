@@ -527,6 +527,14 @@ int32_t css_computed_macsurf_grid_placement(
 	return style->i.macsurf_grid_col_span;
 }
 
+/* fixes275 (#65): grid-auto-flow accessor. */
+uint8_t css_computed_macsurf_grid_flow(const css_computed_style *style)
+{
+	int32_t v = style->i.macsurf_grid_flow;
+	if (v < 0 || v > 4) return CSS_MACSURF_GRID_FLOW_ROW;
+	return (uint8_t)v;
+}
+
 int32_t css_computed_aspect_ratio(
 		const css_computed_style *style)
 {

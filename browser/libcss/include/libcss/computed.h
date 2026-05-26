@@ -257,6 +257,11 @@ int32_t css_computed_background_size(
 uint8_t css_computed_pointer_events(
 		const css_computed_style *style);
 
+/* fixes275 (#65): grid-auto-flow value. Returns one of
+ * CSS_MACSURF_GRID_FLOW_{ROW,COLUMN,ROW_DENSE,COLUMN_DENSE}.
+ * Defaults to ROW (sparse row-major) when unset. */
+uint8_t css_computed_macsurf_grid_flow(const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

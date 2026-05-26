@@ -158,6 +158,7 @@ enum css_properties_e {
 	CSS_PROP_ASPECT_RATIO			= 0x08D,
 	CSS_PROP_BACKGROUND_SIZE                = 0x08e,
 	CSS_PROP_POINTER_EVENTS                 = 0x08f,
+	CSS_PROP_MACSURF_GRID_FLOW              = 0x090,
 	CSS_N_PROPERTIES
 };
 
@@ -176,6 +177,19 @@ enum css_pointer_events_e {
 	CSS_POINTER_EVENTS_INHERIT              = 0x0,
 	CSS_POINTER_EVENTS_AUTO                 = 0x1,
 	CSS_POINTER_EVENTS_NONE                 = 0x2
+};
+
+/* fixes275 (#65) — -macsurf-grid-flow: encodes grid-auto-flow.
+ * row = default sparse row-major auto-placement
+ * column = column-major placement
+ * row_dense = row-major with backfill (dense packing)
+ * column_dense = column-major with backfill */
+enum css_macsurf_grid_flow_e {
+	CSS_MACSURF_GRID_FLOW_INHERIT           = 0x0,
+	CSS_MACSURF_GRID_FLOW_ROW               = 0x1,
+	CSS_MACSURF_GRID_FLOW_COLUMN            = 0x2,
+	CSS_MACSURF_GRID_FLOW_ROW_DENSE         = 0x3,
+	CSS_MACSURF_GRID_FLOW_COLUMN_DENSE      = 0x4
 };
 
 enum css_macsurf_gradient_e {

@@ -76,6 +76,8 @@ css_error css__copy_pointer_events(const css_computed_style *from, css_computed_
 css_error css__compose_pointer_events(const css_computed_style *parent, const css_computed_style *child, css_computed_style *result);
 uint32_t destroy_pointer_events(void *bytecode);
 
+PROPERTY_FUNCS(macsurf_grid_flow);
+
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
 PROPERTY_FUNCS(break_after);
