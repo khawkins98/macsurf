@@ -751,6 +751,19 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 		int cur_row = 0;
 		int max_row_used = -1;
 		int slot_index;
+		/* fixes275 (#65): read grid-auto-flow from container style.
+		 * 1=row, 2=column, 3=row dense, 4=column dense. */
+		uint8_t grid_flow = (grid->style != NULL)
+				? css_computed_macsurf_grid_flow(grid->style)
+				: (uint8_t)CSS_MACSURF_GRID_FLOW_ROW;
+		bool flow_dense = (grid_flow ==
+					CSS_MACSURF_GRID_FLOW_ROW_DENSE ||
+				grid_flow ==
+					CSS_MACSURF_GRID_FLOW_COLUMN_DENSE);
+		bool flow_column = (grid_flow ==
+					CSS_MACSURF_GRID_FLOW_COLUMN ||
+				grid_flow ==
+					CSS_MACSURF_GRID_FLOW_COLUMN_DENSE);
 
 		memset(row_max_h, 0, sizeof(row_max_h));
 		memset(row_y_arr, 0, sizeof(row_y_arr));
@@ -890,34 +903,76 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 						slot_row, col_span, row_span,
 						cols);
 			} else {
-				/* Pure auto-flow. Advance cursor row-major
-				 * past any occupied cells until a free
-				 * col-run of col_span cells is found. */
+				/* Pure auto-flow. fixes275 (#65): honor
+				 * grid-auto-flow row/column/dense.
+				 *
+				 * row (default): advance cursor row-major
+				 *   (cur_col 0..cols, then cur_row++).
+				 * column: advance column-major
+				 *   (cur_row 0..row_wrap, then cur_col++).
+				 *   row_wrap = explicit grid-template-rows
+				 *   count if set, else MACSURF_GRID_ROWS_MAX
+				 *   (safety cap).
+				 * dense: each item starts its scan from
+				 *   (0,0) instead of the running cursor,
+				 *   backfilling earlier holes. */
+				int row_wrap = has_row_tracks ?
+						n_row_tracks :
+						MACSURF_GRID_ROWS_MAX;
 				int safety = MACSURF_GRID_ROWS_MAX *
 						MACSURF_GRID_TRACK_MAX + 4;
+				int scan_col = flow_dense ? 0 : cur_col;
+				int scan_row = flow_dense ? 0 : cur_row;
 				while (safety-- > 0) {
-					if (cur_col + col_span > cols) {
-						cur_col = 0;
-						cur_row++;
+					if (flow_column) {
+						if (scan_row + row_span >
+								row_wrap) {
+							scan_row = 0;
+							scan_col++;
+						}
+						if (scan_col + col_span > cols)
+							break;
+					} else {
+						if (scan_col + col_span > cols) {
+							scan_col = 0;
+							scan_row++;
+						}
+						if (scan_row >=
+								MACSURF_GRID_ROWS_MAX)
+							break;
 					}
-					if (cur_row >= MACSURF_GRID_ROWS_MAX)
-						break;
 					if (macsurf_grid_run_free(occupancy,
-							cur_col, cur_row,
+							scan_col, scan_row,
 							col_span, cols)) {
 						break;
 					}
-					cur_col++;
+					if (flow_column) scan_row++;
+					else scan_col++;
 				}
-				slot_col = cur_col;
-				slot_row = cur_row;
+				slot_col = scan_col;
+				slot_row = scan_row;
 				macsurf_grid_mark(occupancy, slot_col,
 						slot_row, col_span, row_span,
 						cols);
-				cur_col += col_span;
-				if (cur_col >= cols) {
-					cur_col = 0;
-					cur_row++;
+				/* Cursor advance only in non-dense modes;
+				 * dense leaves cursor at (0,0) so the next
+				 * item also re-scans from origin. */
+				if (!flow_dense) {
+					if (flow_column) {
+						cur_col = scan_col;
+						cur_row = scan_row + row_span;
+						if (cur_row >= row_wrap) {
+							cur_row = 0;
+							cur_col++;
+						}
+					} else {
+						cur_col = scan_col + col_span;
+						cur_row = scan_row;
+						if (cur_col >= cols) {
+							cur_col = 0;
+							cur_row++;
+						}
+					}
 				}
 			}
 

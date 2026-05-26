@@ -179,7 +179,8 @@ const css_prop_handler property_handlers[LAST_PROP + 1 - FIRST_PROP] =
 	css__parse_macsurf_grid_col_span,
 	css__parse_aspect_ratio,
 	css__parse_background_size,
-	css__parse_pointer_events
+	css__parse_pointer_events,
+	css__parse_macsurf_grid_flow
 };
 
 /** Mapping from property bytecode index to bytecode unit class mask. */
