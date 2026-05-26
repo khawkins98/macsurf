@@ -2274,6 +2274,96 @@ macsurf__rewrite_background_image_gradient(const char *data, size_t in_size,
 }
 
 
+/* fixes279 (#27) — strip trailing stacked gradients from
+ * `-macsurf-gradient:` declarations. Author CSS commonly stacks layered
+ * backgrounds like `background-image: linear-gradient(a), linear-gradient(b)`.
+ * After fixes266's rename pass we have `-macsurf-gradient: linear-gradient(a),
+ * linear-gradient(b)` which libcss's vendor-gradient parser rejects on the
+ * trailing `, linear-gradient(b)`. This pass walks each `-macsurf-gradient:`
+ * declaration, finds the first depth-0 comma in the value, and replaces it
+ * plus everything up to `;` / `}` / `!` with spaces. The first gradient
+ * survives intact.
+ *
+ * In-place same-size rewrite (only spaces are introduced). */
+static char *
+macsurf__strip_stacked_gradients(const char *data, size_t in_size)
+{
+	static const char NEEDLE[] = "-macsurf-gradient";
+	static const size_t NEEDLE_LEN = 17;
+	char *out;
+	size_t i;
+	int changed = 0;
+
+	out = (char *)malloc(in_size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, in_size);
+
+	i = 0;
+	while (i + NEEDLE_LEN < in_size) {
+		size_t j;
+		size_t k;
+		int paren = 0;
+		bool found_comma = false;
+		size_t comma_pos = 0;
+
+		if (!macsurf__match_prop_name(out, in_size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			i++;
+			continue;
+		}
+		j = i + NEEDLE_LEN;
+		while (j < in_size && (out[j] == ' ' || out[j] == '\t' ||
+				out[j] == '\n' || out[j] == '\r')) j++;
+		if (j >= in_size || out[j] != ':') {
+			i = j;
+			continue;
+		}
+		k = j + 1;
+		/* Scan value, tracking paren depth. */
+		while (k < in_size) {
+			char c = out[k];
+			if (c == '(') paren++;
+			else if (c == ')') {
+				if (paren > 0) paren--;
+			} else if (paren == 0 && c == ',') {
+				found_comma = true;
+				comma_pos = k;
+				break;
+			} else if (paren == 0 &&
+					(c == ';' || c == '}' || c == '!')) {
+				break;
+			}
+			k++;
+		}
+		if (found_comma) {
+			/* Wipe from the comma to the value terminator. */
+			size_t w = comma_pos;
+			int p2 = 0;
+			while (w < in_size) {
+				char c = out[w];
+				if (c == '(') p2++;
+				else if (c == ')') {
+					if (p2 > 0) p2--;
+				} else if (p2 == 0 && (c == ';' ||
+						c == '}' || c == '!')) {
+					break;
+				}
+				out[w] = ' ';
+				w++;
+			}
+			changed = 1;
+		}
+		i = k;
+	}
+
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+	return out;
+}
+
+
 /* fixes185 — modern-CSS compatibility preprocessor. Rewrites unsupported
  * modern syntax into supported equivalents (or drops it) so author CSS
  * keeps cascading instead of having rules silently dropped by libcss.
@@ -3964,14 +4054,26 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 		size_t bg_grad_size = 0;
 		char *rewritten_bg_grad = macsurf__rewrite_background_image_gradient(
 				final_data, (size_t)final_size, &bg_grad_size);
+		char *rewritten_strip = NULL;
 		if (rewritten_bg_grad != NULL &&
 				bg_grad_size <= (size_t)0x7fffffff) {
 			final_data = (const char *)rewritten_bg_grad;
 			final_size = (unsigned int)bg_grad_size;
 		}
 
+		/* fixes279 (#27) — strip stacked gradients (everything past
+		 * the first depth-0 comma in any -macsurf-gradient value).
+		 * Same-size in-place rewrite; only spaces introduced. */
+		rewritten_strip = macsurf__strip_stacked_gradients(
+				final_data, (size_t)final_size);
+		if (rewritten_strip != NULL) {
+			final_data = (const char *)rewritten_strip;
+			/* size unchanged */
+		}
+
 		error = nscss_process_css_data(&css->data, final_data, final_size);
 
+		if (rewritten_strip != NULL) free(rewritten_strip);
 		if (rewritten_bg_grad != NULL) free(rewritten_bg_grad);
 	}
 
