@@ -1083,6 +1083,7 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 			if (max_row_used >= 0 && grid->height > 0 &&
 			    grid->height > row_y) {
 				uint8_t ac = CSS_ALIGN_CONTENT_INHERIT;
+				int container_height = grid->height;
 				if (grid->style != NULL) {
 					ac = css_computed_align_content(
 							grid->style);
@@ -1091,7 +1092,7 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 				    ac != CSS_ALIGN_CONTENT_STRETCH &&
 				    ac != CSS_ALIGN_CONTENT_FLEX_START) {
 					int n_rows = max_row_used + 1;
-					int free_v = grid->height - row_y;
+					int free_v = container_height - row_y;
 					int delta_top = 0;
 					int extra_gap = 0;
 					int leading = 0;
@@ -1143,6 +1144,15 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 								extra_gap;
 						}
 					}
+					/* fixes270a — preserve the CSS-declared
+					 * container height through the grid->height
+					 * assignment at the tail of this function.
+					 * Without this, row_y (natural content
+					 * height) overwrites grid->height, the
+					 * container paints at content height, and
+					 * the just-shifted tracks render OUTSIDE
+					 * the painted container. */
+					row_y = container_height;
 				}
 			}
 		}
