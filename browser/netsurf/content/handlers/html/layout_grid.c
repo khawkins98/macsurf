@@ -599,6 +599,102 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 		col_width = container_width;
 	}
 
+	/* fixes270 (#4) — justify-content on the grid container distributes
+	 * tracks along the inline (horizontal) axis. CSS Grid V2 alignment.
+	 * Only kicks in when the sum of track widths + gaps is less than the
+	 * container width (free space). When tracks already fill the
+	 * container (1fr expansion typical case), justify-content is a
+	 * no-op.
+	 *
+	 * V1 supported values:
+	 *   - flex-start (default)        : tracks packed at the left
+	 *   - flex-end                    : tracks packed at the right
+	 *   - center                      : tracks packed at the centre
+	 *   - space-between               : extra space split between tracks
+	 *   - space-around / space-evenly : extra space wraps the tracks
+	 *
+	 * Implementation: compute used_width (tracks + gaps), then either
+	 * shift track_x[] by a uniform delta (start/end/center) or rebuild
+	 * track_x[] with redistributed gaps (space-*). For the non-tracks
+	 * uniform-spacing path, derive a synthetic track_x[] so the same
+	 * code path applies. */
+	{
+		uint8_t jc = CSS_JUSTIFY_CONTENT_INHERIT;
+		if (grid->style != NULL) {
+			jc = css_computed_justify_content(grid->style);
+		}
+		if (cols >= 1 &&
+		    jc != CSS_JUSTIFY_CONTENT_INHERIT &&
+		    jc != CSS_JUSTIFY_CONTENT_FLEX_START) {
+			int used_width;
+			int free_space;
+			int total_gap_w = col_gap * (cols - 1);
+			if (!has_tracks) {
+				/* Synthesize track_x[] from uniform spacing so
+				 * the same redistribute logic applies below. */
+				for (i = 0; i < cols && i < MACSURF_GRID_TRACK_MAX; i++) {
+					track_x[i] = i * (col_width + col_gap);
+					track_widths[i] = col_width;
+				}
+				if (cols <= MACSURF_GRID_TRACK_MAX) {
+					n_tracks = cols;
+				} else {
+					n_tracks = MACSURF_GRID_TRACK_MAX;
+				}
+				has_tracks = true;
+			}
+			used_width = 0;
+			for (i = 0; i < n_tracks; i++) {
+				used_width += track_widths[i];
+			}
+			used_width += total_gap_w;
+			free_space = container_width - used_width;
+			if (free_space > 0) {
+				int delta_start = 0;
+				int extra_gap = 0;
+				int leading_gap = 0;
+				switch (jc) {
+				case CSS_JUSTIFY_CONTENT_FLEX_END:
+					delta_start = free_space;
+					break;
+				case CSS_JUSTIFY_CONTENT_CENTER:
+					delta_start = free_space / 2;
+					break;
+				case CSS_JUSTIFY_CONTENT_SPACE_BETWEEN:
+					if (n_tracks > 1) {
+						extra_gap = free_space /
+							(n_tracks - 1);
+					}
+					break;
+				case CSS_JUSTIFY_CONTENT_SPACE_AROUND:
+					if (n_tracks > 0) {
+						extra_gap = free_space / n_tracks;
+						leading_gap = extra_gap / 2;
+					}
+					break;
+				case CSS_JUSTIFY_CONTENT_SPACE_EVENLY:
+					if (n_tracks > 0) {
+						extra_gap = free_space /
+							(n_tracks + 1);
+						leading_gap = extra_gap;
+					}
+					break;
+				default:
+					/* flex-start / start / left / normal */
+					break;
+				}
+				{
+					int x = delta_start + leading_gap;
+					for (i = 0; i < n_tracks; i++) {
+						track_x[i] = x;
+						x += track_widths[i] + col_gap +
+							extra_gap;
+					}
+				}
+			}
+		}
+	}
+
 	/* fixes150 -- read row tracks. V1 honours PX heights; FR and
 	 * PERCENT row tracks degrade to tallest-child sizing (the
 	 * existing auto-row behaviour) because we don't have a definite
@@ -972,6 +1068,83 @@ static bool layout_grid_inner(struct box *grid, int available_width,
 				row_y -= row_gap;
 			}
 			(void)last_h;
+
+			/* fixes270 (#4) — align-content on the grid container
+			 * distributes rows along the block (vertical) axis.
+			 * Mirrors the justify-content logic on the inline
+			 * axis. Only kicks in when there is a definite
+			 * container height and rows leave free space.
+			 *
+			 * Without a definite height we can't tell where the
+			 * "free space" is, so align-content is a no-op
+			 * (matches CSS spec: aligns to the container's
+			 * block-size; an indefinite block-size means no
+			 * free space to redistribute). */
+			if (max_row_used >= 0 && grid->height > 0 &&
+			    grid->height > row_y) {
+				uint8_t ac = CSS_ALIGN_CONTENT_INHERIT;
+				if (grid->style != NULL) {
+					ac = css_computed_align_content(
+							grid->style);
+				}
+				if (ac != CSS_ALIGN_CONTENT_INHERIT &&
+				    ac != CSS_ALIGN_CONTENT_STRETCH &&
+				    ac != CSS_ALIGN_CONTENT_FLEX_START) {
+					int n_rows = max_row_used + 1;
+					int free_v = grid->height - row_y;
+					int delta_top = 0;
+					int extra_gap = 0;
+					int leading = 0;
+					switch (ac) {
+					case CSS_ALIGN_CONTENT_FLEX_END:
+						delta_top = free_v;
+						break;
+					case CSS_ALIGN_CONTENT_CENTER:
+						delta_top = free_v / 2;
+						break;
+					case CSS_ALIGN_CONTENT_SPACE_BETWEEN:
+						if (n_rows > 1) {
+							extra_gap = free_v /
+								(n_rows - 1);
+						}
+						break;
+					case CSS_ALIGN_CONTENT_SPACE_AROUND:
+						if (n_rows > 0) {
+							extra_gap = free_v /
+								n_rows;
+							leading = extra_gap / 2;
+						}
+						break;
+					case CSS_ALIGN_CONTENT_SPACE_EVENLY:
+						if (n_rows > 0) {
+							extra_gap = free_v /
+								(n_rows + 1);
+							leading = extra_gap;
+						}
+						break;
+					default:
+						break;
+					}
+					{
+						int yy = delta_top + leading;
+						int rr;
+						for (rr = 0;
+						     rr <= max_row_used &&
+						     rr < MACSURF_GRID_ROWS_MAX;
+						     rr++) {
+							int h = row_max_h[rr];
+							if (has_row_tracks &&
+							    rr < n_row_tracks &&
+							    row_track_h[rr] > 0) {
+								h = row_track_h[rr];
+							}
+							row_y_arr[rr] = yy;
+							yy += h + row_gap +
+								extra_gap;
+						}
+					}
+				}
+			}
 		}
 
 		/* --- Pass 3: position each child.
