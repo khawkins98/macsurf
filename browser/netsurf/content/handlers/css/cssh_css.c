@@ -2364,6 +2364,206 @@ macsurf__strip_stacked_gradients(const char *data, size_t in_size)
 }
 
 
+/* fixes280 — narrow calc() evaluator for the aspect-ratio padding hack.
+ *
+ * Real-world pattern: `padding-top: calc(105 / 478 * 100%)`. mactrove's
+ * Platinum theme uses this to maintain a fixed aspect ratio on absolutely-
+ * positioned banner images. If libcss can't fold the expression, padding-
+ * top stays 0, the container collapses, and the positioned images render
+ * at 0×0.
+ *
+ * Scope: recognise EXACTLY the patterns
+ *   calc( <num> / <num> * <num>% )
+ *   calc( <num> * <num>% )
+ *   calc( <num>% * <num> )
+ *   calc( <num> / <num> )       -> emit unitless number scaled to 4 decimals
+ * Numbers are integer or decimal; whitespace flexible. Anything more
+ * complex falls through unchanged for libcss's existing calc parser.
+ *
+ * In-place same-size rewrite: output is padded with trailing spaces so
+ * the declaration's length stays put.
+ *
+ * Why a preprocessor instead of fixing libcss's calc: libcss's calc
+ * resolution happens at bytecode-eval time and supports lengths better
+ * than percentages-with-arithmetic. This pattern is constant-folded at
+ * source-rewrite time so libcss sees a plain percentage. */
+static int
+macsurf__cc_skip_ws(const char *s, int len, int p)
+{
+	while (p < len && (s[p] == ' ' || s[p] == '\t' ||
+			s[p] == '\n' || s[p] == '\r'))
+		p++;
+	return p;
+}
+
+static bool
+macsurf__cc_read_number(const char *s, int len, int *p,
+		double *out)
+{
+	int start = *p;
+	bool seen_digit = false;
+	double sign = 1.0;
+	double value = 0.0;
+	double frac = 0.0;
+	double div = 10.0;
+
+	if (*p < len && s[*p] == '-') { sign = -1.0; (*p)++; }
+	else if (*p < len && s[*p] == '+') { (*p)++; }
+	while (*p < len && s[*p] >= '0' && s[*p] <= '9') {
+		value = value * 10.0 + (s[*p] - '0');
+		seen_digit = true;
+		(*p)++;
+	}
+	if (*p < len && s[*p] == '.') {
+		(*p)++;
+		while (*p < len && s[*p] >= '0' && s[*p] <= '9') {
+			frac += (s[*p] - '0') / div;
+			div *= 10.0;
+			seen_digit = true;
+			(*p)++;
+		}
+	}
+	if (!seen_digit) {
+		*p = start;
+		return false;
+	}
+	*out = sign * (value + frac);
+	return true;
+}
+
+static char *
+macsurf__rewrite_calc_aspect(const char *data, size_t in_size)
+{
+	static const char NEEDLE[] = "calc(";
+	static const size_t NEEDLE_LEN = 5;
+	char *out;
+	size_t i;
+	int changed = 0;
+
+	out = (char *)malloc(in_size);
+	if (out == NULL) return NULL;
+	memcpy(out, data, in_size);
+
+	i = 0;
+	while (i + NEEDLE_LEN < in_size) {
+		int p, q;
+		double a, b, c;
+		bool ok;
+		char rep[40];
+		size_t rlen;
+		size_t close_pos;
+		int paren;
+		bool has_pct = false;
+		double result = 0.0;
+		bool result_is_pct = false;
+		int op1 = 0;
+		int op2 = 0;
+
+		if (memcmp(out + i, NEEDLE, NEEDLE_LEN) != 0) {
+			i++;
+			continue;
+		}
+
+		p = (int)(i + NEEDLE_LEN);
+		paren = 1;
+		q = p;
+		while (q < (int)in_size && paren > 0) {
+			if (out[q] == '(') paren++;
+			else if (out[q] == ')') {
+				paren--;
+				if (paren == 0) break;
+			}
+			q++;
+		}
+		if (q >= (int)in_size) { i++; continue; }
+		close_pos = (size_t)q;
+
+		/* Try to read: <num>[%] [op <num>[%] [op <num>[%]]] */
+		p = macsurf__cc_skip_ws(out, q, p);
+		ok = macsurf__cc_read_number(out, q, &p, &a);
+		if (!ok) { i = close_pos + 1; continue; }
+		p = macsurf__cc_skip_ws(out, q, p);
+		if (p < q && out[p] == '%') { has_pct = true; result_is_pct = true; p++; }
+		p = macsurf__cc_skip_ws(out, q, p);
+
+		if (p >= q) {
+			/* calc(num) or calc(num%) — already simple, skip. */
+			i = close_pos + 1;
+			continue;
+		}
+
+		if (out[p] == '*' || out[p] == '/') {
+			op1 = out[p];
+			p++;
+			p = macsurf__cc_skip_ws(out, q, p);
+			ok = macsurf__cc_read_number(out, q, &p, &b);
+			if (!ok) { i = close_pos + 1; continue; }
+			p = macsurf__cc_skip_ws(out, q, p);
+			if (p < q && out[p] == '%') {
+				has_pct = true;
+				result_is_pct = true;
+				p++;
+			}
+			p = macsurf__cc_skip_ws(out, q, p);
+		} else {
+			i = close_pos + 1;
+			continue;
+		}
+
+		if (p < q && (out[p] == '*' || out[p] == '/')) {
+			op2 = out[p];
+			p++;
+			p = macsurf__cc_skip_ws(out, q, p);
+			ok = macsurf__cc_read_number(out, q, &p, &c);
+			if (!ok) { i = close_pos + 1; continue; }
+			p = macsurf__cc_skip_ws(out, q, p);
+			if (p < q && out[p] == '%') {
+				has_pct = true;
+				result_is_pct = true;
+				p++;
+			}
+			p = macsurf__cc_skip_ws(out, q, p);
+		}
+
+		if (p != q) { i = close_pos + 1; continue; }
+		(void)has_pct;
+
+		/* Compute. */
+		result = a;
+		if (op1 == '*') result = result * b;
+		else if (op1 == '/') {
+			if (b == 0.0) { i = close_pos + 1; continue; }
+			result = result / b;
+		}
+		if (op2 == '*') result = result * c;
+		else if (op2 == '/') {
+			if (c == 0.0) { i = close_pos + 1; continue; }
+			result = result / c;
+		}
+
+		rlen = (size_t)sprintf(rep, result_is_pct ? "%.4f%%" : "%.4f",
+				result);
+		/* Replace calc(...) [length = close_pos - i + 1] with rep,
+		 * pad remainder with spaces. */
+		{
+			size_t span = close_pos - i + 1;
+			if (rlen > span) {
+				/* Won't fit — leave alone. */
+				i = close_pos + 1;
+				continue;
+			}
+			memcpy(out + i, rep, rlen);
+			memset(out + i + rlen, ' ', span - rlen);
+		}
+		i = close_pos + 1;
+		changed = 1;
+	}
+
+	if (!changed) { free(out); return NULL; }
+	return out;
+}
+
+
 /* fixes185 — modern-CSS compatibility preprocessor. Rewrites unsupported
  * modern syntax into supported equivalents (or drops it) so author CSS
  * keeps cascading instead of having rules silently dropped by libcss.
@@ -3816,6 +4016,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_grid_align = NULL; /* fixes274 grid alignment */
 	char *rewritten_grid_flow = NULL;  /* fixes275 grid-auto-flow */
 	char *rewritten_logical = NULL;    /* fixes277 logical properties */
+	char *rewritten_calc = NULL;       /* fixes280 calc() arithmetic */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -3922,6 +4123,14 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_logical != NULL) {
 		data = (const char *)rewritten_logical;
 		/* In-place rewrite: size unchanged. */
+	}
+
+	/* fixes280 — fold calc() arithmetic for simple aspect-ratio
+	 * padding-hack patterns: calc(N / M * 100%) -> N*100/M %. */
+	rewritten_calc = macsurf__rewrite_calc_aspect(data, (size_t)size);
+	if (rewritten_calc != NULL) {
+		data = (const char *)rewritten_calc;
+		/* In-place same-size rewrite. */
 	}
 
 	/* fixes115 — pre-process the CSS bytes to convert
@@ -4089,6 +4298,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_grid_align != NULL) free(rewritten_grid_align); /* fixes274 */
 	if (rewritten_grid_flow != NULL) free(rewritten_grid_flow); /* fixes275 */
 	if (rewritten_logical != NULL) free(rewritten_logical); /* fixes277 */
+	if (rewritten_calc != NULL) free(rewritten_calc); /* fixes280 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);
