@@ -152,6 +152,38 @@ static inline bool mq_match_feature(
 		}
 
 		return false;
+	} else {
+		/* fixes273 (#52) — orientation media feature. Direct text
+		 * comparison so we don't depend on str->orientation being
+		 * initialized (which would require strings.c to have
+		 * rebuilt alongside this header — a CW8 trap zone). */
+		const char *name_data = lwc_string_data(feat->name);
+		size_t name_len = lwc_string_length(feat->name);
+		if (name_len == 11 &&
+				memcmp(name_data, "orientation", 11) == 0) {
+			if (feat->op == CSS_MQ_FEATURE_OP_BOOL) {
+				return true;
+			}
+			if (feat->op == CSS_MQ_FEATURE_OP_EQ &&
+					feat->value.type == CSS_MQ_VALUE_TYPE_IDENT &&
+					feat->value.data.ident != NULL) {
+				const char *v_data = lwc_string_data(
+						feat->value.data.ident);
+				size_t v_len = lwc_string_length(
+						feat->value.data.ident);
+				if (v_len == 9 && memcmp(v_data,
+						"landscape", 9) == 0) {
+					return media->orientation ==
+						CSS_MEDIA_ORIENTATION_LANDSCAPE;
+				}
+				if (v_len == 8 && memcmp(v_data,
+						"portrait", 8) == 0) {
+					return media->orientation ==
+						CSS_MEDIA_ORIENTATION_PORTRAIT;
+				}
+			}
+			return false;
+		}
 	}
 
 	/* TODO: Look at other feature names. */

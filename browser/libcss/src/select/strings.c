@@ -195,6 +195,20 @@ css_error css_select_strings_intern(css_select_strings *str)
 	if (error != lwc_error_ok)
 		return css_error_from_lwc_error(error);
 
+	/* fixes273 (#52) — orientation media feature + its keyword values. */
+	error = lwc_intern_string("orientation", SLEN("orientation"),
+			&str->orientation);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+	error = lwc_intern_string("portrait", SLEN("portrait"),
+			&str->portrait);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+	error = lwc_intern_string("landscape", SLEN("landscape"),
+			&str->landscape);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+
 	return CSS_OK;
 }
 
@@ -231,4 +245,7 @@ void css_select_strings_unref(css_select_strings *str)
 	lwc_string_unref(str->width);
 	lwc_string_unref(str->height);
 	lwc_string_unref(str->prefers_color_scheme);
+	lwc_string_unref(str->orientation);   /* fixes273 */
+	lwc_string_unref(str->portrait);
+	lwc_string_unref(str->landscape);
 }
