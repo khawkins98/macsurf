@@ -455,7 +455,9 @@ macsurf_debug_log_write(const char *msg)
 	}
 	if (msg[0] == 'g' && strncmp(msg, "gw_event: e=", 12) == 0) return;
 	if (msg[0] == 'L' && strncmp(msg, "LAYOUT_CRUMB", 12) == 0) return;
-	if (msg[0] == 'S' && strncmp(msg, "SITE url=", 9) == 0) return;
+	/* fixes268 — SITE filter removed. Issues #9 and #11 require the
+	 * SITE line to surface css_total= and blocker= for verification.
+	 * SITE fires a few times per page reformat (low volume; survivable). */
 #endif
 
 	/* fixes233 — prepend ms-since-first-log to every line so we can
