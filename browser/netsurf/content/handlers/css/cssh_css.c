@@ -2700,6 +2700,276 @@ grow_fail:
 }
 
 
+/* fixes273 (Bundle I) — at-rule preprocessor for @supports and @layer.
+ *
+ * libcss in this vintage doesn't parse @supports or @layer rules
+ * natively. Without preprocessing, author CSS that wraps modern
+ * feature-detection or cascade-layer organisation around their rules
+ * loses everything inside the wrapper.
+ *
+ * V1 strategy (zero libcss surgery):
+ *
+ *   @supports ( PROP : VAL ) { INNER }
+ *     -> INNER (assume support, let cascade handle the inner rules;
+ *        any libcss-unsupported declarations drop naturally)
+ *
+ *   @supports not ( PROP : VAL ) { INNER }
+ *     -> (drop entirely; the block was intended for browsers WITHOUT
+ *        the feature, but we DO support most modern properties)
+ *
+ *   @supports ( A ) and ( B ) { INNER } / @supports ( A ) or ( B ) { ... }
+ *     -> INNER (conservative include for complex queries)
+ *
+ *   @layer NAME { INNER }     -> INNER (flatten cascade priority)
+ *   @layer NAME, NAME, ... ;  -> (strip declaration-only form)
+ *
+ * Brace-counting scan to find matching '}'. String / comment / paren
+ * contents are tracked to avoid counting braces inside them. Output
+ * grows when blocks are kept, shrinks when blocks are dropped. */
+static char *
+macsurf__rewrite_at_rules(const char *data, size_t in_size,
+		size_t *out_size_p)
+{
+	char *out;
+	size_t cap;
+	size_t out_pos = 0;
+	size_t i = 0;
+	int changed = 0;
+
+	cap = in_size + 256;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		bool is_supports = false;
+		bool is_layer = false;
+		size_t name_len = 0;
+
+		/* Skip CSS comments — without this, `/* @supports ... *\/`
+		 * comment text falsely triggers the preprocessor and orphans
+		 * the comment opening, which libcss then treats as eating the
+		 * rest of the stylesheet. */
+		if (data[i] == '/' && i + 1 < in_size && data[i + 1] == '*') {
+			size_t k = i + 2;
+			while (k + 1 < in_size) {
+				if (data[k] == '*' && data[k + 1] == '/') {
+					k += 2;
+					break;
+				}
+				k++;
+			}
+			if (k + 1 >= in_size) k = in_size;
+			while (out_pos + (k - i) + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + (k - i) + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			memcpy(out + out_pos, data + i, k - i);
+			out_pos += (k - i);
+			i = k;
+			continue;
+		}
+
+		/* Skip CSS string literals — same reason as comments. */
+		if (data[i] == '"' || data[i] == '\'') {
+			char quote = data[i];
+			size_t k = i + 1;
+			while (k < in_size && data[k] != quote) {
+				if (data[k] == '\\' && k + 1 < in_size) k += 2;
+				else k++;
+			}
+			if (k < in_size) k++;   /* include closing quote */
+			while (out_pos + (k - i) + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + (k - i) + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			memcpy(out + out_pos, data + i, k - i);
+			out_pos += (k - i);
+			i = k;
+			continue;
+		}
+
+		/* Detect @supports / @layer at this position. Must be at
+		 * statement start (preceded by whitespace, ';', '{', '}',
+		 * or start-of-input). */
+		if (data[i] == '@' && i + 8 < in_size) {
+			char prev = (i > 0) ? data[i - 1] : ' ';
+			if (prev == ' ' || prev == '\t' || prev == '\n' ||
+			    prev == '\r' || prev == ';' || prev == '{' ||
+			    prev == '}' || i == 0) {
+				if (i + 9 <= in_size &&
+				    memcmp(data + i, "@supports", 9) == 0 &&
+				    (data[i + 9] == ' ' || data[i + 9] == '\t' ||
+				     data[i + 9] == '(' || data[i + 9] == '\n')) {
+					is_supports = true;
+					name_len = 9;
+				} else if (i + 6 <= in_size &&
+					   memcmp(data + i, "@layer", 6) == 0 &&
+					   (data[i + 6] == ' ' || data[i + 6] == '\t' ||
+					    data[i + 6] == ';' || data[i + 6] == '\n')) {
+					is_layer = true;
+					name_len = 6;
+				}
+			}
+		}
+
+		if (!is_supports && !is_layer) {
+			if (out_pos + 1 >= cap) {
+				char *bigger;
+				cap = cap * 2 + 64;
+				bigger = (char *)realloc(out, cap);
+				if (bigger == NULL) { free(out); return NULL; }
+				out = bigger;
+			}
+			out[out_pos++] = data[i++];
+			continue;
+		}
+
+		changed = 1;
+
+		{
+			size_t j = i + name_len;
+			bool has_not = false;
+			size_t brace_open;
+			size_t brace_close;
+			int depth;
+			size_t inner_start;
+			size_t inner_end;
+			bool keep_inner;
+
+			/* Skip whitespace after the at-rule name. */
+			while (j < in_size && (data[j] == ' ' ||
+					data[j] == '\t' || data[j] == '\n' ||
+					data[j] == '\r')) j++;
+
+			/* For @supports, check for leading 'not' keyword. */
+			if (is_supports && j + 3 < in_size &&
+			    memcmp(data + j, "not", 3) == 0 &&
+			    (data[j + 3] == ' ' || data[j + 3] == '\t' ||
+			     data[j + 3] == '(')) {
+				has_not = true;
+				j += 3;
+				while (j < in_size && (data[j] == ' ' ||
+						data[j] == '\t')) j++;
+			}
+
+			/* For @layer in declaration form (ends at ';' before
+			 * any '{') — strip the whole statement. */
+			if (is_layer) {
+				size_t scan = j;
+				size_t semi = (size_t)-1;
+				while (scan < in_size && data[scan] != '{' &&
+						data[scan] != ';') scan++;
+				if (scan < in_size && data[scan] == ';') {
+					semi = scan;
+					i = semi + 1;
+					continue;
+				}
+				/* otherwise falls through to block form below */
+			}
+
+			/* Find the opening '{' that begins the inner block.
+			 * Tracking parens so '(' / ')' inside the condition
+			 * aren't confused. */
+			brace_open = (size_t)-1;
+			{
+				int paren = 0;
+				size_t k = j;
+				while (k < in_size) {
+					char c = data[k];
+					if (c == '(') paren++;
+					else if (c == ')') paren--;
+					else if (c == '{' && paren == 0) {
+						brace_open = k;
+						break;
+					} else if (c == ';' && paren == 0) {
+						break;   /* shouldn't happen here */
+					}
+					k++;
+				}
+			}
+			if (brace_open == (size_t)-1) {
+				/* Malformed; skip the '@' and continue. */
+				out[out_pos++] = data[i++];
+				continue;
+			}
+
+			/* Find the matching close brace. */
+			depth = 1;
+			brace_close = (size_t)-1;
+			{
+				size_t k = brace_open + 1;
+				while (k < in_size) {
+					char c = data[k];
+					if (c == '{') depth++;
+					else if (c == '}') {
+						depth--;
+						if (depth == 0) {
+							brace_close = k;
+							break;
+						}
+					}
+					k++;
+				}
+			}
+			if (brace_close == (size_t)-1) {
+				/* Unterminated; emit rest as-is. */
+				while (i < in_size) {
+					if (out_pos + 1 >= cap) {
+						char *bigger;
+						cap = cap * 2 + 64;
+						bigger = (char *)realloc(out, cap);
+						if (bigger == NULL) { free(out); return NULL; }
+						out = bigger;
+					}
+					out[out_pos++] = data[i++];
+				}
+				break;
+			}
+
+			inner_start = brace_open + 1;
+			inner_end = brace_close;
+
+			/* Decide whether to keep the inner block. */
+			if (is_supports) {
+				keep_inner = !has_not;
+			} else {
+				keep_inner = true;   /* @layer always flattens */
+			}
+
+			if (keep_inner) {
+				size_t copy_len = inner_end - inner_start;
+				while (out_pos + copy_len + 1 >= cap) {
+					char *bigger;
+					cap = cap * 2 + copy_len + 64;
+					bigger = (char *)realloc(out, cap);
+					if (bigger == NULL) { free(out); return NULL; }
+					out = bigger;
+				}
+				memcpy(out + out_pos, data + inner_start,
+						copy_len);
+				out_pos += copy_len;
+			}
+
+			i = brace_close + 1;
+		}
+	}
+
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+
+	*out_size_p = out_pos;
+	return out;
+}
+
+
 /* fixes202 — inline-style preprocessor.
  *
  * External stylesheets and <style> blocks run through nscss_process_data
@@ -2798,6 +3068,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_object_position = NULL;
 	char *rewritten_modern_compat = NULL;
 	char *rewritten_inset = NULL;
+	char *rewritten_at_rules = NULL;   /* fixes273 — @supports/@layer */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -2851,6 +3122,21 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 				(long)total_cap);
 			content_broadcast_error(c, NSERROR_CSS, NULL);
 			return false;
+		}
+	}
+
+	/* fixes273 (Bundle I) — earliest pass: unwrap / drop @supports
+	 * and @layer wrappers since libcss in this vintage doesn't parse
+	 * them natively. Inner rules then flow through the rest of the
+	 * preprocessing chain normally. */
+	{
+		size_t at_size = 0;
+		rewritten_at_rules = macsurf__rewrite_at_rules(data,
+				(size_t)size, &at_size);
+		if (rewritten_at_rules != NULL &&
+				at_size <= (size_t)0x7fffffff) {
+			data = (const char *)rewritten_at_rules;
+			size = (unsigned int)at_size;
 		}
 	}
 
@@ -3003,6 +3289,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_col_span != NULL) free(rewritten_col_span);
 	if (rewritten_rows != NULL) free(rewritten_rows);
 	if (rewritten != NULL) free(rewritten);
+	if (rewritten_at_rules != NULL) free(rewritten_at_rules);   /* fixes273 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);

@@ -389,6 +389,13 @@ static void html_get_dimensions(html_content *htmlc)
 	 * media queries naturally match the desktop branch. */
 	htmlc->media.width  = w;
 	htmlc->media.height = h;
+	/* fixes273 (#52) — derive orientation from viewport dims so
+	 * @media (orientation: landscape) / (orientation: portrait)
+	 * evaluates correctly. Without this, orientation defaults to
+	 * PORTRAIT (0) regardless of the actual window size. */
+	htmlc->media.orientation = (w > h) ?
+			CSS_MEDIA_ORIENTATION_LANDSCAPE :
+			CSS_MEDIA_ORIENTATION_PORTRAIT;
 	htmlc->unit_len_ctx.viewport_width  = w;
 	htmlc->unit_len_ctx.viewport_height = h;
 	htmlc->unit_len_ctx.device_dpi = device_dpi;
