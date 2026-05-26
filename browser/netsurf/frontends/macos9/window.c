@@ -482,6 +482,26 @@ static void macos9_gw_set_pointer(struct gui_window *g, enum gui_pointer_shape s
 	case GUI_POINTER_MOVE:
 		SetThemeCursor(kThemeOpenHandCursor);
 		break;
+	/* fixes278 (#79): extended cursor mapping. Limited to constants
+	 * known to exist in early CarbonLib (1.x baseline on Mac OS 9.1).
+	 * kThemeContextualMenuArrowCursor and kThemeResizeLeftRightCursor
+	 * are present from CarbonLib 1.0. kThemeNotAllowedCursor was added
+	 * in CarbonLib 1.5; we approximate with kThemeArrowCursor for now
+	 * rather than risk a link error on the 9.1 G3 baseline. */
+	case GUI_POINTER_HELP:
+	case GUI_POINTER_NOT_ALLOWED:
+	case GUI_POINTER_NO_DROP:
+		SetThemeCursor(kThemeArrowCursor);
+		break;
+	case GUI_POINTER_MENU:
+		SetThemeCursor(kThemeContextualMenuArrowCursor);
+		break;
+	case GUI_POINTER_UP:
+	case GUI_POINTER_DOWN:
+	case GUI_POINTER_LEFT:
+	case GUI_POINTER_RIGHT:
+		SetThemeCursor(kThemeResizeLeftRightCursor);
+		break;
 	default:
 		SetThemeCursor(kThemeArrowCursor);
 		break;
