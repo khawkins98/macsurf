@@ -3698,9 +3698,21 @@ bool html_redraw_box(const html_content *html, struct box *box,
 		html_redraw_apply_object_fit(box, &obj_data);
 
 		if (!content_redraw(box->object, &obj_data, &r, ctx)) {
-			/* Show image fail */
-			/* Unicode (U+FFFC) 'OBJECT REPLACEMENT CHARACTER' */
-			const char *obj = "\xef\xbf\xbc";
+			/* fixes291 (#101): prefer the <img> `alt` text as the
+			 * fallback when image content fails to decode/fetch.
+			 * box_special.c box_image already captures the alt
+			 * attribute into box->text at parse; when present,
+			 * render it inside the placeholder rect rather than
+			 * the generic OBJECT REPLACEMENT CHARACTER glyph.
+			 *
+			 * V1 paint is small italic grey (plot_fstyle_broken_object)
+			 * centered inside the box's reserved replaced-element
+			 * dimensions, with a left-edge clamp so long alt text
+			 * doesn't render at a negative x offset.  Real V2
+			 * relaxes the IS_REPLACED layout when content is
+			 * permanently failed and lets alt flow as inline text. */
+			const char *fallback;
+			size_t fallback_len;
 			int obj_width;
 			int obj_x = x + padding_left;
 			nserror res;
@@ -3714,14 +3726,25 @@ bool html_redraw_box(const html_content *html, struct box *box,
 				return false;
 			}
 
+			if (box->text != NULL && box->length > 0) {
+				fallback = box->text;
+				fallback_len = box->length;
+			} else {
+				/* Unicode (U+FFFC) 'OBJECT REPLACEMENT CHARACTER' */
+				fallback = "\xef\xbf\xbc";
+				fallback_len = 3;
+			}
+
 			res = guit->layout->width(plot_fstyle_broken_object,
-						  obj,
-						  sizeof(obj) - 1,
+						  fallback,
+						  fallback_len,
 						  &obj_width);
 			if (res != NSERROR_OK) {
 				obj_x += 1;
 			} else {
 				obj_x += width / 2 - obj_width / 2;
+				if (obj_x < x + padding_left)
+					obj_x = x + padding_left + 2;
 			}
 
 			if (ctx->plot->text(ctx,
@@ -3730,7 +3753,7 @@ bool html_redraw_box(const html_content *html, struct box *box,
 						    font_plot_style_baseline(
 							    plot_fstyle_broken_object,
 							    height),
-					    obj, sizeof(obj) - 1) != NSERROR_OK)
+					    fallback, fallback_len) != NSERROR_OK)
 				return false;
 		}
 	} else if (tag_type == DOM_HTML_ELEMENT_TYPE_CANVAS &&
