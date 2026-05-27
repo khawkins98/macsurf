@@ -268,8 +268,18 @@ static void macos9_handle_update(const EventRecord *event) {
 		EraseRect(&update_bounds);
 	} else {
 		/* Fallback path: paint directly into window. Flash returns. */
+		Boolean fb_top_dirty = (Boolean)(update_bounds.top < gw->content_rect.top);
+		Boolean fb_bot_dirty = (Boolean)(update_bounds.bottom > gw->content_rect.bottom);
 		EraseRect(&gw->content_rect);
-		draw_url_bar(gw); DrawControls(win); macos9_window_draw_toolbar_icons(gw); draw_status_bar(gw);
+		if (fb_top_dirty) {
+			macos9_window_draw_toolbar_bg(gw);
+			draw_url_bar(gw);
+			DrawControls(win);
+			macos9_window_draw_toolbar_icons(gw);
+		}
+		if (fb_bot_dirty) {
+			draw_status_bar(gw);
+		}
 	}
 	{ extern struct hlcache_handle *browser_window_get_content(struct browser_window *);
 	  struct hlcache_handle *cur = gw->bw ? browser_window_get_content(gw->bw) : NULL;
@@ -352,10 +362,23 @@ static void macos9_handle_update(const EventRecord *event) {
 			if (gwpm != NULL) UnlockPixels(gwpm);
 			gworld_active = (Boolean)0;
 		}
-		draw_url_bar(gw);
-		DrawControls(win);
-		macos9_window_draw_toolbar_icons(gw);    /* fixes297 */
-		draw_status_bar(gw);
+		/* fixes297h / fixes298 — only paint chrome regions that are
+		 * actually dirty.  Top chrome = toolbar+URL bar+buttons.
+		 * Bottom chrome = status bar.  Gradient bg paints first so
+		 * the URL bar and button icons sit on top of it. */
+		{
+			Boolean top_dirty = (Boolean)(update_bounds.top < gw->content_rect.top);
+			Boolean bot_dirty = (Boolean)(update_bounds.bottom > gw->content_rect.bottom);
+			if (top_dirty) {
+				macos9_window_draw_toolbar_bg(gw);
+				draw_url_bar(gw);
+				DrawControls(win);
+				macos9_window_draw_toolbar_icons(gw);
+			}
+			if (bot_dirty) {
+				draw_status_bar(gw);
+			}
+		}
 		if (gw->url_field_active && gw->url_te) TEActivate(gw->url_te);
 	} else if (gw->bw) {
 		MS_LOG("update: bw not ready, skip");
@@ -425,14 +448,27 @@ void macos9_handle_mouse_down(const EventRecord *event) {
 						if (cpart != 0 && ctrl != NULL) {
 							if (ctrl == gw->vscroll || ctrl == gw->hscroll) {
 								macos9_window_handle_scrollbar_click(gw, ctrl, cpart, &p);
-							} else if (ctrl == gw->back_btn && TrackControl(ctrl, p, NULL)) {
-								macos9_window_back(gw);
-							} else if (ctrl == gw->forward_btn && TrackControl(ctrl, p, NULL)) {
-								macos9_window_forward(gw);
-							} else if (ctrl == gw->reload_btn && TrackControl(ctrl, p, NULL)) {
-								macos9_window_reload(gw);
-							} else if (ctrl == gw->home_btn && TrackControl(ctrl, p, NULL)) {
-								macos9_window_home(gw);
+							} else if (ctrl == gw->back_btn ||
+							           ctrl == gw->forward_btn ||
+							           ctrl == gw->reload_btn ||
+							           ctrl == gw->home_btn) {
+								/* fixes298 — user-pane controls
+								 * (kControlUserPaneProc 256) don't
+								 * track via TrackControl, so we do a
+								 * tiny wait-for-mouseup + PtInRect
+								 * check.  Same UX as Carbon
+								 * push-button without the platinum. */
+								Rect bb;
+								Point up;
+								Boolean fired;
+								GetControlBounds(ctrl, &bb);
+								while (StillDown()) { /* spin */ }
+								GetMouse(&up);
+								fired = (Boolean)PtInRect(up, &bb);
+								if (fired && ctrl == gw->back_btn)    macos9_window_back(gw);
+								else if (fired && ctrl == gw->forward_btn) macos9_window_forward(gw);
+								else if (fired && ctrl == gw->reload_btn)  macos9_window_reload(gw);
+								else if (fired && ctrl == gw->home_btn)    macos9_window_home(gw);
 							}
 						} else if (PtInRect(p, &gw->url_rect)) {
 							macos9_window_te_activate_url(gw);

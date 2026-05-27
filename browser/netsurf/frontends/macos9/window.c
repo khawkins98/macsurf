@@ -170,6 +170,53 @@ static void set_status_text(struct gui_window *g, const char *m) { if(!m) g->sta
 /* fixes294 — shift TE field's left by +20 to leave room for the favicon. */
 static void compute_url_te_rect(const Rect *u, Rect *o) { o->left=(short)(u->left+20); o->top=(short)(u->top+2); o->right=(short)(u->right-4); o->bottom=(short)(u->bottom-2); }
 
+/* fixes298 — paint a Netscape-7-style vertical gradient as the toolbar
+ * background.  Light grey at the top, slightly darker at the bottom.
+ * Called from main.c's chrome paint path BEFORE draw_url_bar / DrawControls
+ * / draw_toolbar_icons so everything else sits on top of the gradient. */
+void macos9_window_draw_toolbar_bg(struct gui_window *g)
+{
+#ifdef __MACOS9__
+	Rect w_bounds;
+	Rect row;
+	short y;
+	short total;
+	short top_v = 0xEC;     /* very light grey */
+	short bot_v = 0xC0;     /* mid grey */
+	RGBColor saved_fg;
+	GWorldPtr saved_port;
+	GDHandle saved_gdh;
+
+	if (g == NULL || g->window == NULL) return;
+
+	GetGWorld(&saved_port, &saved_gdh);
+	SetPortWindowPort(g->window);
+	GetForeColor(&saved_fg);
+
+	GetWindowBounds(g->window, 33, &w_bounds);
+	total = (short)(g->content_rect.top);    /* paint y=0..top-1 */
+	for (y = 0; y < total; y++) {
+		short t = (short)((long)y * 100L / (total > 0 ? total : 1));
+		short v = (short)(top_v + ((long)(bot_v - top_v) * t / 100L));
+		RGBColor c;
+		c.red = (unsigned short)((v << 8) | v);
+		c.green = c.red;
+		c.blue = c.red;
+		row.left = 0;
+		row.top = y;
+		row.right = (short)(w_bounds.right - w_bounds.left);
+		row.bottom = (short)(y + 1);
+		RGBForeColor(&c);
+		PaintRect(&row);
+	}
+
+	RGBForeColor(&saved_fg);
+	SetGWorld(saved_port, saved_gdh);
+#else
+	(void)g;
+#endif
+}
+
 /* fixes294 — return the favicon's paint rect inside a given url_rect. */
 static void compute_favicon_rect(const Rect *u, Rect *o)
 {
@@ -184,11 +231,12 @@ static void compute_favicon_rect(const Rect *u, Rect *o)
 void macos9_window_layout(struct gui_window *g) {
 	Rect c; short w, h, ux, ur, cb, ht; if(!g||!g->window) return;
 	GetWindowBounds(g->window, 33, &c); w=(short)(c.right-c.left); h=(short)(c.bottom-c.top);
-	/* fixes297a — toolbar buttons shrunk from 60w to 32w (icon-only),
-	 * 4px gap unchanged.  URL bar starts at x=4+4*36=148 (was 260). */
-	ux=(short)(4+4*36); ur=(short)(w-4); SetRect(&g->url_rect, ux, 8, ur, 30);
-	ht=(short)(h-15); cb=(short)(ht-16); SetRect(&g->content_rect, 0, 38, (short)(w-15), cb); SetRect(&g->status_rect, 0, cb, (short)(w-15), ht);
-	if(g->vscroll) { MoveControl(g->vscroll, (short)(w-15), 37); SizeControl(g->vscroll, 16, (short)(cb-36)); }
+	/* fixes298 — toolbar grows from 22 tall (y=8..30) to 28 tall
+	 * (y=8..36).  Content area starts at y=44 (was 38).  URL bar
+	 * vertically centered in new toolbar at y=10..34. */
+	ux=(short)(4+4*36); ur=(short)(w-4); SetRect(&g->url_rect, ux, 10, ur, 34);
+	ht=(short)(h-15); cb=(short)(ht-16); SetRect(&g->content_rect, 0, 44, (short)(w-15), cb); SetRect(&g->status_rect, 0, cb, (short)(w-15), ht);
+	if(g->vscroll) { MoveControl(g->vscroll, (short)(w-15), 43); SizeControl(g->vscroll, 16, (short)(cb-42)); }
 	if(g->hscroll) { MoveControl(g->hscroll, -1, ht); SizeControl(g->hscroll, (short)(w-13), 16); }
 }
 
@@ -492,16 +540,22 @@ static struct gui_window *macos9_window_create(struct browser_window *bw, struct
 	g->bw=bw; if(CreateNewWindow(6, 0x1F, &b, &g->window)!=0) { free(g); return NULL; }
 	SetWRefCon(g->window,(long)g); SetPortWindowPort(g->window); SetWTitle(g->window,(const unsigned char*)"\pMacSurf");
 	g->next=window_list; window_list=g; 
-	/* fixes297a — icon-only buttons.  Labels are empty Pascal strings so
-	 * the Carbon button paints platinum chrome only; macos9_window_draw_toolbar_icons
-	 * overlays the actual icon (back/fwd/refresh/home).  Button width
-	 * shrunk from 60 to 32 to match the 25x25 icon + a few pixels of
-	 * chrome margin.  URL bar now starts at x=4+4*36=148 (was 4+4*64=260),
-	 * gaining ~110px of address-bar width. */
-	x=4; SetRect(&b,x,8,(short)(x+32),30); g->back_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,1,368,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),30); g->forward_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,1,368,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),30); g->reload_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,1,368,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),30); g->home_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,1,368,(long)g);
+	/* fixes298 — switch buttons to kControlUserPaneProc (procID 256).
+	 * User-pane controls are INVISIBLE — Carbon paints nothing.  This
+	 * kills the platinum chrome + the box-lines outside our EraseRect
+	 * area + the platinum-pushed-button flash during click tracking.
+	 * Our paint helper is now the SOLE source of button visuals.
+	 *
+	 * Click handling switches from TrackControl (which user-pane
+	 * doesn't track) to PtInRect on mouse-up — see main.c.
+	 *
+	 * Bumped height: button bottom from 30 to 36 (was 22 tall, now
+	 * 28 tall) to comfortably contain 25x25 icons without crowding.
+	 * Top stays at 8.  Toolbar bottom moves from 38 to 44. */
+	x=4; SetRect(&b,x,8,(short)(x+32),36); g->back_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
+	SetRect(&b,x,8,(short)(x+32),36); g->forward_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
+	SetRect(&b,x,8,(short)(x+32),36); g->reload_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
+	SetRect(&b,x,8,(short)(x+32),36); g->home_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g);
 	SetRect(&b,0,0,16,16); g->vscroll=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,384,(long)g);
 	g->hscroll=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,384,(long)g);
 	macos9_window_layout(g);

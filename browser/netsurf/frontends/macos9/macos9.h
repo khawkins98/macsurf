@@ -165,6 +165,8 @@ void macos9_window_draw_favicon(struct gui_window *g);
 /* fixes297 — toolbar button icon overlays */
 void macos9_window_load_toolbar_icons(void);
 void macos9_window_draw_toolbar_icons(struct gui_window *g);
+/* fixes298 — Netscape-7-style gradient background for the toolbar area */
+void macos9_window_draw_toolbar_bg(struct gui_window *g);
 void macos9_window_update_scrollbars(struct gui_window *g);
 void macos9_window_scroll_to(struct gui_window *g, int nx, int ny);
 void macos9_window_scroll_by(struct gui_window *g, int dx, int dy);
