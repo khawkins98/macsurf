@@ -158,6 +158,10 @@ void macos9_window_invalidate_content(struct gui_window *g);
 void macos9_window_invalidate_rect(struct gui_window *g, int px, int py, int pw, int ph);
 void macos9_window_invalidate_status(struct gui_window *g);
 void macos9_window_invalidate_url(struct gui_window *g);
+/* fixes294 — Phase 0 favicon plumbing.  load fn must be called once at
+ * startup; draw fn is called from main.c's draw_url_bar after TEUpdate. */
+void macos9_window_load_default_favicon(void);
+void macos9_window_draw_favicon(struct gui_window *g);
 void macos9_window_update_scrollbars(struct gui_window *g);
 void macos9_window_scroll_to(struct gui_window *g, int nx, int ny);
 void macos9_window_scroll_by(struct gui_window *g, int dx, int dy);

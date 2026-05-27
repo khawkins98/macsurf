@@ -57,6 +57,9 @@ static void draw_url_bar(struct gui_window *gw) {
 	TextFont(kFontIDMonaco); TextSize(10); TextFace(0);
 	EraseRect(&gw->url_rect); FrameRect(&gw->url_rect);
 	if (gw->url_te != NULL) TEUpdate(&gw->url_rect, gw->url_te);
+	/* fixes294 — favicon paints on top of the URL field's white
+	 * background.  No-op if the default favicon failed to load. */
+	macos9_window_draw_favicon(gw);
 #endif
 }
 
@@ -701,6 +704,14 @@ int main(void) {
 
 	macos9_init_menus();
 	MS_LOG("menus installed");
+	/* fixes294 — decode the baked-in default favicon PNG into a GWorld
+	 * that lives for the life of the process.  Must happen AFTER
+	 * EnterMovies (which initialises QT but we use lodepng for this) and
+	 * AFTER menus install (purely conventional ordering, no real
+	 * dependency).  Idempotent and best-effort: paint helper bails if
+	 * load failed. */
+	macos9_window_load_default_favicon();
+	MS_LOG("default favicon loaded");
 #endif
 	memset(&macos9_table, 0, sizeof(macos9_table));
 	macos9_table.window = macos9_window_table;
