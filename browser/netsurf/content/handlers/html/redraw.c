@@ -3724,9 +3724,14 @@ bool html_redraw_box(const html_content *html, struct box *box,
 		html_redraw_apply_object_fit(box, &obj_data);
 
 		if (!content_redraw(box->object, &obj_data, &r, ctx)) {
-			/* Show image fail */
-			/* Unicode (U+FFFC) 'OBJECT REPLACEMENT CHARACTER' */
-			const char *obj = "\xef\xbf\xbc";
+			/* fixes285 (#101): prefer the <img> `alt` text as
+			 * fallback when image content fails. box_special.c
+			 * box_image captures alt into box->text at parse;
+			 * when present, render it centered inside the
+			 * placeholder rect rather than the generic broken-
+			 * object glyph. */
+			const char *fallback;
+			size_t fallback_len;
 			int obj_width;
 			int obj_x = x + padding_left;
 			nserror res;
@@ -3740,14 +3745,26 @@ bool html_redraw_box(const html_content *html, struct box *box,
 				return false;
 			}
 
+			if (box->text != NULL && box->length > 0) {
+				fallback = box->text;
+				fallback_len = box->length;
+			} else {
+				/* Unicode (U+FFFC) 'OBJECT
+				 * REPLACEMENT CHARACTER' */
+				fallback = "\xef\xbf\xbc";
+				fallback_len = 3;
+			}
+
 			res = guit->layout->width(plot_fstyle_broken_object,
-						  obj,
-						  sizeof(obj) - 1,
+						  fallback,
+						  fallback_len,
 						  &obj_width);
 			if (res != NSERROR_OK) {
 				obj_x += 1;
 			} else {
 				obj_x += width / 2 - obj_width / 2;
+				if (obj_x < x + padding_left)
+					obj_x = x + padding_left + 2;
 			}
 
 			if (ctx->plot->text(ctx,
@@ -3756,7 +3773,7 @@ bool html_redraw_box(const html_content *html, struct box *box,
 						    font_plot_style_baseline(
 							    plot_fstyle_broken_object,
 							    height),
-					    obj, sizeof(obj) - 1) != NSERROR_OK)
+					    fallback, fallback_len) != NSERROR_OK)
 				return false;
 		}
 	} else if (tag_type == DOM_HTML_ELEMENT_TYPE_CANVAS &&
