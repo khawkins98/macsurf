@@ -160,6 +160,7 @@ enum css_properties_e {
 	CSS_PROP_POINTER_EVENTS                 = 0x08f,
 	CSS_PROP_MACSURF_GRID_FLOW              = 0x090,
 	CSS_PROP_MACSURF_ACCENT_COLOR           = 0x091,
+	CSS_PROP_MACSURF_CARET_COLOR            = 0x092,
 	CSS_N_PROPERTIES
 };
 
