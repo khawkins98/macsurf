@@ -926,11 +926,27 @@ text_redraw(const char *utf8_text,
  */
 
 static bool html_redraw_checkbox(int x, int y, int width, int height,
-		bool selected, const struct redraw_context *ctx)
+		bool selected, colour accent,
+		const struct redraw_context *ctx)
 {
 	double z;
 	nserror res;
 	struct rect rect;
+	plot_style_t blob_fill;
+	plot_style_t blob_stroke;
+	plot_style_t *use_fill = plot_style_fill_wblobc;
+	plot_style_t *use_stroke = plot_style_stroke_wblobc;
+
+	/* fixes283 (#73): accent-color override for the checkbox blob /
+	 * tick. accent=0 means unset; keep the default platinum-grey blob. */
+	if (accent != 0) {
+		blob_fill = *plot_style_fill_wblobc;
+		blob_fill.fill_colour = accent;
+		use_fill = &blob_fill;
+		blob_stroke = *plot_style_stroke_wblobc;
+		blob_stroke.stroke_colour = accent;
+		use_stroke = &blob_stroke;
+	}
 
 	z = width * 0.15;
 	if (z == 0) {
@@ -984,7 +1000,7 @@ static bool html_redraw_checkbox(int x, int y, int width, int height,
 			rect.y0 = y + z + z;
 			rect.x1 = x + width - z;
 			rect.y1 = y + height - z;
-			res = ctx->plot->rectangle(ctx, plot_style_fill_wblobc, &rect);
+			res = ctx->plot->rectangle(ctx, use_fill, &rect);
 			if (res != NSERROR_OK) {
 				return false;
 			}
@@ -994,7 +1010,7 @@ static bool html_redraw_checkbox(int x, int y, int width, int height,
 			rect.y0 = y + z;
 			rect.x1 = x + (z * 3);
 			rect.y1 = y + height - z;
-			res = ctx->plot->line(ctx, plot_style_stroke_wblobc, &rect);
+			res = ctx->plot->line(ctx, use_stroke, &rect);
 			if (res != NSERROR_OK) {
 				return false;
 			}
@@ -1003,7 +1019,7 @@ static bool html_redraw_checkbox(int x, int y, int width, int height,
 			rect.y0 = y + height - z;
 			rect.x1 = x + z + z;
 			rect.y1 = y + (height / 2);
-			res = ctx->plot->line(ctx, plot_style_stroke_wblobc, &rect);
+			res = ctx->plot->line(ctx, use_stroke, &rect);
 			if (res != NSERROR_OK) {
 				return false;
 			}
@@ -1025,9 +1041,19 @@ static bool html_redraw_checkbox(int x, int y, int width, int height,
  * \return true if successful, false otherwise
  */
 static bool html_redraw_radio(int x, int y, int width, int height,
-		bool selected, const struct redraw_context *ctx)
+		bool selected, colour accent,
+		const struct redraw_context *ctx)
 {
 	nserror res;
+	plot_style_t blob_fill;
+	plot_style_t *use_fill = plot_style_fill_wblobc;
+
+	/* fixes283 (#73): accent-color override for the radio blob. */
+	if (accent != 0) {
+		blob_fill = *plot_style_fill_wblobc;
+		blob_fill.fill_colour = accent;
+		use_fill = &blob_fill;
+	}
 
 	/* plot background of radio button */
 	res = ctx->plot->disc(ctx,
@@ -1066,7 +1092,7 @@ static bool html_redraw_radio(int x, int y, int width, int height,
 	if (selected) {
 		/* plot selection blob */
 		res = ctx->plot->disc(ctx,
-				      plot_style_fill_wblobc,
+				      use_fill,
 				      x + width * 0.5,
 				      y + height * 0.5,
 				      width * 0.3 - 1);
@@ -3756,13 +3782,31 @@ bool html_redraw_box(const html_content *html, struct box *box,
 				y + padding_top, &r, ctx);
 
 	} else if (box->gadget && box->gadget->type == GADGET_CHECKBOX) {
+		/* fixes283 (#73): pull accent-color from cascaded style.
+		 * fixes283e: convert libcss color (ARGB) to NetSurf colour
+		 * (BGRA) via nscss_color_to_ns — otherwise R/B swap shows
+		 * up as orange instead of blue, etc. */
+		colour accent = 0;
+		if (box->style != NULL) {
+			css_color raw = (css_color)
+				css_computed_macsurf_accent_color(box->style);
+			if (raw != 0) accent = nscss_color_to_ns(raw);
+		}
 		if (!html_redraw_checkbox(x + padding_left, y + padding_top,
-				width, height, box->gadget->selected, ctx))
+				width, height, box->gadget->selected,
+				accent, ctx))
 			return false;
 
 	} else if (box->gadget && box->gadget->type == GADGET_RADIO) {
+		colour accent = 0;
+		if (box->style != NULL) {
+			css_color raw = (css_color)
+				css_computed_macsurf_accent_color(box->style);
+			if (raw != 0) accent = nscss_color_to_ns(raw);
+		}
 		if (!html_redraw_radio(x + padding_left, y + padding_top,
-				width, height, box->gadget->selected, ctx))
+				width, height, box->gadget->selected,
+				accent, ctx))
 			return false;
 
 	} else if (box->gadget && box->gadget->type == GADGET_FILE) {

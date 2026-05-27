@@ -388,6 +388,9 @@ struct css_computed_style_i {
 	 * Field appended at struct end so existing field offsets in stale CW8
 	 * .o files don't shift (per project_libcss_struct_mid_insert_crash). */
 	int32_t macsurf_grid_flow;
+	/* fixes282 (#73): accent-color. Stored as css_color (uint32 packed
+	 * ARGB; 0 = unset/auto, form paint falls back to default). */
+	int32_t macsurf_accent_color;
 };
 
 struct css_computed_style {
