@@ -7,8 +7,7 @@
 </p>
 
 <p>
-  MacSurf is a web browser for Classic Mac OS 9 PowerPC.<br>
-  Real CSS3. Real ES5 JavaScript. Real PNGs with alpha. Running on a beige G3.
+  MacSurf is a web browser for Classic Mac OS 9 PowerPC. CSS3, ES5 JavaScript, PNGs with alpha — running on a beige G3.
 </p>
 
 <div align="center">
@@ -39,23 +38,23 @@
 ---
 
 > [!WARNING]
-> **MacSurf is a very early alpha.** It runs, it renders real CSS3, it executes JavaScript on a beige G3, **and as of 2026-05-25 it speaks TLS 1.2 natively** against real modern HTTPS sites (`mactrove.com` is the canonical hardware test target). **Most websites in 2026 will still not work** in it — heavy SPAs, modern CSS features MacSurf doesn't ship yet, missing form interactions, slow JS on real hardware. A lot is still rough.
+> **MacSurf is early alpha.** It runs, it renders, it talks TLS 1.2 natively to real HTTPS sites (as of May 2026), and it executes JavaScript on a 233 MHz G3. That doesn't mean it's ready for daily driving — most of the modern web still won't work in it. Heavy SPAs, modern CSS features we haven't shipped, missing form interactions, slow JS on real hardware. Plenty is rough.
 >
-> **It is ready to be tested.** If you've got a Power Mac G3 / G4 sitting around, please load it up and try it. Bug reports and screenshots from real hardware are exactly what this project needs right now. **Coders welcome too**; there's an enormous amount of CSS / DOM / JS surface left to fill in, and the code is approachable C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list and [docs/README.md](docs/README.md) for the doc index.
+> But it's ready for people to try. If you've got a Power Mac G3 or G4 sitting around, please load it and see what breaks. Bug reports and screenshots from real hardware are exactly what this project needs. Contributors welcome too — there's a lot of CSS, DOM, and JS surface left to fill in, and the code is plain C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list.
 >
-> What you should *not* expect yet: smooth browsing of arbitrary modern sites, video, audio, WebGL, service workers, anything React-heavy. What you *can* expect: hand-built pages, retro-style sites, a respectable subset of the CSS Grid spec, native HTTPS with the full Mozilla CA bundle, and the surreal experience of running ES5 JavaScript on a 233 MHz PowerPC.
+> What you can expect: hand-built pages, retro-style sites, a respectable chunk of CSS Grid, native HTTPS with the full Mozilla CA bundle, and the strange thrill of running ES5 JavaScript on a PowerPC. What you shouldn't expect yet: smooth browsing on arbitrary modern sites, video, audio, WebGL, service workers, anything heavy on React.
 >
-> First numbered version: **0.1a1** (2026-05-20). Latest release: **[v0.7 — Cleanup](https://github.com/mplsllc/macsurf/releases/latest)** (2026-05-26). Twelve issues closed in one sprint — cross-element `var()`, CSS Grid V2 alignment, image-purge on nav, gradients via standard CSS syntax. Full notes: [docs/release-notes/MacSurf-0.7.md](docs/release-notes/MacSurf-0.7.md).
+> First numbered release was **0.1a1** in May 2026. Latest is **[v0.7 — Cleanup](https://github.com/mplsllc/macsurf/releases/latest)**: twelve issues closed in a single sprint — cross-element `var()`, CSS Grid V2 alignment, image-purge on nav, standard-syntax gradients. Full notes in [docs/release-notes/MacSurf-0.7.md](docs/release-notes/MacSurf-0.7.md).
 
 ---
 
-## Why MacSurf exists
+## Why this exists
 
-The web outgrew Classic Mac OS twenty years ago. Modern HTTPS killed it for good around 2016. Today, an out-of-the-box G3 or G4 running OS 9 can barely reach a single live website.
+The web outgrew Classic Mac OS twenty years ago. Modern HTTPS finished it off around 2016. Pull a G3 or G4 out of the closet today and it can barely reach a single live website.
 
-MacSurf brings the real web back. Not a screenshot proxy. Not a remote terminal session. A native browser, built with the tools that were on the platform—CodeWarrior, the Carbon API, QuickDraw, Open Transport—running real CSS3 layouts and real JavaScript inside the 64-megabyte memory floor of a 1999 iMac. **As of 2026-05-25 it talks TLS 1.2 directly to the modern web**, through a BearSSL-based stack ([macTLS](https://github.com/mplsllc/macTLS)) that ships inside the browser binary with the full 121-anchor Mozilla CA bundle. No proxy required.
+MacSurf is an attempt to fix that on the machine itself — no screenshot proxy, no remote terminal trick. A native browser, built with the tools that were already on the platform: CodeWarrior, Carbon, QuickDraw, Open Transport. Real CSS3 layouts and real JavaScript, running inside the 64 MB memory floor of a 1999 iMac. Since late May 2026 it speaks TLS 1.2 directly to the modern web through [macTLS](https://github.com/mplsllc/macTLS), a BearSSL-based stack that ships inside the browser binary with 121 trust anchors from the Mozilla CA bundle. No proxy needed anymore.
 
-It is, as far as we can find, the first serious [NetSurf](https://www.netsurf-browser.org/) port to Classic Mac OS, and the first browser shipped on Mac OS 9 with native CSS Grid, CSS custom properties, and ES5 JavaScript.
+As far as we can tell, this is the first serious [NetSurf](https://www.netsurf-browser.org/) port to Classic Mac OS, and the first browser ever shipped on Mac OS 9 with native CSS Grid, CSS custom properties, and ES5 JavaScript.
 
 ---
 
@@ -116,24 +115,24 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 
 ---
 
-## What's in the box
+## The pieces
 
 <table>
 <tr><th align="left">Component</th><th align="left">Language</th><th align="left">Purpose</th></tr>
 <tr>
 <td><a href="browser/"><code>browser/</code></a></td>
 <td>C (C89, CW8)</td>
-<td>NetSurf fork with a <code>macos9</code> frontend. Carbon UI, QuickDraw plotters, Open Transport networking, Duktape JS engine.</td>
+<td>NetSurf fork with a <code>macos9</code> frontend. Carbon for the UI, QuickDraw for drawing, Open Transport for networking, Duktape for JS.</td>
 </tr>
 <tr>
 <td><a href="proxy/"><code>proxy/</code></a></td>
 <td>Go (stdlib only)</td>
-<td>TLS-stripping HTTP proxy. Mac sends plain HTTP, proxy fetches via HTTPS, returns plain HTTP. Deploy on a VPS or run locally.</td>
+<td>The old TLS-stripping HTTP proxy. Largely retired now that macTLS works natively, but still useful as a fallback or on machines without CarbonLib. Mac sends plain HTTP, proxy fetches via HTTPS, returns plain HTTP.</td>
 </tr>
 <tr>
 <td><code>macTLS</code><br><sub>sibling repo</sub></td>
 <td>C (CW8)</td>
-<td>Native TLS 1.2 library for OS 9, modern HTTPS straight from the Mac, no proxy required. Built on BearSSL with ten embedded root CAs.</td>
+<td>Native TLS 1.2 library for OS 9 — modern HTTPS straight from the Mac, no proxy required. BearSSL underneath, 121 trust anchors baked in.</td>
 </tr>
 </table>
 
@@ -148,31 +147,31 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 **Rendering pipeline**
 - Full NetSurf fetch → parse → cascade → layout → plot
 - Native libcss with `var()` resolution
-- QuickDraw plotters with offscreen GWorld back-buffer
+- QuickDraw plotters with an offscreen GWorld back-buffer
 
-**CSS**: ~150 properties consumed in layout
-- Custom properties &amp; `var()`
-- Flex (`justify-content`, `align-content`, `order`)
-- Grid V1 + `grid-template-columns/rows`, `gap`
+**CSS** — around 150 properties consumed in layout
+- Custom properties and `var()`
+- Flex: `justify-content`, `align-content`, `order`
+- Grid V1 plus `grid-template-columns/rows`, `gap`
 - `border-radius`, `box-shadow`, opacity
-- Linear &amp; radial gradients
+- Linear and radial gradients
 - `text-shadow`, `text-overflow: ellipsis`
-- `transform` (rotate / translate / scale)
+- `transform` (rotate, translate, scale)
 - z-index stacking contexts (CSS 2.1 painting order)
 - CSS counters, viewport units, `aspect-ratio`
-- Font-family aliases (sans / serif / monospace)
+- Font-family aliases for sans, serif, monospace
 
 [Full CSS status &rarr;](docs/css-status.md)
 
 </td>
 <td valign="top" width="50%">
 
-**JavaScript**: Duktape 2.7.0 ES5
+**JavaScript** — Duktape 2.7.0, full ES5
 - Closures, prototypes, regex, JSON
 - Promises (polyfill), recursion, Mandelbrot
-- ~6&nbsp;sec ackermann(3,7) on a 233&nbsp;MHz G3
+- About 6 seconds for `ackermann(3,7)` on a 233 MHz G3
 
-**Images**: all five formats
+**Images** — all five formats
 - PNG with real per-pixel alpha (lodepng + `CopyMask`)
 - GIF with palette transparency
 - JPEG, BMP, TIFF
@@ -180,10 +179,10 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 **Networking**
 - Open Transport TCP, plain non-`InContext` calls
 - HTTP/1.1 + chunked + keep-alive + 3xx follow
-- Connection pooling, 15s no-progress timeout
-- HTTPS via Go proxy or native macTLS
+- Connection pooling, 15-second no-progress timeout
+- HTTPS via macTLS (default) or the Go proxy (fallback)
 
-**Chrome**
+**Browser chrome**
 - Address bar, back / forward / reload / home
 - Status bar, page-info, multi-window
 - Smooth scroll bar, keyboard scrolling
@@ -196,12 +195,12 @@ Each shot below is a real milestone, captured on a Power Macintosh G3 running Ma
 
 ## Download
 
-Latest release: **[MacSurf v0.7 — Cleanup](https://github.com/mplsllc/macsurf/releases/tag/v0.7)** (2026-05-26, correctness + cleanup sprint — 12 issues closed in one day: cross-element `var()`, CSS Grid V2 alignment, image-purge on nav, gradients via standard CSS syntax). Previous: [v0.6.2 — Speed-Run](https://github.com/mplsllc/macsurf/releases/tag/v0.6.2) (cold mactrove.com 30+ s → ~2-3 s), [v0.6.1](https://github.com/mplsllc/macsurf/releases/tag/v0.6.1), [v0.6](https://github.com/mplsllc/macsurf/releases/tag/v0.6), [v0.5.0](https://github.com/mplsllc/macsurf/releases/tag/v0.5.0), [v0.1a1](https://github.com/mplsllc/macsurf/releases/tag/v0.1a1).
+Latest is **[MacSurf v0.7 — Cleanup](https://github.com/mplsllc/macsurf/releases/tag/v0.7)** (May 2026): a correctness and cleanup sprint that closed twelve issues in a single day — cross-element `var()`, CSS Grid V2 alignment, image-purge on nav, gradients via standard CSS syntax. Earlier releases on the [releases page](https://github.com/mplsllc/macsurf/releases) include [v0.6.2 "Speed-Run"](https://github.com/mplsllc/macsurf/releases/tag/v0.6.2) (cold mactrove.com from 30+ seconds down to ~2–3) and the first numbered alpha at [v0.1a1](https://github.com/mplsllc/macsurf/releases/tag/v0.1a1).
 
-- **[MacSurf.sit](https://github.com/mplsllc/macsurf/releases/download/v0.7/MacSurf.sit)** (latest binary, v0.7), ready-to-run. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
-- Building from source: clone this repo, then on the Mac side open `browser/netsurf/frontends/macos9/MacSurf.mcp` in CodeWarrior 8 and choose Build. The earliest release ships a [BuildPack.sit](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf-BuildPack.sit) snapshot with the CW8 project pre-wired; current builds work straight from the git clone.
+- **[MacSurf.sit](https://github.com/mplsllc/macsurf/releases/download/v0.7/MacSurf.sit)** — the v0.7 binary, ready to run. Expand on Mac OS 9.1+ with CarbonLib 1.5+ and launch.
+- Building from source: clone the repo, then on the Mac side open `browser/netsurf/frontends/macos9/MacSurf.mcp` in CodeWarrior 8 and choose Build. The earliest release also ships a [BuildPack.sit](https://github.com/mplsllc/macsurf/releases/download/v0.1a1/MacSurf-BuildPack.sit) snapshot with the CW8 project pre-wired, but current builds work straight from a fresh clone.
 
-All releases (with full notes per version): [github.com/mplsllc/macsurf/releases](https://github.com/mplsllc/macsurf/releases). Earlier alpha release notes: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
+Earlier alpha notes if you want context: [docs/release-notes/MacSurf-0.1a1.md](docs/release-notes/MacSurf-0.1a1.md).
 
 ---
 
@@ -212,7 +211,7 @@ All releases (with full notes per version): [github.com/mplsllc/macsurf/releases
 <td valign="top" width="50%">
 
 ### Building the browser
-MacSurf is built on Mac OS 9 with CodeWarrior 8 Pro (8.3 update). Source is cross-compile-clean against Retro68 PowerPC GCC for fast Linux-side syntax checks.
+MacSurf is built on Mac OS 9 with CodeWarrior 8 Pro (8.3 update). The source is cross-compile-clean against Retro68 PowerPC GCC, which is what we use for fast Linux-side syntax checks.
 
 - [Mac-side build guide](docs/codewarrior-setup.md)
 - [Linux cross-dev workflow](docs/cross-dev-from-linux.md)
