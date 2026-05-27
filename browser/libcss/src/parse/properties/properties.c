@@ -181,7 +181,8 @@ const css_prop_handler property_handlers[LAST_PROP + 1 - FIRST_PROP] =
 	css__parse_background_size,
 	css__parse_pointer_events,
 	css__parse_macsurf_grid_flow,
-	css__parse_macsurf_accent_color
+	css__parse_macsurf_accent_color,
+	css__parse_macsurf_caret_color
 };
 
 /** Mapping from property bytecode index to bytecode unit class mask. */

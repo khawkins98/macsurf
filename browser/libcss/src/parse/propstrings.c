@@ -256,6 +256,7 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("pointer-events"),
 	SMAP("-macsurf-grid-flow"),
 	SMAP("-macsurf-accent-color"),
+	SMAP("-macsurf-caret-color"),
 	SMAP("inherit"),
 	SMAP("unset"),
 	SMAP("important"),

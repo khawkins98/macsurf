@@ -78,6 +78,7 @@ uint32_t destroy_pointer_events(void *bytecode);
 
 PROPERTY_FUNCS(macsurf_grid_flow);
 PROPERTY_FUNCS(macsurf_accent_color);
+PROPERTY_FUNCS(macsurf_caret_color);
 
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
