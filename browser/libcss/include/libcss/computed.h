@@ -262,6 +262,11 @@ uint8_t css_computed_pointer_events(
  * Defaults to ROW (sparse row-major) when unset. */
 uint8_t css_computed_macsurf_grid_flow(const css_computed_style *style);
 
+/* fixes282 (#73): accent-color packed css_color value (uint32 ARGB).
+ * Returns 0 when unset / `auto` — caller should fall back to default
+ * highlight color. */
+uint32_t css_computed_macsurf_accent_color(const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.
