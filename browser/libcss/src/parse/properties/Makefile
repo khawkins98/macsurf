@@ -61,8 +61,6 @@ DIR_SOURCES :=				\
 	overflow.c			\
 	padding.c			\
 	pause.c				\
-	p_macsurf_accent_color.c	\
-	p_macsurf_caret_color.c		\
 	p_macsurf_grid_flow.c		\
 	p_macsurf_object_position.c	\
 	play_during.c			\

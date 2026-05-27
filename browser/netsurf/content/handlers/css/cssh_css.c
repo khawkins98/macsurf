@@ -2564,133 +2564,6 @@ macsurf__rewrite_calc_aspect(const char *data, size_t in_size)
 }
 
 
-/* fixes282 (#73) — rewrite standard `accent-color: VALUE` to
- * `-macsurf-accent-color: VALUE` so author CSS reaches the new
- * libcss vendor property. Output grows: "accent-color" (12) ->
- * "-macsurf-accent-color" (21), +9 bytes per match. Allocates a
- * fresh buffer. */
-static char *
-macsurf__rewrite_accent_color(const char *data, size_t in_size,
-		size_t *out_size_p)
-{
-	static const char NEEDLE[] = "accent-color";
-	static const size_t NEEDLE_LEN = 12;
-	static const char REPLACE[] = "-macsurf-accent-color";
-	static const size_t REPLACE_LEN = 21;
-	char *out;
-	size_t cap;
-	size_t out_pos = 0;
-	size_t i = 0;
-	int changed = 0;
-
-	cap = in_size + (in_size / NEEDLE_LEN + 1) *
-			(REPLACE_LEN - NEEDLE_LEN) + 64;
-	out = (char *)malloc(cap);
-	if (out == NULL) return NULL;
-
-	while (i < in_size) {
-		size_t k;
-		if (!macsurf__match_prop_name(data, in_size, i,
-				NEEDLE, NEEDLE_LEN)) {
-			if (out_pos + 1 >= cap) {
-				char *bigger;
-				cap = cap * 2 + 64;
-				bigger = (char *)realloc(out, cap);
-				if (bigger == NULL) { free(out); return NULL; }
-				out = bigger;
-			}
-			out[out_pos++] = data[i++];
-			continue;
-		}
-		k = i + NEEDLE_LEN;
-		while (k < in_size && (data[k] == ' ' || data[k] == '\t' ||
-				data[k] == '\n' || data[k] == '\r')) k++;
-		if (k >= in_size || data[k] != ':') {
-			out[out_pos++] = data[i++];
-			continue;
-		}
-		while (out_pos + REPLACE_LEN + 1 >= cap) {
-			char *bigger;
-			cap = cap * 2 + REPLACE_LEN + 64;
-			bigger = (char *)realloc(out, cap);
-			if (bigger == NULL) { free(out); return NULL; }
-			out = bigger;
-		}
-		memcpy(out + out_pos, REPLACE, REPLACE_LEN);
-		out_pos += REPLACE_LEN;
-		i += NEEDLE_LEN;
-		changed = 1;
-	}
-
-	if (!changed) { free(out); return NULL; }
-	*out_size_p = out_pos;
-	return out;
-}
-
-
-/* fixes284 (#73, caret-color half) — same pattern as accent-color
- * fixes282. Renames `caret-color: VALUE` to `-macsurf-caret-color:
- * VALUE` so the new vendor parser receives it. Output grows
- * "caret-color"(11) -> "-macsurf-caret-color"(20), +9 bytes/match. */
-static char *
-macsurf__rewrite_caret_color(const char *data, size_t in_size,
-		size_t *out_size_p)
-{
-	static const char NEEDLE[] = "caret-color";
-	static const size_t NEEDLE_LEN = 11;
-	static const char REPLACE[] = "-macsurf-caret-color";
-	static const size_t REPLACE_LEN = 20;
-	char *out;
-	size_t cap;
-	size_t out_pos = 0;
-	size_t i = 0;
-	int changed = 0;
-
-	cap = in_size + (in_size / NEEDLE_LEN + 1) *
-			(REPLACE_LEN - NEEDLE_LEN) + 64;
-	out = (char *)malloc(cap);
-	if (out == NULL) return NULL;
-
-	while (i < in_size) {
-		size_t k;
-		if (!macsurf__match_prop_name(data, in_size, i,
-				NEEDLE, NEEDLE_LEN)) {
-			if (out_pos + 1 >= cap) {
-				char *bigger;
-				cap = cap * 2 + 64;
-				bigger = (char *)realloc(out, cap);
-				if (bigger == NULL) { free(out); return NULL; }
-				out = bigger;
-			}
-			out[out_pos++] = data[i++];
-			continue;
-		}
-		k = i + NEEDLE_LEN;
-		while (k < in_size && (data[k] == ' ' || data[k] == '\t' ||
-				data[k] == '\n' || data[k] == '\r')) k++;
-		if (k >= in_size || data[k] != ':') {
-			out[out_pos++] = data[i++];
-			continue;
-		}
-		while (out_pos + REPLACE_LEN + 1 >= cap) {
-			char *bigger;
-			cap = cap * 2 + REPLACE_LEN + 64;
-			bigger = (char *)realloc(out, cap);
-			if (bigger == NULL) { free(out); return NULL; }
-			out = bigger;
-		}
-		memcpy(out + out_pos, REPLACE, REPLACE_LEN);
-		out_pos += REPLACE_LEN;
-		i += NEEDLE_LEN;
-		changed = 1;
-	}
-
-	if (!changed) { free(out); return NULL; }
-	*out_size_p = out_pos;
-	return out;
-}
-
-
 /* fixes281 — fallback solid color for repeating-linear-gradient.
  *
  * mactrove's Platinum theme paints window title bars with
@@ -4250,8 +4123,6 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_logical = NULL;    /* fixes277 logical properties */
 	char *rewritten_calc = NULL;       /* fixes280 calc() arithmetic */
 	char *rewritten_rep_grad = NULL;   /* fixes281 repeating-gradient -> solid */
-	char *rewritten_accent = NULL;     /* fixes282 accent-color */
-	char *rewritten_caret = NULL;      /* fixes284 caret-color */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -4376,31 +4247,6 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_rep_grad != NULL) {
 		data = (const char *)rewritten_rep_grad;
 		/* In-place same-size rewrite. */
-	}
-
-	/* fixes282 (#73) — rename `accent-color: VAL` to
-	 * `-macsurf-accent-color: VAL` so the new vendor parser sees it. */
-	{
-		size_t ac_size = 0;
-		rewritten_accent = macsurf__rewrite_accent_color(data,
-				(size_t)size, &ac_size);
-		if (rewritten_accent != NULL &&
-				ac_size <= (size_t)0x7fffffff) {
-			data = (const char *)rewritten_accent;
-			size = (unsigned int)ac_size;
-		}
-	}
-
-	/* fixes284 (#73) — same for caret-color. */
-	{
-		size_t cc_size = 0;
-		rewritten_caret = macsurf__rewrite_caret_color(data,
-				(size_t)size, &cc_size);
-		if (rewritten_caret != NULL &&
-				cc_size <= (size_t)0x7fffffff) {
-			data = (const char *)rewritten_caret;
-			size = (unsigned int)cc_size;
-		}
 	}
 
 	/* fixes115 — pre-process the CSS bytes to convert
@@ -4570,8 +4416,6 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_logical != NULL) free(rewritten_logical); /* fixes277 */
 	if (rewritten_calc != NULL) free(rewritten_calc); /* fixes280 */
 	if (rewritten_rep_grad != NULL) free(rewritten_rep_grad); /* fixes281 */
-	if (rewritten_accent != NULL) free(rewritten_accent); /* fixes282 */
-	if (rewritten_caret != NULL) free(rewritten_caret); /* fixes284 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);

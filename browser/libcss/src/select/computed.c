@@ -535,20 +535,6 @@ uint8_t css_computed_macsurf_grid_flow(const css_computed_style *style)
 	return (uint8_t)v;
 }
 
-/* fixes282 (#73): accent-color accessor. Returns the stored
- * css_color packed value (uint32 ARGB). 0 means unset/auto -- form
- * paint should fall back to its default highlight. */
-uint32_t css_computed_macsurf_accent_color(const css_computed_style *style)
-{
-	return (uint32_t)style->i.macsurf_accent_color;
-}
-
-/* fixes284 (#73): caret-color accessor. Same packing as accent_color. */
-uint32_t css_computed_macsurf_caret_color(const css_computed_style *style)
-{
-	return (uint32_t)style->i.macsurf_caret_color;
-}
-
 int32_t css_computed_aspect_ratio(
 		const css_computed_style *style)
 {
