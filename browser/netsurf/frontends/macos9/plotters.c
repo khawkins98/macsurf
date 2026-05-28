@@ -290,10 +290,16 @@ static struct gui_window *macos9_find_gw_for_plot(void)
 	return (struct gui_window *)GetWRefCon((WindowRef)port);
 }
 
-/* fixes137: expose scroll origin + viewport dimensions for
- * background-attachment: fixed. NetSurf core's html_redraw_background
- * needs to know where the viewport sits in page coordinates to anchor
- * the bg image origin instead of letting it scroll with the element box.
+/* fixes137 / fixes309: expose viewport top-left + dimensions in WINDOW
+ * coordinates for background-attachment: fixed. html_redraw_background
+ * substitutes (out_x, out_y, out_w, out_h) for the element box's (x, y,
+ * width, height) so the subsequent bg-position math anchors the image
+ * to the viewport instead of the element. The caller does that math in
+ * the same coordinate frame NetSurf uses for the rest of paint — window
+ * (not page) — so return content_rect.left / content_rect.top, NOT the
+ * page-space scroll offset. The fixes308 diagnostic round revealed the
+ * original (scroll_x, scroll_y) values were drifting the image down
+ * along with scroll instead of anchoring it.
  * Returns 1 on success (out_x/y/w/h written), 0 if no current gw. */
 int macos9_get_bg_fixed_origin(int *out_x, int *out_y, int *out_w, int *out_h)
 {
@@ -305,8 +311,8 @@ int macos9_get_bg_fixed_origin(int *out_x, int *out_y, int *out_w, int *out_h)
 		*out_h = 0;
 		return 0;
 	}
-	*out_x = gw->scroll_x;
-	*out_y = gw->scroll_y;
+	*out_x = (int)gw->content_rect.left;
+	*out_y = (int)gw->content_rect.top;
 	*out_w = (int)(gw->content_rect.right - gw->content_rect.left);
 	*out_h = (int)(gw->content_rect.bottom - gw->content_rect.top);
 	return 1;

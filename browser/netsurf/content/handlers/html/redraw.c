@@ -1507,6 +1507,31 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 		/* plot the background colour */
 		css_computed_background_color(background->style, &bgcol);
 
+		/* fixes306 (#41) — background-attachment: fixed for gradients.
+		 * Anchor the gradient stops to the viewport (not the box) by
+		 * substituting the viewport rect for `r` before the paint. The
+		 * QD clipRgn still narrows the visible pixels to the box, so
+		 * the gradient appears to scroll with the viewport behind the
+		 * box's content. Mirrors the fixes137 raster-image override.
+		 * Solid backgrounds are unaffected: a solid colour fills the
+		 * same visible region regardless of whether `r` is sized to
+		 * the box or the viewport (the QD clip narrows it either way),
+		 * so we override unconditionally on attachment:fixed. */
+#ifdef __MACOS9__
+		if (background && background->style &&
+		    css_computed_background_attachment(background->style) ==
+		    CSS_BACKGROUND_ATTACHMENT_FIXED) {
+			int fx = 0, fy = 0, fw = 0, fh = 0;
+			(void) macos9_get_bg_fixed_origin(&fx, &fy, &fw, &fh);
+			if (fw > 0 && fh > 0) {
+				r.x0 = fx;
+				r.y0 = fy;
+				r.x1 = fx + fw;
+				r.y1 = fy + fh;
+			}
+		}
+#endif
+
 		if (nscss_color_is_transparent(bgcol) == false) {
 			int32_t grad_col_late = 0;
 			*background_colour = nscss_color_to_ns(bgcol);
