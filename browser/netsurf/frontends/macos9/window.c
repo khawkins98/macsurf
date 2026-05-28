@@ -455,6 +455,17 @@ void macos9_window_address_bar_submit(struct gui_window *g) {
 	} else {
 		strcpy(f, r);
 	}
+	/* fixes304 — URL-bar Enter bypasses the disk cache for the first
+	 * fetch of the new navigation (one-shot, cleared by macos9_cache_store
+	 * after the network response lands). Without this, re-typing a URL on
+	 * a page you just edited server-side keeps serving the stale cached
+	 * HTML, and any updated <img> / <link> refs never get re-requested.
+	 * Reload already sets this flag; URL-bar nav now matches. Link clicks
+	 * within a page (browser_window internal nav) still use the cache. */
+	{
+		extern int macsurf_http_skip_next_cache;
+		macsurf_http_skip_next_cache = 1;
+	}
 	macos9_window_navigate(g,f);
 }
 
