@@ -168,22 +168,32 @@ struct gui_window *macos9_find_window(WindowRef w) { struct gui_window *g; for(g
 struct gui_window *macos9_window_list_head(void) { return window_list; }
 static void set_status_text(struct gui_window *g, const char *m) { if(!m) g->status[0]=0; else { strncpy(g->status,m,127); g->status[127]=0; } }
 /* fixes294 — shift TE field's left by +20 to leave room for the favicon. */
-static void compute_url_te_rect(const Rect *u, Rect *o) { o->left=(short)(u->left+20); o->top=(short)(u->top+2); o->right=(short)(u->right-4); o->bottom=(short)(u->bottom-2); }
+/* fixes302 — TextEdit rect inside the url field.
+ *   left  = 2px bevel + 16px favicon + 6px gap  -> text never touches the
+ *           left bevel and clears the favicon.
+ *   right = clear the 2px right bevel + a few px margin.
+ *   top/bottom vertically centre a ~16px (Geneva 12) line in the field. */
+static void compute_url_te_rect(const Rect *u, Rect *o) {
+	short h = (short)(u->bottom - u->top);
+	short pad = (short)((h - 16) / 2);
+	if (pad < 3) pad = 3;
+	o->left   = (short)(u->left + 24);
+	o->right  = (short)(u->right - 6);
+	o->top    = (short)(u->top + pad);
+	o->bottom = (short)(u->bottom - pad);
+}
 
-/* fixes298 — paint a Netscape-7-style vertical gradient as the toolbar
- * background.  Light grey at the top, slightly darker at the bottom.
- * Called from main.c's chrome paint path BEFORE draw_url_bar / DrawControls
- * / draw_toolbar_icons so everything else sits on top of the gradient. */
+/* fixes300 — solid Mac OS 9 Platinum grey (#D6D6D6) toolbar background.
+ * Replaces the fixes298 vertical gradient.  Buttons sit directly on this
+ * surface with no white "tab" backing — the icon's own colours provide
+ * contrast. */
 void macos9_window_draw_toolbar_bg(struct gui_window *g)
 {
 #ifdef __MACOS9__
 	Rect w_bounds;
-	Rect row;
-	short y;
-	short total;
-	short top_v = 0xEC;     /* very light grey */
-	short bot_v = 0xC0;     /* mid grey */
+	Rect bar;
 	RGBColor saved_fg;
+	RGBColor platinum = {0xD6D6, 0xD6D6, 0xD6D6};
 	GWorldPtr saved_port;
 	GDHandle saved_gdh;
 
@@ -194,20 +204,24 @@ void macos9_window_draw_toolbar_bg(struct gui_window *g)
 	GetForeColor(&saved_fg);
 
 	GetWindowBounds(g->window, 33, &w_bounds);
-	total = (short)(g->content_rect.top);    /* paint y=0..top-1 */
-	for (y = 0; y < total; y++) {
-		short t = (short)((long)y * 100L / (total > 0 ? total : 1));
-		short v = (short)(top_v + ((long)(bot_v - top_v) * t / 100L));
-		RGBColor c;
-		c.red = (unsigned short)((v << 8) | v);
-		c.green = c.red;
-		c.blue = c.red;
-		row.left = 0;
-		row.top = y;
-		row.right = (short)(w_bounds.right - w_bounds.left);
-		row.bottom = (short)(y + 1);
-		RGBForeColor(&c);
-		PaintRect(&row);
+	bar.left = 0;
+	bar.top = 0;
+	bar.right = (short)(w_bounds.right - w_bounds.left);
+	bar.bottom = (short)(g->content_rect.top);
+	RGBForeColor(&platinum);
+	PaintRect(&bar);
+
+	/* fixes303 — 1px dark-grey accent line along the bottom edge of
+	 * the toolbar to cleanly separate chrome from the page viewport. */
+	{
+		RGBColor sep = {0x5555, 0x5555, 0x5555};   /* #555555 */
+		Rect line;
+		line.left = 0;
+		line.right = bar.right;
+		line.top = (short)(bar.bottom - 1);
+		line.bottom = bar.bottom;
+		RGBForeColor(&sep);
+		PaintRect(&line);
 	}
 
 	RGBForeColor(&saved_fg);
@@ -222,8 +236,8 @@ static void compute_favicon_rect(const Rect *u, Rect *o)
 {
 	short top;
 	top = (short)(u->top + ((u->bottom - u->top) - 16) / 2);
-	o->left = (short)(u->left + 3);
-	o->right = (short)(u->left + 19);
+	o->left = (short)(u->left + 4);
+	o->right = (short)(u->left + 20);
 	o->top = top;
 	o->bottom = (short)(top + 16);
 }
@@ -231,10 +245,14 @@ static void compute_favicon_rect(const Rect *u, Rect *o)
 void macos9_window_layout(struct gui_window *g) {
 	Rect c; short w, h, ux, ur, cb, ht; if(!g||!g->window) return;
 	GetWindowBounds(g->window, 33, &c); w=(short)(c.right-c.left); h=(short)(c.bottom-c.top);
-	/* fixes298 — toolbar grows from 22 tall (y=8..30) to 28 tall
-	 * (y=8..36).  Content area starts at y=44 (was 38).  URL bar
-	 * vertically centered in new toolbar at y=10..34. */
-	ux=(short)(4+4*36); ur=(short)(w-4); SetRect(&g->url_rect, ux, 10, ur, 34);
+	/* fixes303 — dense "tool belt" geometry. Buttons are 32 wide at a
+	 * 34-pixel pitch (2px gap), so x=4,38,72,106 and the home button's
+	 * right edge is 138. The URL field sits 6px past it (x=144) and is
+	 * aligned to the button vertical band (y=6..38) for a unified
+	 * horizontal baseline. The 1px #555 separator at y=43 (drawn by
+	 * macos9_window_draw_toolbar_bg) closes the toolbar. */
+	ux=(short)(4 + 3*34 + 32 + 6); ur=(short)(w-4);
+	SetRect(&g->url_rect, ux, 6, ur, 38);
 	ht=(short)(h-15); cb=(short)(ht-16); SetRect(&g->content_rect, 0, 44, (short)(w-15), cb); SetRect(&g->status_rect, 0, cb, (short)(w-15), ht);
 	if(g->vscroll) { MoveControl(g->vscroll, (short)(w-15), 43); SizeControl(g->vscroll, 16, (short)(cb-42)); }
 	if(g->hscroll) { MoveControl(g->hscroll, -1, ht); SizeControl(g->hscroll, (short)(w-13), 16); }
@@ -540,22 +558,18 @@ static struct gui_window *macos9_window_create(struct browser_window *bw, struct
 	g->bw=bw; if(CreateNewWindow(6, 0x1F, &b, &g->window)!=0) { free(g); return NULL; }
 	SetWRefCon(g->window,(long)g); SetPortWindowPort(g->window); SetWTitle(g->window,(const unsigned char*)"\pMacSurf");
 	g->next=window_list; window_list=g; 
-	/* fixes298 — switch buttons to kControlUserPaneProc (procID 256).
-	 * User-pane controls are INVISIBLE — Carbon paints nothing.  This
-	 * kills the platinum chrome + the box-lines outside our EraseRect
-	 * area + the platinum-pushed-button flash during click tracking.
-	 * Our paint helper is now the SOLE source of button visuals.
-	 *
-	 * Click handling switches from TrackControl (which user-pane
-	 * doesn't track) to PtInRect on mouse-up — see main.c.
-	 *
-	 * Bumped height: button bottom from 30 to 36 (was 22 tall, now
-	 * 28 tall) to comfortably contain 25x25 icons without crowding.
-	 * Top stays at 8.  Toolbar bottom moves from 38 to 44. */
-	x=4; SetRect(&b,x,8,(short)(x+32),36); g->back_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),36); g->forward_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),36); g->reload_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+36);
-	SetRect(&b,x,8,(short)(x+32),36); g->home_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g);
+	/* fixes300 — 32x32 square buttons (was 32x28).  Vertically centered
+	 * inside the 44-tall toolbar: top=6, bottom=38, height=32.  4px
+	 * horizontal gap → stride=36 (32 + 4) → URL bar still starts at
+	 * x=4+4*36=148.  The 25x25 icon centers automatically inside the
+	 * 32x32 control bounds, giving (32-25)/2 = ~3px padding on every
+	 * side — matches the period-accurate breathing-room target. */
+	/* fixes303 — tight 2px gap between buttons (34px pitch on 32px
+	 * buttons) for a dense Netscape-7-style tool belt. */
+	x=4; SetRect(&b,x,6,(short)(x+32),38); g->back_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+34);
+	SetRect(&b,x,6,(short)(x+32),38); g->forward_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+34);
+	SetRect(&b,x,6,(short)(x+32),38); g->reload_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g); x=(short)(x+34);
+	SetRect(&b,x,6,(short)(x+32),38); g->home_btn=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,256,(long)g);
 	SetRect(&b,0,0,16,16); g->vscroll=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,384,(long)g);
 	g->hscroll=NewControl(g->window,&b,(const unsigned char*)"\p",1,0,0,0,384,(long)g);
 	macos9_window_layout(g);
@@ -566,6 +580,9 @@ static struct gui_window *macos9_window_create(struct browser_window *bw, struct
 	 * "URL field unresponsive on initial window" regression. */
 	ShowWindow(g->window); SelectWindow(g->window);
 	SetPortWindowPort(g->window);
+	/* fixes302 — set the URL field font (Geneva 12) before TENew so the
+	 * TERec captures it; TextEdit measures and draws with the stored font. */
+	TextFont(kFontIDGeneva); TextSize(12); TextFace(0);
 	compute_url_te_rect(&g->url_rect,&b); g->url_te=TENew(&b,&b);
 	if(g->url_te) {
 		TESetText(MACSURF_HOME_URL,(long)strlen(MACSURF_HOME_URL),g->url_te);
@@ -1065,14 +1082,22 @@ static int macos9_decode_png_to_gworld(const unsigned char *png_bytes,
 		SetGWorld(saved_port, saved_gdh);
 		return 0;
 	}
+	/* fixes303 — bake the toolbar-grey background (#D6D6D6) into pixels
+	 * the PNG marked transparent. The buttons are blitted via opaque
+	 * CopyBits srcCopy, so transparent rounded corners would otherwise
+	 * paint whatever RGB the PNG stored under alpha=0 (typically white
+	 * → visible halo against the platinum toolbar). Matting once at
+	 * decode time turns those corners into the exact toolbar grey so the
+	 * icons sit on the toolbar seamlessly. */
 	dst_rowbytes = (long)((*pm)->rowBytes & 0x3FFF);
 	for (row = 0; row < (long)h; row++) {
 		src_row = rgba + row * (long)w * 4L;
 		dst_row = (unsigned char *)GetPixBaseAddr(pm) + row * dst_rowbytes;
 		for (col = 0; col < (long)w; col++) {
-			unsigned char r = src_row[col * 4 + 0];
-			unsigned char gn = src_row[col * 4 + 1];
-			unsigned char b = src_row[col * 4 + 2];
+			unsigned char a  = src_row[col * 4 + 3];
+			unsigned char r  = (a < 8) ? 0xD6 : src_row[col * 4 + 0];
+			unsigned char gn = (a < 8) ? 0xD6 : src_row[col * 4 + 1];
+			unsigned char b  = (a < 8) ? 0xD6 : src_row[col * 4 + 2];
 			dst_row[col * 4 + 0] = 0xFF;
 			dst_row[col * 4 + 1] = r;
 			dst_row[col * 4 + 2] = gn;
@@ -1151,32 +1176,43 @@ static void paint_toolbar_icon(WindowRef window, ControlRef ctrl,
 	GetControlBounds(ctrl, &ctrl_bounds);
 	icon_w = (short)(src_rect->right - src_rect->left);
 	icon_h = (short)(src_rect->bottom - src_rect->top);
-	/* fixes297a — center icon both horizontally and vertically inside
-	 * the (now icon-only) control bounds. */
-	cy = (short)(ctrl_bounds.top + ((ctrl_bounds.bottom - ctrl_bounds.top) - icon_h) / 2);
-	dst_rect.left = (short)(ctrl_bounds.left + ((ctrl_bounds.right - ctrl_bounds.left) - icon_w) / 2);
-	dst_rect.top = cy;
-	dst_rect.right = (short)(dst_rect.left + icon_w);
-	dst_rect.bottom = (short)(cy + icon_h);
+	(void)icon_w; (void)icon_h;
+	/* fixes300 — paint into a fixed 4px-padded box inside the 32x32
+	 * button bounds.  Source icons are mixed sizes (25x25, 35x35);
+	 * CopyBits downscales/upscales as needed so the visible icon is
+	 * always button_size - 8 in each dimension, with 4px breathing
+	 * room on every side. */
+	{
+		short btn_w = (short)(ctrl_bounds.right - ctrl_bounds.left);
+		short btn_h = (short)(ctrl_bounds.bottom - ctrl_bounds.top);
+		short pad = 4;
+		short dw = (short)(btn_w - pad * 2);
+		short dh = (short)(btn_h - pad * 2);
+		if (dw < 1) dw = btn_w;
+		if (dh < 1) dh = btn_h;
+		dst_rect.left = (short)(ctrl_bounds.left + (btn_w - dw) / 2);
+		dst_rect.top = (short)(ctrl_bounds.top + (btn_h - dh) / 2);
+		dst_rect.right = (short)(dst_rect.left + dw);
+		dst_rect.bottom = (short)(dst_rect.top + dh);
+		cy = dst_rect.top;
+	}
 
 	GetGWorld(&saved_port, &saved_gdh);
 	SetPortWindowPort(window);
 	win_port = GetWindowPort(window);
 	if (win_port == NULL) { SetGWorld(saved_port, saved_gdh); return; }
 
-	/* fixes297b — paint our own background over the platinum Carbon
-	 * button chrome.  Eliminates the platinum-visible-between-paints
-	 * flash that surfaces every time NetSurf triggers a redraw (which
-	 * happens on every dyn-hover over content links).  White fill for
-	 * classic clean look, light-grey frame for button definition. */
+	/* fixes303 — paint the button slot to the exact toolbar grey
+	 * (#D6D6D6) and skip the per-button frame. Combined with the matted
+	 * icon corners (also #D6D6D6), the buttons no longer have white
+	 * halos OR individual frames — they read as a dense "tool belt"
+	 * row of icons on the toolbar rather than four chrome buttons. */
 	{
 		RGBColor saved_fg, saved_bg;
-		RGBColor white = {0xFFFF, 0xFFFF, 0xFFFF};
-		RGBColor frame = {0xAAAA, 0xAAAA, 0xAAAA};
+		RGBColor toolbar_grey = {0xD6D6, 0xD6D6, 0xD6D6};
 		GetForeColor(&saved_fg); GetBackColor(&saved_bg);
-		RGBForeColor(&frame); RGBBackColor(&white);
-		EraseRect(&ctrl_bounds);
-		FrameRect(&ctrl_bounds);
+		RGBForeColor(&toolbar_grey); RGBBackColor(&toolbar_grey);
+		PaintRect(&ctrl_bounds);
 		RGBForeColor(&saved_fg); RGBBackColor(&saved_bg);
 	}
 

@@ -52,10 +52,34 @@ extern const BitMap *GetPortBitMapForCopyBits(CGrafPtr port);
 
 static void draw_url_bar(struct gui_window *gw) {
 #ifdef __MACOS9__
-	RGBColor black = {0,0,0}, white = {0xFFFF, 0xFFFF, 0xFFFF};
+	/* fixes303 — razor-sharp 1px inset border. Top + left are technical
+	 * charcoal #444444, bottom + right are crisp white #FFFFFF. White
+	 * canvas inside. Text in Geneva 12 with the existing favicon at the
+	 * left and the TE rect inset well past it. */
+	RGBColor black     = {0, 0, 0};
+	RGBColor white     = {0xFFFF, 0xFFFF, 0xFFFF};
+	RGBColor charcoal  = {0x4444, 0x4444, 0x4444};   /* #444444 */
+	Rect u = gw->url_rect;
+	Rect r;
+	short L = u.left, T = u.top, R = u.right, B = u.bottom;
+
+	/* white input canvas inside the 1px frame */
+	RGBForeColor(&white);
+	SetRect(&r, (short)(L + 1), (short)(T + 1), (short)(R - 1), (short)(B - 1));
+	PaintRect(&r);
+
+	/* top + left = #444 */
+	RGBForeColor(&charcoal);
+	SetRect(&r, L, T, R, (short)(T + 1)); PaintRect(&r);
+	SetRect(&r, L, T, (short)(L + 1), B); PaintRect(&r);
+	/* bottom + right = #FFFFFF */
+	RGBForeColor(&white);
+	SetRect(&r, L, (short)(B - 1), R, B); PaintRect(&r);
+	SetRect(&r, (short)(R - 1), T, R, B); PaintRect(&r);
+
+	/* text */
 	RGBForeColor(&black); RGBBackColor(&white);
-	TextFont(kFontIDMonaco); TextSize(10); TextFace(0);
-	EraseRect(&gw->url_rect); FrameRect(&gw->url_rect);
+	TextFont(kFontIDGeneva); TextSize(12); TextFace(0);
 	if (gw->url_te != NULL) TEUpdate(&gw->url_rect, gw->url_te);
 	/* fixes294 — favicon paints on top of the URL field's white
 	 * background.  No-op if the default favicon failed to load. */
@@ -444,36 +468,50 @@ void macos9_handle_mouse_down(const EventRecord *event) {
 					if (gw) {
 						SetPortWindowPort(win);
 						GlobalToLocal(&p);
-						cpart = FindControl(p, win, &ctrl);
+						/* fixes298b — user-pane buttons aren't visible to
+						 * FindControl (the default user-pane hit-test
+						 * returns kControlNoPart, and Carbon interprets
+						 * that as "click not in any control" → returns
+						 * ctrl=NULL).  Hit-test our four toolbar buttons
+						 * manually via PtInRect BEFORE FindControl runs.
+						 * tbtn != NULL after this block means we handled
+						 * the click; skip FindControl + the URL/content
+						 * dispatch. */
+						{
+							ControlRef tbtn = NULL;
+							void (*tact)(struct gui_window *) = NULL;
+							Rect bb;
+							if (gw->back_btn) { GetControlBounds(gw->back_btn, &bb);
+								if (PtInRect(p, &bb)) { tbtn = gw->back_btn; tact = macos9_window_back; } }
+							if (tbtn == NULL && gw->forward_btn) { GetControlBounds(gw->forward_btn, &bb);
+								if (PtInRect(p, &bb)) { tbtn = gw->forward_btn; tact = macos9_window_forward; } }
+							if (tbtn == NULL && gw->reload_btn) { GetControlBounds(gw->reload_btn, &bb);
+								if (PtInRect(p, &bb)) { tbtn = gw->reload_btn; tact = macos9_window_reload; } }
+							if (tbtn == NULL && gw->home_btn) { GetControlBounds(gw->home_btn, &bb);
+								if (PtInRect(p, &bb)) { tbtn = gw->home_btn; tact = macos9_window_home; } }
+							if (tbtn != NULL) {
+								Point up;
+								GetControlBounds(tbtn, &bb);
+								while (StillDown()) { /* wait for release */ }
+								GetMouse(&up);
+								if (PtInRect(up, &bb)) tact(gw);
+								cpart = 0; ctrl = (ControlRef)(long)1;
+								/* sentinel: non-NULL ctrl with cpart=0
+								 * so the if-chain below skips all
+								 * branches (each requires either cpart
+								 * non-zero or PtInRect-not-handled). */
+							} else {
+								cpart = FindControl(p, win, &ctrl);
+							}
+						}
 						if (cpart != 0 && ctrl != NULL) {
 							if (ctrl == gw->vscroll || ctrl == gw->hscroll) {
 								macos9_window_handle_scrollbar_click(gw, ctrl, cpart, &p);
-							} else if (ctrl == gw->back_btn ||
-							           ctrl == gw->forward_btn ||
-							           ctrl == gw->reload_btn ||
-							           ctrl == gw->home_btn) {
-								/* fixes298 — user-pane controls
-								 * (kControlUserPaneProc 256) don't
-								 * track via TrackControl, so we do a
-								 * tiny wait-for-mouseup + PtInRect
-								 * check.  Same UX as Carbon
-								 * push-button without the platinum. */
-								Rect bb;
-								Point up;
-								Boolean fired;
-								GetControlBounds(ctrl, &bb);
-								while (StillDown()) { /* spin */ }
-								GetMouse(&up);
-								fired = (Boolean)PtInRect(up, &bb);
-								if (fired && ctrl == gw->back_btn)    macos9_window_back(gw);
-								else if (fired && ctrl == gw->forward_btn) macos9_window_forward(gw);
-								else if (fired && ctrl == gw->reload_btn)  macos9_window_reload(gw);
-								else if (fired && ctrl == gw->home_btn)    macos9_window_home(gw);
 							}
-						} else if (PtInRect(p, &gw->url_rect)) {
+						} else if (ctrl == NULL && PtInRect(p, &gw->url_rect)) {
 							macos9_window_te_activate_url(gw);
 							if (gw->url_te) TEClick(p, (event->modifiers & shiftKey) != 0, gw->url_te);
-						} else if (PtInRect(p, &gw->content_rect) && gw->bw) {
+						} else if (ctrl == NULL && PtInRect(p, &gw->content_rect) && gw->bw) {
 							/* Click in content area — dispatch to NetSurf so
 							 * links navigate, forms submit, etc.  Coordinates
 							 * are translated from window-local to NetSurf
