@@ -17,7 +17,7 @@ This page documents the asset spec and the manual upload step (the GitHub API do
 - **Left ~42%**: dark panel (~#121828) with:
   - The puffin wordmark from [img/bannerlogo.png](../img/bannerlogo.png), scaled to ~440 px wide, top-left.
   - Two-line tagline in bold sans-serif white / warm-orange: "The modern web, on a 25-year-old Mac."
-  - Sub-tagline in lighter weight: "Real CSS3. Real ES5 JavaScript. Real HTTPS. Running on a beige G3."
+  - Sub-tagline in lighter weight: "Real CSS3. Real ES5 JavaScript. Real HTTPS. Running on a G3 iMac."
   - Bottom strip in small caps, muted blue-gray: `MAC OS 9 · POWERPC · CARBON · CODEWARRIOR`.
 - **Bleed**: a 100-120 px gradient feather between the dark panel and the screenshot makes the transition feel intentional rather than collaged.
 
