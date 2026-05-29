@@ -14,7 +14,7 @@
 
 MacSurf is a working web browser for Classic Mac OS 9.1–9.2.2 on PowerPC, built on a NetSurf fork with a Carbon / QuickDraw / Open Transport frontend. As of 2026-05-25 it speaks TLS 1.2 end-to-end via macTLS (BearSSL on top of Open Transport), so the Go TLS-stripping proxy is no longer on the default path. As of 2026-05-29 (v1.2) the entropy backing those TLS handshakes is **macEntropy v1.0** — SHA-256 accumulator + BearSSL HMAC-DRBG, fed by OT packet jitter, event-loop input, high-res clock, and a persisted seed file. The pre-v1.2 insecure-stub entropy source is closed.
 
-The build runs on real beige G3-class hardware, with a G4 upgrade also used in development. The target compiler is CodeWarrior 8 Pro with the 8.3 update, strict C89, and a 16 MB application partition. Network fetches go direct via TLS 1.2 to the origin, using the full Mozilla CA bundle (121 trust anchors) baked into the binary.
+The build runs on a G3 iMac for current work, with a beige G3 Minitower (Sonnet G4 upgrade) for the initial development arc. The target compiler is CodeWarrior 8 Pro with the 8.3 update, strict C89, and a 16 MB application partition. Network fetches go direct via TLS 1.2 to the origin, using the full Mozilla CA bundle (121 trust anchors) baked into the binary.
 
 ## What works in the current tree
 

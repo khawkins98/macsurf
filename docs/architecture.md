@@ -449,7 +449,7 @@ These are not answered by this document and require decisions before implementat
 MacSurf is not trying to make OS 9 a general-purpose modern computing platform.
 It is a browser for people who love classic Mac hardware and want to use it. The proxy
 and template layer exist in service of that goal, they are infrastructure, not the
-product. The product is the experience of opening MacSurf on a beige G3, going to
+product. The product is the experience of opening MacSurf on a G3 iMac, going to
 Facebook, and seeing your actual feed.
 
 Every architectural decision should be evaluated against that bar.

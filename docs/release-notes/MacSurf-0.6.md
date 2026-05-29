@@ -9,7 +9,7 @@
 
 ## The headline
 
-**Native HTTPS works.** MacSurf 0.6 speaks TLS 1.2 directly to the modern web from a 233 MHz beige G3, with the full Mozilla CA bundle (121 trust anchors) baked into the binary. The Go TLS-stripping proxy that earlier versions required is retired from the default path.
+**Native HTTPS works.** MacSurf 0.6 speaks TLS 1.2 directly to the modern web from a 233 MHz G3 iMac, with the full Mozilla CA bundle (121 trust anchors) baked into the binary. The Go TLS-stripping proxy that earlier versions required is retired from the default path.
 
 The whole encrypted stack — BearSSL + Open Transport + the cooperative async pump — runs inside the same 16 MB application partition that hosts the layout engine, JavaScript runtime, and image decoders.
 
@@ -107,7 +107,7 @@ The load-time QOL items deferred from this round:
 
 ## Credits
 
-This release was the culmination of two weeks of focused TLS work plus the entire prior 200-fix arc that brought NetSurf's rendering pipeline to a state where modern pages render correctly on a beige G3. macTLS itself is a single-author project, built on top of [BearSSL](https://www.bearssl.org/) by Thomas Pornin.
+This release was the culmination of two weeks of focused TLS work plus the entire prior 200-fix arc that brought NetSurf's rendering pipeline to a state where modern pages render correctly on a G3 iMac. macTLS itself is a single-author project, built on top of [BearSSL](https://www.bearssl.org/) by Thomas Pornin.
 
 ---
 
