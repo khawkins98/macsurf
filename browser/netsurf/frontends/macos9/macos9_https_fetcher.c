@@ -1169,6 +1169,44 @@ static int feed_body(struct macos9_https_ctx *c, const char *buf, long n)
 	fetch_msg msg;
 	if (n <= 0) return 0;
 
+	/* fixes320 — robust chunked detection by body framing. Some responses
+	 * (observed: 68kmla.org's soft-404 served for /favicon.ico, which
+	 * carries a large cookie/header block) send Transfer-Encoding: chunked
+	 * that the header scan missed AND no Content-Length. Per RFC 7230
+	 * §3.3.3 an HTTP/1.1 keep-alive response with no Content-Length is
+	 * REQUIRED to be chunked — there is no other way to delimit it — and we
+	 * always send Connection: keep-alive, so the peer never closes. Without
+	 * recognizing the framing the fetch stalls until the no-progress
+	 * timeout and the raw "<hex>\r\n" chunk-size line leaks into the body.
+	 *
+	 * Sniff the first body bytes once (body_bytes == 0, nothing delivered
+	 * yet): a hex run immediately followed by CRLF (or a ';' chunk-ext)
+	 * is chunk framing — switch to the decoder. Safe because no real
+	 * no-Content-Length payload begins that way: HTML starts '<', CSS
+	 * '@'/'.'/'/', PNG 0x89, JPEG 0xFF, GIF 'G'. */
+	if (!c->chunked && c->content_length < 0 && c->body_bytes == 0) {
+		long i = 0;
+		while (i < n && i < 16) {
+			char ch = buf[i];
+			if ((ch >= '0' && ch <= '9') ||
+			    (ch >= 'a' && ch <= 'f') ||
+			    (ch >= 'A' && ch <= 'F')) {
+				i++;
+			} else {
+				break;
+			}
+		}
+		if (i > 0 && i < n &&
+		    ((buf[i] == '\r' && i + 1 < n && buf[i+1] == '\n') ||
+		     buf[i] == ';')) {
+			c->chunked = 1;
+			OSTLS_HTTP_ChunkDecoderInit(&c->chunk);
+			macsurf_debug_log_writef(
+				"https: chunk-framing sniffed (clen<0, TE missed) "
+				"— enabling decoder");
+		}
+	}
+
 	if (c->chunked) {
 		const char *in = buf;
 		UInt32 in_left = (UInt32)n;
