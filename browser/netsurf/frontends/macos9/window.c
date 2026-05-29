@@ -432,26 +432,34 @@ void macos9_window_address_bar_submit(struct gui_window *g) {
 	{ long k = 0; while (r[k] == ' ') k++; if (k > 0) memmove(r, r+k, (size_t)(j - k + 1)); }
 	macsurf_debug_log_writef("submit: cleaned url='%s'", r);
 	if (r[0] == 0) { MS_LOG("submit: empty after clean"); return; }
+	/* fixes317a — repair single-slash schemes. User typos or TextEdit
+	 * slash-mangling occasionally land "https:/example.com/" (one slash)
+	 * in r. The no-scheme check below uses strstr(r,"://") which misses
+	 * the single-slash form, then prepends "https://" → URL becomes
+	 * "https://https:/example.com/" which nsurl parses as host=https,
+	 * path=/example.com/. Repair to canonical "https://" before the
+	 * scheme check. Same for http:/. */
+	if (strncmp(r, "https:/", 7) == 0 && r[7] != '/' && j + 1 < (long)sizeof(r)) {
+		memmove(r + 8, r + 7, (size_t)(j - 7 + 1));
+		r[7] = '/';
+		j++;
+		macsurf_debug_log_writef("submit: repaired single-slash https → '%s'", r);
+	} else if (strncmp(r, "http:/", 6) == 0 && r[6] != '/' && j + 1 < (long)sizeof(r)) {
+		memmove(r + 7, r + 6, (size_t)(j - 6 + 1));
+		r[6] = '/';
+		j++;
+		macsurf_debug_log_writef("submit: repaired single-slash http → '%s'", r);
+	}
 	/* fixes249 — default scheme is https://. Modern web is HTTPS-only;
 	 * defaulting to http meant typed-by-name domains (google.com,
 	 * apple.com, etc.) hit dead http:// endpoints and routed to
-	 * about:fetcherror. Sites that only serve plain HTTP (some retro-
-	 * focused servers) still work — users must type the full
-	 * "http://example.com" explicitly. The HTTPS fetcher's keep-alive +
-	 * dead-host blocklist keeps the upgrade cheap on hosts where TLS
-	 * succeeds, and the salvage path (fixes243) renders partial
-	 * responses on hosts where TLS half-works. */
+	 * about:fetcherror. Sites that only serve plain HTTP still work
+	 * because fixes317 now ALWAYS attempts the other scheme on failure
+	 * (regardless of what the user typed), one shot per scheme per host
+	 * per navigation, bounce-loop-safe. */
 	if (!strstr(r, "://")) {
 		/* Mark with explicit https scheme. */
 		sprintf(f, "https://%s", r);
-		/* fixes249b — register for HTTP fallback so retro HTTP-only
-		 * sites still work after the auto-upgrade. The HTTPS fetcher's
-		 * hctx_fail consumes this mark and emits FETCH_REDIRECT to the
-		 * http:// equivalent if the TLS path fails. */
-		{
-			extern void macsurf_auto_upgrade_mark(const char *url);
-			macsurf_auto_upgrade_mark(f);
-		}
 	} else {
 		strcpy(f, r);
 	}

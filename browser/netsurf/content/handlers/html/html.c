@@ -226,6 +226,7 @@ static void html_box_convert_done(html_content *c, bool success)
 	dom_node *html;
 
 	NSLOG(netsurf, INFO, "DOM to box conversion complete (content %p)", c);
+	macsurf_debug_log_writef("fc: box_convert_done entered (success=%d)", (int)success);
 
 	c->box_conversion_context = NULL;
 
@@ -459,9 +460,13 @@ void html_finish_conversion(html_content *htmlc)
 	 * object, but with its target set to the Document object (and
 	 * the currentTarget set to the Window object)
 	 */
+	/* FCDIAG — localize the load-time freeze. Remove once found. */
+	macsurf_debug_log_writef("fc: select_ctx OK, firing load (js=%p)",
+		(void *)htmlc->js_thread);
 	if (htmlc->js_thread != NULL) {
 		js_fire_event(htmlc->js_thread, "load", htmlc->document, NULL);
 	}
+	macsurf_debug_log_writef("fc: load event done");
 
 	/* convert dom tree to box tree */
 	NSLOG(netsurf, INFO, "DOM to box (%p)", htmlc);
@@ -477,9 +482,12 @@ void html_finish_conversion(html_content *htmlc)
 		return;
 	}
 
+	macsurf_debug_log_writef("fc: got html element, get_dimensions");
 	html_get_dimensions(htmlc);
 
+	macsurf_debug_log_writef("fc: dimensions done, dom_to_box");
 	error = dom_to_box(html, htmlc, html_box_convert_done, &htmlc->box_conversion_context);
+	macsurf_debug_log_writef("fc: dom_to_box returned err=%d", (int)error);
 	if (error != NSERROR_OK) {
 		NSLOG(netsurf, INFO, "box conversion failed");
 		dom_node_unref(html);

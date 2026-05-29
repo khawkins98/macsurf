@@ -1081,19 +1081,55 @@ static void macos9_http_poll(lwc_string *s) {
 		mfs_poll_one(c);
 #endif
 		if(c->state==MFS_FAIL) {
-			fetch_msg m; m.type=FETCH_ERROR; m.data.error=c->err;
-			c->state=MFS_NOTIFIED; fetch_send_callback(&m,c->parent);
-			macsurf_debug_log_writef("http: fail body_bytes=%ld status=%d", c->body_bytes, c->status);
-			/* fixes103 — both calls, matching every reference
-			 * fetcher (file.c:828-829, resource.c:469-470,
-			 * about.c:731-732, data.c:314-315, css_fetcher.c,
-			 * javascript/fetcher.c, curl.c). fetch_free does NOT
-			 * call RING_REMOVE on its own; without
-			 * fetch_remove_from_queues the freed struct stays in
-			 * fetch_ring as a dangling pointer and the next
-			 * RING_GETSIZE walks freed memory. */
-			fetch_remove_from_queues(c->parent);
-			fetch_free(c->parent);
+			/* fixes317 — record this HTTP failure for the host
+			 * so a later HTTPS fail for the same host knows it
+			 * can't bounce back. */
+			extern void macsurf_scheme_mark_http_failed(const char *key);
+			extern int  macsurf_scheme_was_https_tried(const char *key);
+			if (c->pool_key[0] != '\0' &&
+			    strcmp(c->pool_key, "PROXY") != 0) {
+				macsurf_scheme_mark_http_failed(c->pool_key);
+			}
+			/* fixes317 — fall back to HTTPS when HTTP fails AND
+			 * HTTPS hasn't already failed this navigation. Only
+			 * triggers for direct (non-proxy) http:// URLs. The
+			 * tracker prevents the bounce loop with HSTS hosts
+			 * whose HTTPS fail prior. */
+			if (c->aborted == 0 &&
+			    c->url != NULL && c->pool_key[0] != '\0' &&
+			    strcmp(c->pool_key, "PROXY") != 0 &&
+			    !macsurf_scheme_was_https_tried(c->pool_key)) {
+				const char *u = nsurl_access(c->url);
+				if (u != NULL && strncmp(u, "http://", 7) == 0) {
+					fetch_msg rm;
+					int n = sprintf(c->redirect_url,
+						"https://%s", u + 7);
+					if (n > 0 &&
+					    (size_t)n < sizeof c->redirect_url) {
+						macsurf_debug_log_writef(
+						    "http: scheme-fallback -> %s",
+						    c->redirect_url);
+						(void)fetch_set_http_code(
+							c->parent, 301);
+						rm.type = FETCH_REDIRECT;
+						rm.data.redirect = c->redirect_url;
+						c->state = MFS_NOTIFIED;
+						fetch_send_callback(&rm,
+							c->parent);
+						fetch_remove_from_queues(
+							c->parent);
+						fetch_free(c->parent);
+						continue;
+					}
+				}
+			}
+			{
+				fetch_msg m; m.type=FETCH_ERROR; m.data.error=c->err;
+				c->state=MFS_NOTIFIED; fetch_send_callback(&m,c->parent);
+				macsurf_debug_log_writef("http: fail body_bytes=%ld status=%d", c->body_bytes, c->status);
+				fetch_remove_from_queues(c->parent);
+				fetch_free(c->parent);
+			}
 		}
 		else if(c->state==MFS_DONE) {
 			fetch_msg m; m.type=FETCH_FINISHED;
@@ -1329,6 +1365,7 @@ void macsurf_site_navigation_reset(void) {
 	extern long macsurf__site_rgov_skip_script;
 	extern long macsurf__site_rgov_skip_font;
 	extern long macsurf__site_rgov_skip_other;
+	extern void macsurf_scheme_reset_all(void);
 	macsurf__site_heavy = 0;
 	macsurf__site_rgov_skip_doc = 0;
 	macsurf__site_rgov_skip_css = 0;
@@ -1336,6 +1373,9 @@ void macsurf_site_navigation_reset(void) {
 	macsurf__site_rgov_skip_script = 0;
 	macsurf__site_rgov_skip_font = 0;
 	macsurf__site_rgov_skip_other = 0;
+	/* fixes317 — clear per-host scheme-attempt tracker so the next
+	 * top-level navigation starts with a fresh https/http budget. */
+	macsurf_scheme_reset_all();
 }
 
 static void *macos9_http_setup(struct fetch *p, struct nsurl *u, bool o, bool d, const char *pu, const struct fetch_multipart_data *pm, const char **h) {
