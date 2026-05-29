@@ -20,7 +20,7 @@
 #define NETSURF_AMIGA_PLUGIN_HACK_H_
 
 #include "utils/config.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 nserror amiga_plugin_hack_init(void);
 

@@ -44,7 +44,7 @@
  *   read this and not re-attempt a Carbon wheel handler.
  */
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "macos9.h"
 
 #ifdef __MACOS9__

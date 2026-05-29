@@ -26,7 +26,7 @@
 
 #include <stdarg.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 /**
  * Create a normalised file name.

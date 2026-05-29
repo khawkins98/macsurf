@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 extern bool verbose_log;
 

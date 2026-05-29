@@ -19,7 +19,7 @@
 #include <dom/core/nodelist.h>
 #include <dom/core/implementation.h>
 #include <dom/core/document_type.h>
-#include <dom/events/events.h>
+#include <dom/events/dom_events.h>
 
 #include "dom_internal_string.h"
 #include "namednodemap.h"

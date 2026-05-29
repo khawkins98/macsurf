@@ -29,7 +29,7 @@
 #include <windows.h>
 #include <windowsx.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "netsurf/browser_window.h"
 #include "netsurf/plotters.h"

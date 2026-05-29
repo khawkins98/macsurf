@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/ring.h"
 #include "netsurf/download.h"
 #include "desktop/download.h"

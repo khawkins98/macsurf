@@ -28,7 +28,7 @@
 extern "C" {
 
 #include "utils/log.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/types.h"
 #include "netsurf/mouse.h"
 #include "netsurf/window.h"

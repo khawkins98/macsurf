@@ -30,7 +30,7 @@
 
 #include "netsurf/plot_style.h"
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nscolour.h"
 
 #include "private.h"

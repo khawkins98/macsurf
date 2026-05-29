@@ -27,7 +27,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nsurl.h"
 
 struct cert_chain;

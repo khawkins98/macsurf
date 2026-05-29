@@ -5,7 +5,7 @@
  * The original wrapper used #include "../../../../bindings/hubbub/parser.h"
  * which CW8 can't resolve. This file IS the content now.
  *
- * Note: the "errors.h" include below resolves via the
+ * Note: the "hubbub_errors.h" include below resolves via the
  * libdom:bindings:hubbub: access path to the real errors.h
  * at browser/libdom/bindings/hubbub/errors.h.
  */
@@ -18,7 +18,7 @@
 
 #include <dom/dom.h>
 
-/* Inlined dom_hubbub_error (normally from "errors.h" in this dir)
+/* Inlined dom_hubbub_error (normally from "hubbub_errors.h" in this dir)
  * and HUBBUB constants. Self-contained so CW8 access-path quirks
  * don't break the cascade. */
 #ifndef dom_hubbub_errors_h_

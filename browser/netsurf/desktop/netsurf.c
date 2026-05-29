@@ -28,7 +28,7 @@
 
 #include "netsurf/inttypes.h"
 #include "utils/config.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nscolour.h"
 #include "utils/nsoption.h"
 #include "utils/corestrings.h"

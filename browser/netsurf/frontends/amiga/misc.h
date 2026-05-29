@@ -21,7 +21,7 @@
 
 #include <exec/types.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 extern struct gui_file_table *amiga_file_table;
 struct Window;

@@ -31,7 +31,7 @@
 
 #include <libcss/libcss.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/types.h"
 
 /**

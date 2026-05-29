@@ -24,7 +24,7 @@
 #include <datatypes/datatypes.h>
 
 #include "netsurf/content_type.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct hlcache_handle;
 struct ami_mime_entry;

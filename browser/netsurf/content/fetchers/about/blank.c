@@ -26,7 +26,7 @@
 #include <string.h>
 
 #include "netsurf/types.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #include "private.h"
 #include "blank.h"

@@ -31,7 +31,7 @@
 #include <math.h>
 #include <nsutils/time.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "utils/corestrings.h"
 #include "utils/messages.h"

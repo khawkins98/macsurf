@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <check.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/time.h"
 
 #define NELEMS(x)  (sizeof(x) / sizeof((x)[0]))

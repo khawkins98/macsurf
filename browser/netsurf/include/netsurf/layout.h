@@ -32,7 +32,7 @@
 #ifndef _NETSURF_LAYOUT_H_
 #define _NETSURF_LAYOUT_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct plot_font_style;
 

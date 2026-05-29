@@ -23,7 +23,7 @@
  * Helpers to simplify core use of corewindow.
  */
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/browser.h"
 #include "netsurf/core_window.h"
 #include "netsurf/types.h"

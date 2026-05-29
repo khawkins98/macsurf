@@ -7,7 +7,7 @@
 #ifndef NETSURF_TEXT_TEXTPLAIN_H_
 #define NETSURF_TEXT_TEXTPLAIN_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 nserror textplain_init(void);
 

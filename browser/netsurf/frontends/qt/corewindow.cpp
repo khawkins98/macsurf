@@ -25,7 +25,7 @@
 #include <QPainter>
 
 extern "C" {
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/types.h"
 #include "netsurf/plotters.h"
 }

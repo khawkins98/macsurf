@@ -21,7 +21,7 @@
  * terminal callback per fixes102-105 discipline.
  */
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nsurl.h"
 #include "utils/log.h"
 #include "content/fetch.h"

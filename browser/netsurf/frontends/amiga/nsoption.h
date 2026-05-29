@@ -18,7 +18,7 @@
 
 #ifndef AMIGA_NSOPTION_H
 #define AMIGA_NSOPTION_H 1
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 nserror ami_nsoption_read(void);
 nserror ami_nsoption_write(void);

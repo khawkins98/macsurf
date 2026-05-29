@@ -29,7 +29,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/messages.h"
 #include "utils/dirent.h"
 #include "utils/inet.h"

@@ -30,7 +30,7 @@
 #include <QWidget>
 
 extern "C" {
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nsurl.h"
 }
 

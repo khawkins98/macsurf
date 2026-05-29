@@ -47,7 +47,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 /* allow targets to include any necessary headers of their own */
 #define NSOPTION_BOOL(NAME, DEFAULT)

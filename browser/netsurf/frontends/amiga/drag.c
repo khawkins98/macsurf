@@ -28,7 +28,7 @@
 #include <graphics/blitattr.h>
 #include <workbench/icon.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "utils/messages.h"
 #include "utils/utils.h"
@@ -292,7 +292,7 @@ bool ami_drag_has_data(void)
 #else
 #include <stddef.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "amiga/drag.h"
 
 void gui_drag_save_object(struct gui_window *g, struct hlcache_handle *c,

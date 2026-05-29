@@ -27,7 +27,7 @@
 
 #include "utils/utils.h"
 #include "utils/nsurl.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/types.h"
 #include "netsurf/content.h"
 #include "netsurf/mouse.h"

@@ -11,7 +11,7 @@
 #include <string.h>
 #include <zlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 enum out_fmt {
 	      OUTPUTFMT_NONE = 0,

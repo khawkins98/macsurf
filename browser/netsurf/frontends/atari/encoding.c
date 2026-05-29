@@ -18,7 +18,7 @@
 
 #include <stdlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/utf8.h"
 
 #include "atari/encoding.h"

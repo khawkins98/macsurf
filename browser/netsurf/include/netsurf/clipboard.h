@@ -27,7 +27,7 @@
 
 #include <stddef.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/plot_style.h"
 
 typedef struct nsnsclipboard_styles {

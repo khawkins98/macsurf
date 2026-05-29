@@ -30,7 +30,7 @@
 
 #include "netsurf/inttypes.h"
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/idna.h"
 #include "utils/idna_props.h"
 #include "utils/log.h"

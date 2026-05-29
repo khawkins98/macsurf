@@ -31,7 +31,7 @@
 #include <gtk/gtk.h>
 
 #include "utils/utils.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/content.h"
 #include "netsurf/bitmap.h"
 #include "netsurf/plotters.h"

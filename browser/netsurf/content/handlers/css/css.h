@@ -23,7 +23,7 @@
 
 #include <libcss/libcss.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct hlcache_handle;
 

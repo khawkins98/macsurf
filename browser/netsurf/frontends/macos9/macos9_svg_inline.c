@@ -38,7 +38,7 @@
 #include <dom/dom.h>
 
 #include "utils/corestrings.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/plotters.h"
 #include "netsurf/plot_style.h"
 #include "content/handlers/html/box.h"

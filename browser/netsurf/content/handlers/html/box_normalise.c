@@ -29,7 +29,7 @@
 #include <string.h>
 
 #include "utils/log.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "css/select.h"
 
 #include "html/private.h"

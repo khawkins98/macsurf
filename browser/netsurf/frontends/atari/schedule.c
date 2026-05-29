@@ -22,7 +22,7 @@
 #include <time.h>
 
 #include "utils/sys_time.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 
 #include "atari/schedule.h"

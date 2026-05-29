@@ -24,7 +24,7 @@
 #define AMIGA_ICON_H
 
 #include "utils/config.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #ifdef WITH_AMIGA_ICON
 

@@ -19,7 +19,7 @@
 #include <dom/core/node.h>
 #include <dom/core/string.h>
 #include <dom/core/document.h>
-#include <dom/events/events.h>
+#include <dom/events/dom_events.h>
 
 #include "attr.h"
 #include "document.h"

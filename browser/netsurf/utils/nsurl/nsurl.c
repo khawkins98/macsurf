@@ -40,7 +40,7 @@
 
 #include "utils/ascii.h"
 #include "utils/corestrings.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/idna.h"
 #include "utils/log.h"
 #include "utils/nsurl/private.h"

@@ -20,7 +20,7 @@
 #define NETSURF_GTK_SCAFFOLDING_H 1
 
 #include <stdbool.h>
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct bitmap;
 struct hlcache_handle;

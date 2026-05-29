@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #include <dom/dom.h>
 

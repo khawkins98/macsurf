@@ -19,7 +19,7 @@
 #ifndef NETSURF_UTILS_HTTP_CHALLENGE_INTERNAL_H_
 #define NETSURF_UTILS_HTTP_CHALLENGE_INTERNAL_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/http/challenge.h"
 
 nserror http__parse_challenge(const char **input, http_challenge **parameter);

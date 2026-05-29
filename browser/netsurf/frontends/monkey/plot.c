@@ -19,7 +19,7 @@
 #include <stdio.h>
 
 #include "utils/utils.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/plotters.h"
 
 #include "monkey/output.h"

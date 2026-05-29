@@ -24,7 +24,7 @@
 #ifndef NETSURF_CONTENT_HLCACHE_H_
 #define NETSURF_CONTENT_HLCACHE_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nsurl.h"
 
 #include "content/content.h"

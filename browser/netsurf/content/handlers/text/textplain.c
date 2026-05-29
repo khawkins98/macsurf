@@ -26,7 +26,7 @@
 #include <string.h>
 #include <parserutils/input/inputstream.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/corestrings.h"
 #include "utils/http.h"
 #include "utils/log.h"

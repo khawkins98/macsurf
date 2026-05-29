@@ -24,7 +24,7 @@
 #define _NETSURF_RISCOS_SPRITE_H_
 
 #include "utils/config.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #ifdef WITH_SPRITE
 

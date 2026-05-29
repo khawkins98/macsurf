@@ -21,7 +21,7 @@
 
 #include <libwapcaplet/libwapcaplet.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 typedef struct http_parameter http_parameter;
 

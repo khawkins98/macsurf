@@ -24,7 +24,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/inttypes.h"
 #include "testament.h"
 

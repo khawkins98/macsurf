@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/bitmap.h"
 
 #include "monkey/output.h"

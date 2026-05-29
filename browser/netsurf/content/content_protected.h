@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <libwapcaplet/libwapcaplet.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/content_type.h"
 #include "netsurf/mouse.h" /* mouse state enums */
 

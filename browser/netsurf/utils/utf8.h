@@ -26,7 +26,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 /**
  * Convert a UTF-8 multibyte sequence into a single UCS4 character
