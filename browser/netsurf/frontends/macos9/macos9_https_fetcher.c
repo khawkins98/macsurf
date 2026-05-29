@@ -768,7 +768,17 @@ static void hctx_fail(struct macos9_https_ctx *c, const char *why)
 	 * The original full-URL match silently failed because NetSurf
 	 * normalises bare-host URLs to add a trailing slash, but window.c's
 	 * mark used the raw form. */
-	if (c->url != NULL && c->pool_key[0] != '\0' &&
+	/* fixes314 — never emit FETCH_REDIRECT from hctx_fail if NetSurf
+	 * has already aborted this fetch. ops.abort (driven by NetSurf
+	 * core fetch_abort) nulls llcache's object->fetch.fetch before
+	 * returning. If we send a synthetic redirect now, llcache_fetch_
+	 * redirect calls fetch_abort(NULL) → crash. Aborts happen on page
+	 * navigation, manual cancel, and resource-pressure cancellation;
+	 * the fallback is only meaningful when WE detected the failure
+	 * (peer-close, timeout, handshake error) — not when NetSurf gave
+	 * up on us. */
+	if (c->aborted == 0 &&
+	    c->url != NULL && c->pool_key[0] != '\0' &&
 	    auto_upgrade_check(c->pool_key)) {
 		const char *u = nsurl_access(c->url);
 		if (u != NULL && strncmp(u, "https://", 8) == 0) {
