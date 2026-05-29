@@ -1,12 +1,11 @@
 # Private archive folder (intermediate ship zips, dev snapshots, etc.)
 .private/
 
-# Per-user assistant state, prompts, and project-context briefs — local
-# to the working copy and not published in the repo.
+# Per-user assistant state directories (local conversation transcripts,
+# session caches). The project-context files themselves (CLAUDE.md,
+# GEMINI.md) are tracked in the repo for transparency.
 .claude/
 .gemini/
-CLAUDE.md
-GEMINI.md
 AGENTS.md
 COPILOT.md
 
