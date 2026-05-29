@@ -18,7 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "netsurf/fetch.h"
 #include "macos9.h"

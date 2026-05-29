@@ -27,7 +27,7 @@
 #include <QWheelEvent>
 
 extern "C" {
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #include "netsurf/mouse.h"
 #include "netsurf/window.h"

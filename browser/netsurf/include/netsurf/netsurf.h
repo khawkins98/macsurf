@@ -25,7 +25,7 @@
 #ifndef _NETSURF_NETSURF_H_
 #define _NETSURF_NETSURF_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "desktop/gui_table.h"
 
 /**

@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 /**
  * Version of cookie

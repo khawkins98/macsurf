@@ -42,7 +42,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "utils/nsurl.h"
 #include "netsurf/download.h"

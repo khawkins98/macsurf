@@ -11,7 +11,7 @@
 
 #include <dom/core/characterdata.h>
 #include <dom/core/string.h>
-#include <dom/events/events.h>
+#include <dom/events/dom_events.h>
 
 #include "characterdata.h"
 #include "document.h"

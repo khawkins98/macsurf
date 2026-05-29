@@ -69,7 +69,7 @@
 
 #include "utils/utils.h"
 #include "utils/log.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/bitmap.h"
 #include "content/content.h"
 #include "netsurf/plotters.h"

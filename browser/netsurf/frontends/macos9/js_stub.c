@@ -14,7 +14,9 @@
 
 
 #include <stddef.h>
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
+
+#ifndef WITH_DUKTAPE
 
 struct dom_event;
 struct dom_document;
@@ -73,4 +75,4 @@ void js_event_cleanup(jsthread *thread, struct dom_event *evt)
 	(void)thread; (void)evt;
 }
 
-
+#endif /* !WITH_DUKTAPE */

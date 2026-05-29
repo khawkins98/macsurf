@@ -24,7 +24,7 @@
 #define NETSURF_UTILS_CORESTRINGS_H_
 
 #include <libwapcaplet/libwapcaplet.h>
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 /** File url prefix. */
 #define FILE_SCHEME_PREFIX "file:///"

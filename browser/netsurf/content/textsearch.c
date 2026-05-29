@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/utils.h"
 #include "utils/ascii.h"
 #include "netsurf/types.h"

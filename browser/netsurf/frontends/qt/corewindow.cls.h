@@ -26,7 +26,7 @@
 #include <QWidget>
 
 extern "C" {
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/core_window.h"
 #include "netsurf/mouse.h"
 }

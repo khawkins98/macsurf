@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 #include "utils/config.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/file.h"
 #include "utils/inet.h"
 #include "netsurf/bitmap.h"

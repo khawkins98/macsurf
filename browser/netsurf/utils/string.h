@@ -62,7 +62,7 @@ char *strsep(char **stringp, const char *delim);
  * (any include style — bare or path-prefixed silently fails to open
  * once we're inside this file). Inline the nserror enum directly,
  * guarded by the same guard utils/errors.h uses, so a later real
- * #include "utils/errors.h" from a primary .c source short-circuits. */
+ * #include "utils/ns_errors.h" from a primary .c source short-circuits. */
 #ifndef NETSURF_UTILS_ERRORS_H_
 #define NETSURF_UTILS_ERRORS_H_
 typedef enum {

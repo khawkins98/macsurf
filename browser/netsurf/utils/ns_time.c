@@ -35,7 +35,7 @@
 #endif
 
 #include "utils/ascii.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/ns_time.h"
 
 

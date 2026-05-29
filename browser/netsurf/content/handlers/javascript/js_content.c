@@ -26,7 +26,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/config.h"
 #include "content/content_protected.h"
 #include "content/content_factory.h"

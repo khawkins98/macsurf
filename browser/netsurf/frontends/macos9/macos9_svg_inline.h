@@ -42,7 +42,7 @@
 #ifndef MACOS9_SVG_INLINE_H_
 #define MACOS9_SVG_INLINE_H_
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "netsurf/plotters.h"
 
 struct box;

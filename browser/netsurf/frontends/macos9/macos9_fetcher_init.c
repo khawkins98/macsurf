@@ -14,7 +14,7 @@
  * current_content stayed NULL, redraw painted only the white blank.
  */
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "macsurf_debug.h"
 
 extern nserror macos9_http_fetcher_register(void);

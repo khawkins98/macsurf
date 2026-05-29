@@ -25,7 +25,7 @@
 #include <proto/utility.h>
 #include <reaction/reaction_macros.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "utils/messages.h"
 #include "netsurf/form.h"

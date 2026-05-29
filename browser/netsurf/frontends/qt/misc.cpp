@@ -27,7 +27,7 @@
 
 extern "C" {
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/sys_time.h"
 #include "utils/log.h"
 #include "netsurf/misc.h"

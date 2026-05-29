@@ -24,7 +24,7 @@
 #include <libwapcaplet/libwapcaplet.h>
 
 #include "netsurf/content_type.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 #define CONTENT_FACTORY_REGISTER_TYPES(HNAME, HTYPELIST, HHANDLER)	\
 									\

@@ -12,7 +12,7 @@
 
 #include <stdlib.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 
 #include "macos9.h"

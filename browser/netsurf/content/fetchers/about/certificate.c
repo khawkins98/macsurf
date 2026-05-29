@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 #include "utils/messages.h"
 #include "netsurf/inttypes.h"

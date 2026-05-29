@@ -19,7 +19,7 @@
 #ifndef NS_MONKEY_401LOGIN_H
 #define NS_MONKEY_401LOGIN_H
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct nsurl;
 

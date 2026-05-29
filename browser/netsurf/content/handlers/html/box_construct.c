@@ -28,7 +28,7 @@
 #include <string.h>
 #include <dom/dom.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/nsoption.h"
 #include "utils/corestrings.h"
 #include "utils/talloc.h"

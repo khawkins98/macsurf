@@ -22,7 +22,7 @@
 
 #ifndef AMIGA_LAUNCH_H
 #define AMIGA_LAUNCH_H
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 struct nsurl;
 
 void ami_openurl_open(void);

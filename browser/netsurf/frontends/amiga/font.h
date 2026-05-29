@@ -20,7 +20,7 @@
 #define AMIGA_FONT_H
 
 #include "netsurf/plotters.h"
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include <graphics/rastport.h>
 #include <graphics/text.h>
 

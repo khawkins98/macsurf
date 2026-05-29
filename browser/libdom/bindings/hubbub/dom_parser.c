@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <hubbub/errors.h>
+#include <hubbub/hubbub_errors.h>
 #include <hubbub/hubbub.h>
 #include <hubbub/parser.h>
 

@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <pbl.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 #include "utils/log.h"
 
 #include "amiga/memory.h"

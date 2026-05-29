@@ -8,7 +8,7 @@
  */
 
 #include <stddef.h>
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 struct nsurl;
 struct bitmap;

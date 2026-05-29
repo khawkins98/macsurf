@@ -2469,6 +2469,17 @@ typedef struct duk_hthread duk_context;
 #endif
 #endif  /* DUK_F_C99 etc */
 
+/* fixes316f — CW8 / MSL on Mac OS 9 doesn't ship cbrt / log2 / trunc.
+ * (log10 IS present in MSL, but we wipe it for symmetry so Duktape's
+ * fallback path is uniform.) Force Duktape's built-in fallbacks. Mirrors
+ * the original fixes289a that landed alongside the JS bridge work. */
+#if defined(__MWERKS__)
+#undef DUK_CBRT
+#undef DUK_LOG2
+#undef DUK_LOG10
+#undef DUK_TRUNC
+#endif
+
 /* NetBSD 6.0 x86 (at least) has a few problems with pow() semantics,
  * see test-bug-netbsd-math-pow.js.  MinGW has similar (but different)
  * issues, see test-bug-mingw-math-issues.js.  Enable pow() workarounds

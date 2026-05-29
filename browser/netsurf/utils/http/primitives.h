@@ -21,7 +21,7 @@
 
 #include <libwapcaplet/libwapcaplet.h>
 
-#include "utils/errors.h"
+#include "utils/ns_errors.h"
 
 void http__skip_LWS(const char **input);
 

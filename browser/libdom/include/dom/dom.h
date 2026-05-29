@@ -99,7 +99,7 @@
 #include <dom/html/html_isindex_element.h>
 
 /* DOM Events header */
-#include <dom/events/events.h>
+#include <dom/events/dom_events.h>
 
 typedef enum dom_namespace {
 	DOM_NAMESPACE_NULL    = 0,
