@@ -288,19 +288,9 @@ void macsurf_auto_upgrade_mark(const char *url)
 	auto_upgrade_count++;
 }
 
-/* fixes299 / #141 — non-destructive lookup.  Returns 1 if `key` is in
- * the mark list.  Previously this consumed the entry (single-shot), so
- * sub-resource fetches (favicon, CSS, scripts) on the same host:port
- * raced the main page through hctx_fail and the loser found nothing to
- * consume → no fallback → about:fetcherror.  Now every failed HTTPS
- * fetch for a marked host emits FETCH_REDIRECT to http://.
- *
- * Loop concern from the original fixes249b "single-shot" design:
- * unfounded.  Our FETCH_REDIRECT changes the scheme to http://, which
- * NetSurf's llcache then dispatches to the HTTP fetcher (different code
- * path).  No path leads back into the HTTPS fetcher.  The only loop
- * risk is a server-side http→https 301; for that NetSurf's own
- * max_redirections counter kicks in and breaks the cycle. */
+/* fixes299 / #141 — non-destructive lookup.  Retained for backward
+ * compatibility; not consulted by the fixes317 fallback logic which
+ * always falls back to the other scheme regardless of mark state. */
 static int auto_upgrade_check(const char *key)
 {
 	int i;
@@ -309,6 +299,109 @@ static int auto_upgrade_check(const char *key)
 		if (strcmp(auto_upgrade_list[i], key) == 0) return 1;
 	}
 	return 0;
+}
+
+/* ---------- fixes317 — per-host scheme-attempt tracker --------------
+ * Replaces the asymmetric fixes249b/249c/299 mechanism (which only
+ * fell back from HTTPS→HTTP for no-scheme-typed URLs). New rule:
+ *
+ *   - First attempt for a host uses whatever scheme the URL specifies
+ *     (HTTPS by default for no-scheme typing, per fixes249).
+ *   - If that scheme fails, FETCH_REDIRECT to the OTHER scheme.
+ *   - If the other scheme ALSO fails (or a server-side 301 bounces
+ *     back to the originally-failed scheme), surface FETCH_ERROR.
+ *
+ * Implementation: per-host (host:port) flags https_tried, http_tried.
+ * Set when that scheme's fetch fails for the host. Both fetchers
+ * consult macsurf_scheme_was_X_tried() and skip the redirect emit
+ * if the alternate scheme has already failed.
+ *
+ * State is reset by macsurf_site_navigation_reset() so each top-level
+ * navigation gets a fresh per-host budget. Sub-resource fetches and
+ * embedded redirects within the same nav share the budget — exactly
+ * what we want for bounce-loop prevention. */
+#define HTTPS_SCHEME_TRACK_MAX 32
+struct macsurf__scheme_track {
+	char host_port[HTTPS_POOL_KEY_LEN];
+	int  https_failed;
+	int  http_failed;
+};
+static struct macsurf__scheme_track scheme_track_list[HTTPS_SCHEME_TRACK_MAX];
+static int scheme_track_count = 0;
+
+static struct macsurf__scheme_track *scheme_track_find_or_add(const char *key)
+{
+	int i;
+	if (key == NULL || key[0] == '\0') return NULL;
+	for (i = 0; i < scheme_track_count; i++) {
+		if (strcmp(scheme_track_list[i].host_port, key) == 0)
+			return &scheme_track_list[i];
+	}
+	if (scheme_track_count >= HTTPS_SCHEME_TRACK_MAX) {
+		/* FIFO evict slot 0 */
+		for (i = 0; i < HTTPS_SCHEME_TRACK_MAX - 1; i++) {
+			scheme_track_list[i] = scheme_track_list[i + 1];
+		}
+		scheme_track_count--;
+	}
+	strncpy(scheme_track_list[scheme_track_count].host_port, key,
+		HTTPS_POOL_KEY_LEN - 1);
+	scheme_track_list[scheme_track_count].host_port[HTTPS_POOL_KEY_LEN - 1] = '\0';
+	scheme_track_list[scheme_track_count].https_failed = 0;
+	scheme_track_list[scheme_track_count].http_failed = 0;
+	scheme_track_count++;
+	return &scheme_track_list[scheme_track_count - 1];
+}
+
+int macsurf_scheme_was_https_tried(const char *key)
+{
+	int i;
+	if (key == NULL || key[0] == '\0') return 0;
+	for (i = 0; i < scheme_track_count; i++) {
+		if (strcmp(scheme_track_list[i].host_port, key) == 0)
+			return scheme_track_list[i].https_failed;
+	}
+	return 0;
+}
+
+int macsurf_scheme_was_http_tried(const char *key)
+{
+	int i;
+	if (key == NULL || key[0] == '\0') return 0;
+	for (i = 0; i < scheme_track_count; i++) {
+		if (strcmp(scheme_track_list[i].host_port, key) == 0)
+			return scheme_track_list[i].http_failed;
+	}
+	return 0;
+}
+
+void macsurf_scheme_mark_https_failed(const char *key)
+{
+	struct macsurf__scheme_track *t = scheme_track_find_or_add(key);
+	if (t != NULL) t->https_failed = 1;
+}
+
+void macsurf_scheme_mark_http_failed(const char *key)
+{
+	struct macsurf__scheme_track *t = scheme_track_find_or_add(key);
+	if (t != NULL) t->http_failed = 1;
+}
+
+void macsurf_scheme_reset_all(void)
+{
+	scheme_track_count = 0;
+}
+
+/* Build a host:port key from "host" (already-parsed) + port int. */
+static int macsurf_scheme_key_from_host_port(char *out, int cap,
+	const char *host, int port)
+{
+	int n;
+	if (out == NULL || cap <= 0 || host == NULL || host[0] == '\0') return 0;
+	n = (int)strlen(host);
+	if (n + 8 >= cap) return 0;
+	sprintf(out, "%s:%d", host, port);
+	return 1;
 }
 
 /* ---------- session-scope dead-host blocklist (fixes236) ----------
@@ -777,9 +870,22 @@ static void hctx_fail(struct macos9_https_ctx *c, const char *why)
 	 * the fallback is only meaningful when WE detected the failure
 	 * (peer-close, timeout, handshake error) — not when NetSurf gave
 	 * up on us. */
+	/* fixes317 — record this HTTPS failure for the host. Used by both
+	 * fetchers to (a) decide whether the OTHER scheme is still worth
+	 * trying, and (b) refuse a server-side 3xx that bounces back to a
+	 * scheme we've already failed at for this host this navigation. */
+	if (c->pool_key[0] != '\0') {
+		macsurf_scheme_mark_https_failed(c->pool_key);
+	}
+
+	/* fixes317 — always fall back to HTTP when HTTPS fails, regardless
+	 * of whether the URL was no-scheme typed (the old auto_upgrade
+	 * mark). Gated by the per-host scheme tracker so a host whose HTTP
+	 * has ALSO already failed this navigation surfaces FETCH_ERROR
+	 * instead of bouncing. */
 	if (c->aborted == 0 &&
 	    c->url != NULL && c->pool_key[0] != '\0' &&
-	    auto_upgrade_check(c->pool_key)) {
+	    !macsurf_scheme_was_http_tried(c->pool_key)) {
 		const char *u = nsurl_access(c->url);
 		if (u != NULL && strncmp(u, "https://", 8) == 0) {
 			fetch_msg rm;
@@ -1089,6 +1195,11 @@ static int feed_body(struct macos9_https_ctx *c, const char *buf, long n)
 			in += in_c;
 			in_left -= in_c;
 		}
+		/* CHUNKDIAG — remove after Google-Fonts chunked stall is fixed. */
+		macsurf_debug_log_writef(
+			"CHUNKDIAG feed: in=%ld state=%d remain=%ld bodyb=%ld",
+			(long)n, (int)c->chunk.state,
+			(long)c->chunk.remaining, (long)c->body_bytes);
 		if (c->chunk.state == kOSTLSChunkStateDone) return 1;
 		return 0;
 	} else {
@@ -1430,6 +1541,28 @@ static void hctx_poll(struct macos9_https_ctx *c)
 				if (r == 1) {
 					long leftover = c->hdr_len - body_off;
 					c->state = HS_BODY;
+					/* CHUNKDIAG — dump the first body bytes the
+					 * decoder is fed, so we can see if it starts
+					 * at "c1\r\n" (correct) or a wrong offset.
+					 * Remove after the chunked stall is fixed. */
+					{
+						static const char hexd[] = "0123456789abcdef";
+						char hxb[80];
+						long k, hn = (leftover < 24) ? leftover : 24;
+						int hp = 0;
+						for (k = 0; k < hn; k++) {
+							unsigned char ch =
+							 (unsigned char)c->hdr_buf[body_off + k];
+							hxb[hp++] = hexd[ch >> 4];
+							hxb[hp++] = hexd[ch & 15];
+							hxb[hp++] = ' ';
+						}
+						hxb[hp] = '\0';
+						macsurf_debug_log_writef(
+						 "CHUNKDIAG split: chunked=%d clen=%ld off=%ld leftover=%ld body0: %s",
+						 c->chunked, c->content_length,
+						 body_off, leftover, hxb);
+					}
 					if (leftover > 0) {
 						if (feed_body(c,
 						    c->hdr_buf + body_off,
