@@ -18,6 +18,13 @@
 OTClientContextPtr macos9_ot_context = NULL;
 /* macTLS expects this symbol; aliased to our OT context after init. */
 OTClientContextPtr g_ostls_ot_context = NULL;
+/* macEntropy host hooks (macTLS os9/ostls_entropy.h). Declared locally,
+ * matching this file's extern idiom, to avoid pulling BearSSL headers
+ * into main.c. LoadSeed warms cold-start; StirEntropy feeds event jitter
+ * from the poll loop; SaveSeed persists the session's entropy at quit. */
+extern void OSTLS_LoadSeed(void);
+extern void OSTLS_SaveSeed(void);
+extern void OSTLS_StirEntropy(const void *data, unsigned long len);
 #ifdef WITH_DUKTAPE
 #include "javascript/macsurf_js.h"
 #include "content/handlers/javascript/js.h"
@@ -646,6 +653,10 @@ void macos9_poll(void) {
 	 * cadence. The real wins from fixes234 (READ_CHUNK=8192,
 	 * PUMP_STEPS=32) stay. */
 	if (WaitNextEvent(MACOS9_EVENT_MASK, &ev, 1, NULL)) {
+		/* macEntropy host seam: the whole EventRecord is jittery -- ev.where
+		 * (mouse location), ev.when (event tick, i.e. key-press latency),
+		 * ev.what, ev.message. Fold it into the pool every real event. */
+		OSTLS_StirEntropy(&ev, sizeof ev);
 		switch (ev.what) {
 			case updateEvt:   macos9_handle_update(&ev); break;
 			case mouseDown:   macos9_handle_mouse_down(&ev); break;
@@ -728,6 +739,10 @@ int main(void) {
 		MS_LOG("InitOT OK");
 	}
 	g_ostls_ot_context = macos9_ot_context;
+	/* macEntropy: fold the persisted seed in before any handshake, so the
+	 * first HTTPS fetch after a cold boot isn't drawing on a thin pool. */
+	OSTLS_LoadSeed();
+	MS_LOG("macEntropy: seed loaded");
 	RegisterAppearanceClient();
 	MS_LOG("Appearance OK");
 
@@ -900,6 +915,10 @@ int main(void) {
 #ifdef WITH_DUKTAPE
 	js_finalise();
 #endif
+	/* macEntropy: persist this session's accumulated entropy so the next
+	 * cold boot starts warm. Must run before OT teardown. */
+	OSTLS_SaveSeed();
+	MS_LOG("macEntropy: seed saved");
 	if (macos9_ot_context) CloseOpenTransportInContext(macos9_ot_context);
 	return 0;
 }
