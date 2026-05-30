@@ -18,9 +18,18 @@
  */
 #include <stddef.h>
 #include <string.h>
+/* Files.h MUST come before OpenTransport/OpenTptInternet because
+ * OpenTransportProviders.h (chained from OpenTptInternet.h) uses
+ * FSSpec by value inside RAConfigModem. */
+#include <Files.h>
 #include <OpenTransport.h>
 #include <OpenTptInternet.h>
-#include <Threads.h>
+/* Phase 0 deliberately does NOT include <Threads.h>. On this CW8
+ * install, <Threads.h> resolves to MRJ (Macintosh Runtime for Java)
+ * thread headers, which cascade into Win32 cruft via jvm.h.
+ * Cooperative yielding from the OT notifier becomes important once
+ * macTLS handshakes start consuming the pump (Phase 1). For now the
+ * main loop's WaitNextEvent gives sufficient cooperative scheduling. */
 
 #include "mlink_listener.h"
 #include "mlink_log.h"
@@ -70,7 +79,9 @@ static pascal void mlink__notifier(void *contextPtr, OTEventCode code,
     (void)result;
     (void)cookie;
     if (code == kOTSyncIdleEvent) {
-        YieldToAnyThread();
+        /* Phase 0: no cooperative threads to yield to. WaitNextEvent
+         * in main loop schedules other apps. Phase 1+ (macTLS pump)
+         * will revisit this and link Thread Manager properly. */
     } else if (code == T_LISTEN) {
         /* Mark the corresponding listener slot. Real dispatch happens
          * in mlink_listener_pump on the main thread; we just flag it. */

@@ -27,6 +27,13 @@
 
 #include "mlink_log.h"
 
+/* smSystemScript lives in <Script.h>; for an FBA running on US
+ * systems any single-byte script tag works. Hardcode smRoman (0)
+ * to avoid the Script.h header cascade. */
+#ifndef smRoman
+#define smRoman 0
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Internal state                                                     */
 /* ------------------------------------------------------------------ */
@@ -156,7 +163,7 @@ int mlink_log_init(void)
 
     err = FSMakeFSSpec(v, d, p_name, &spec);
     if (err == fnfErr) {
-        err = FSpCreate(&spec, 'CWIE', 'TEXT', smSystemScript);
+        err = FSpCreate(&spec, 'CWIE', 'TEXT', smRoman);
         if (err != noErr) return -1;
     } else if (err != noErr) {
         return -1;

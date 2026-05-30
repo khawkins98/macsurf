@@ -15,9 +15,19 @@
 
 #include <MacTypes.h>
 
+#ifndef __MACOS9__
 #define __MACOS9__              1
+#endif
+
+#ifndef NO_IPV6
 #define NO_IPV6                 1
+#endif
+
+/* CW8's Carbon target panel already defines this; guard so we don't
+ * collide if the project settings panel was already used to set it. */
+#ifndef TARGET_API_MAC_CARBON
 #define TARGET_API_MAC_CARBON   1
+#endif
 
 /* OS-level Carbon include is gated to a single place so future
  * subheader-collision suppression (per CLAUDE.md notes on Carbon.h
