@@ -553,9 +553,21 @@ box_construct_generate(struct box_construct_ctx *ctx,
 		 * var(--header-tile); }`) is silently never painted. */
 		{
 			lwc_string *bgimage_uri = NULL;
-			if (css_computed_background_image(gen->style,
-					&bgimage_uri) ==
-					CSS_BACKGROUND_IMAGE_IMAGE &&
+			uint8_t bgimg_kind = css_computed_background_image(
+				gen->style, &bgimage_uri);
+#ifdef MACSURF_DEBUG
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				macsurf_debug_log_writef(
+					"fixes347 pseudo bg-image: kind=%d uri=%s",
+					(int)bgimg_kind,
+					(bgimage_uri != NULL) ?
+						lwc_string_data(bgimage_uri) :
+						"(null)");
+			}
+#endif
+			if (bgimg_kind == CSS_BACKGROUND_IMAGE_IMAGE &&
 					bgimage_uri != NULL &&
 					nsoption_bool(background_images)
 					== true) {
