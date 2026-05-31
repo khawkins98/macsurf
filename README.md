@@ -16,6 +16,10 @@
   </a>
 </div>
 <p align="center">
+  <em>MacSurf is a nights-and-weekends project. If it brought your old Mac back to the web, a coffee helps keep development going.</em>
+</p>
+
+<p align="center">
   <a href="https://github.com/mplsllc/macsurf/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/mplsllc/macsurf?include_prereleases&label=release&color=ff8800"></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/mplsllc/macsurf?color=blue"></a>
   <a href="https://github.com/mplsllc/macsurf/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/mplsllc/macsurf"></a>
@@ -37,14 +41,10 @@
 
 ---
 
-> [!WARNING]
-> **MacSurf is early alpha.** It runs, it renders, it talks TLS 1.2 natively to real HTTPS sites (as of May 2026), and it executes JavaScript on a 233 MHz G3. That doesn't mean it's ready for daily driving — most of the modern web still won't work in it. Heavy SPAs, modern CSS features we haven't shipped, missing form interactions, slow JS on real hardware. Plenty is rough.
+> [!NOTE]
+> Early alpha — it runs, renders, and speaks TLS 1.3 natively on a 233 MHz G3, but most of the modern web won't work in it yet. Expect hand-built pages, retro-style sites, and the strange thrill of ES5 JavaScript on PowerPC. Don't expect smooth browsing on arbitrary modern sites, video, or anything React-heavy.
 >
-> But it's ready for people to try. If you've got a Power Mac G3 or G4 sitting around, please load it and see what breaks. Bug reports and screenshots from real hardware are exactly what this project needs. Contributors welcome too — there's a lot of CSS, DOM, and JS surface left to fill in, and the code is plain C89 (the same C you'd have written in 1999). See [docs/status.md](docs/status.md) for the current punch list.
->
-> What you can expect: hand-built pages, retro-style sites, a respectable chunk of CSS Grid, native HTTPS with the full Mozilla CA bundle, and the strange thrill of running ES5 JavaScript on a PowerPC. What you shouldn't expect yet: smooth browsing on arbitrary modern sites, video, audio, WebGL, service workers, anything heavy on React.
->
-> First numbered release was **0.1a1** in May 2026. Latest is **[v1.3.1 — Forward, refined](https://github.com/mplsllc/macsurf/releases/latest)** (2026-05-29): **multi-curve ECDHE in TLS 1.3.** macTLS now offers X25519, secp256r1 (P-256), and secp384r1 (P-384) in `supported_groups`, with HelloRetryRequest handled cleanly so servers that mandate a NIST curve can drive the rekey. That unblocks 68kmla.org — one of the largest active Classic Mac communities, XenForo on nginx with NIST-only curve config — which now renders fully on a G3 iMac via TLS 1.3 + P-384. Predecessor **[v1.3 — Forward](https://github.com/mplsllc/macsurf/releases/tag/v1.3)** landed **the first native TLS 1.3 implementation on Classic Mac OS, ever** — RFC 8446 handshake on BearSSL primitives, ChaCha20-Poly1305 + AES-128-GCM, verified end-to-end on a G3 iMac by Cloudflare's `/cdn-cgi/trace`, Akamai, BrowserLeaks, and How's My SSL. The day before, **[v1.2 — Sealed](https://github.com/mplsllc/macsurf/releases/tag/v1.2)** closed the documented insecure-stub entropy hole with **macEntropy v1.0**, wired POST forms through both fetchers, and shipped a real download manager. Full v1.3.1 notes in [docs/release-notes/MacSurf-1.3.1.md](docs/release-notes/MacSurf-1.3.1.md). Predecessors: [v1.3 notes](docs/release-notes/MacSurf-1.3.md), [v1.2 notes](docs/release-notes/MacSurf-1.2.md), [v1.0 notes](docs/release-notes/MacSurf-1.0.md).
+> If you've got a Power Mac G3 or G4 sitting around, load it up and see what breaks — bug reports and real-hardware screenshots are exactly what this project needs. See [docs/status.md](docs/status.md) for the current punch list.
 
 ---
 
@@ -233,3 +233,14 @@ A single Go binary. No config files. No dependencies beyond stdlib.
 cd proxy
 go build -o macsurf-proxy
 ./macsurf-proxy
+
+
+---
+
+## Support
+
+MacSurf is a solo nights-and-weekends project. If it brought your G3 or G4 back to the live web — or if you just enjoy watching Classic Mac OS keep up with 2026 — a coffee goes a long way.
+
+<a href="https://www.buymeacoffee.com/Ptricky"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" height="48" width="217"></a>
+
+Bug reports, screenshots from real hardware, and pull requests are equally welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
