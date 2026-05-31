@@ -224,23 +224,3 @@ MacSurf is built on Mac OS 9 with CodeWarrior 8 Pro (8.3 update). The source is 
 - [Linux cross-dev workflow](docs/cross-dev-from-linux.md)
 
 </td>
-<td valign="top" width="50%">
-
-### Running the proxy
-A single Go binary. No config files. No dependencies beyond stdlib.
-
-```bash
-cd proxy
-go build -o macsurf-proxy
-./macsurf-proxy
-
-
----
-
-## Support
-
-MacSurf is a solo nights-and-weekends project. If it brought your G3 or G4 back to the live web — or if you just enjoy watching Classic Mac OS keep up with 2026 — a coffee goes a long way.
-
-<a href="https://www.buymeacoffee.com/Ptricky"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" height="48" width="217"></a>
-
-Bug reports, screenshots from real hardware, and pull requests are equally welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
