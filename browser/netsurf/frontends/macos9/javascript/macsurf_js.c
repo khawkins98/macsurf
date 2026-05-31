@@ -320,6 +320,24 @@ static void register_browser_globals(duk_context *ctx)
 	duk_push_c_function(ctx, native_atob, 1);
 	duk_put_prop_string(ctx, -2, "atob");
 
+	/* fixes321 (#103) — setTimeout / setInterval / clearTimeout /
+	 * clearInterval. Backed by macsurf_js_timers.c. clearInterval is
+	 * an alias for clearTimeout (the per-timer "repeating" flag in
+	 * the arena distinguishes; clearing by id works for either). */
+	{
+		extern duk_ret_t macsurf_js_settimeout(duk_context *duk);
+		extern duk_ret_t macsurf_js_setinterval(duk_context *duk);
+		extern duk_ret_t macsurf_js_cleartimeout(duk_context *duk);
+		duk_push_c_function(ctx, macsurf_js_settimeout, 2);
+		duk_put_prop_string(ctx, -2, "setTimeout");
+		duk_push_c_function(ctx, macsurf_js_setinterval, 2);
+		duk_put_prop_string(ctx, -2, "setInterval");
+		duk_push_c_function(ctx, macsurf_js_cleartimeout, 1);
+		duk_put_prop_string(ctx, -2, "clearTimeout");
+		duk_push_c_function(ctx, macsurf_js_cleartimeout, 1);
+		duk_put_prop_string(ctx, -2, "clearInterval");
+	}
+
 	/* navigator */
 	duk_push_object(ctx);
 	duk_push_string(ctx, MACSURF_JS_UA);
@@ -430,6 +448,22 @@ static const char * const macsurf_js__content_types[] = {
 	"text/javascript",
 	"text/ecmascript"
 };
+
+/* fixes321 (#103) — pump bridge. macos9_poll calls this every event
+ * loop tick. Builds a temporary jscontext from global_heap and fires
+ * any due timers. No-op if no JS heap is alive yet. */
+void macsurf_js_pump_timers(void)
+{
+	extern void macsurf_js_run_timers(struct jscontext *ctx);
+	if (global_heap == NULL || global_heap->ctx == NULL) return;
+	{
+		struct jscontext tmp;
+		tmp.duk = global_heap->ctx;
+		tmp.win_priv = NULL;
+		tmp.doc_priv = NULL;
+		macsurf_js_run_timers(&tmp);
+	}
+}
 
 /* fixes319g — link-stub for macsurf_js_dom.c's macsurf_console_log.
  * The DOM file's pre-existing single-stream console.log routes through

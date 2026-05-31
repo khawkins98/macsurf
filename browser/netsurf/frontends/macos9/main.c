@@ -693,6 +693,9 @@ void macos9_poll(void) {
 		macos9_poll_mouse_hover();
 		{ extern void macos9_animation_tick(void);
 		  macos9_animation_tick(); }
+		/* fixes321 (#103) — drive setTimeout / setInterval. */
+		{ extern void macsurf_js_pump_timers(void);
+		  macsurf_js_pump_timers(); }
 	}
 }
 
