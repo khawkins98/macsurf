@@ -154,6 +154,7 @@ extern bool macos9_quitting;
 #define MENU_FILE   129
 #define MENU_EDIT   130
 #define MENU_GO     131
+#define MENU_VIEW   132
 
 #define ITEM_FILE_NEW       1
 #define ITEM_FILE_LOCATION  2
@@ -165,6 +166,9 @@ extern bool macos9_quitting;
 #define ITEM_GO_STOP        3
 #define ITEM_GO_RELOAD      4
 #define ITEM_GO_HOME        6
+
+#define ITEM_VIEW_SOURCE    1
+#define ITEM_VIEW_FIND      3
 
 struct gui_window *macos9_find_window(WindowRef w);
 void macos9_window_layout(struct gui_window *g);

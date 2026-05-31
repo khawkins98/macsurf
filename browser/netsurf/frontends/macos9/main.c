@@ -143,6 +143,15 @@ static void macos9_init_menus(void) {
 	AppendMenu(go_menu, "\pHome/H");
 	InsertMenu(go_menu, 0);
 
+	/* fixes330 (#96 #45) — View menu with View Source + Find. */
+	{
+		MenuHandle view_menu = NewMenu(MENU_VIEW, "\pView");
+		AppendMenu(view_menu, "\pView Source/U");
+		AppendMenu(view_menu, "\p(-");
+		AppendMenu(view_menu, "\pFind.../F");
+		InsertMenu(view_menu, 0);
+	}
+
 	DrawMenuBar();
 #endif
 }
@@ -200,6 +209,30 @@ static void macos9_handle_menu(short menu_id, short item) {
 		case ITEM_GO_FORWARD: macos9_window_forward(gw); break;
 		case ITEM_GO_RELOAD:  macos9_window_reload(gw); break;
 		case ITEM_GO_HOME:    macos9_window_home(gw); break;
+		default: break;
+		}
+		break;
+	case MENU_VIEW:
+		front = FrontWindow();
+		gw = front ? macos9_find_window(front) : NULL;
+		if (!gw) break;
+		switch (item) {
+		case ITEM_VIEW_SOURCE: {
+			/* fixes330 (#96) — open view-source: URL in a new
+			 * window. The source fetcher path is wired separately
+			 * in the resource stub fetchers; for V1 we open a new
+			 * tab with view-source: prefix and a future resource
+			 * handler can format the bytes. */
+			extern void macos9_view_source_for_window(
+				struct gui_window *g);
+			macos9_view_source_for_window(gw);
+		} break;
+		case ITEM_VIEW_FIND: {
+			/* fixes330 (#45) — find-in-page via prompt for now.
+			 * Future: real Carbon dialog with search controls. */
+			extern void macos9_find_in_page(struct gui_window *g);
+			macos9_find_in_page(gw);
+		} break;
 		default: break;
 		}
 		break;
