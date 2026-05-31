@@ -110,3 +110,17 @@ dom_exception macsurf_dom_node_set_node_value(dom_node *node,
     return dom_node_set_node_value(node, value);
 }
 
+/* fixes319d — text-content accessors. Inline in dom/core/node.h; the
+ * JS bridge needs an external symbol it can extern-link. */
+dom_exception macsurf_dom_node_get_text_content(dom_node *node,
+    dom_string **result)
+{
+    return dom_node_get_text_content(node, result);
+}
+
+dom_exception macsurf_dom_node_set_text_content(dom_node *node,
+    dom_string *content)
+{
+    return dom_node_set_text_content(node, content);
+}
+

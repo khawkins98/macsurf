@@ -36,6 +36,7 @@
 #include "utils/log.h"
 #include "duktape.h"
 #include "macsurf_js.h"
+#include "macsurf_debug.h"
 
 /*
  * libdom is in the source tree but not all the implementation .c files
@@ -118,6 +119,12 @@ element_finalizer(duk_context *duk)
 static duk_ret_t macsurf_getTagName(duk_context *duk);
 static duk_ret_t macsurf_getInnerHTML(duk_context *duk);
 static duk_ret_t macsurf_setInnerHTML(duk_context *duk);
+static duk_ret_t macsurf_getTextContent(duk_context *duk);
+static duk_ret_t macsurf_setTextContent(duk_context *duk);
+extern dom_exception macsurf_dom_node_get_text_content(dom_node *node,
+		dom_string **result);
+extern dom_exception macsurf_dom_node_set_text_content(dom_node *node,
+		dom_string *content);
 static duk_ret_t macsurf_getAttribute(duk_context *duk);
 static duk_ret_t macsurf_setAttribute(duk_context *duk);
 static duk_ret_t macsurf_appendChild(duk_context *duk);
@@ -159,6 +166,17 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	duk_push_string(duk, "innerHTML");
 	duk_push_c_function(duk, macsurf_getInnerHTML, 0);
 	duk_push_c_function(duk, macsurf_setInnerHTML, 1);
+	duk_def_prop(duk, -4,
+			DUK_DEFPROP_HAVE_GETTER | DUK_DEFPROP_HAVE_SETTER |
+			DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE |
+			DUK_DEFPROP_HAVE_CONFIGURABLE | DUK_DEFPROP_CONFIGURABLE);
+
+	/* fixes319d — textContent accessor. Writes through to the real
+	 * DOM via dom_node_set_text_content so el.textContent='foo' in JS
+	 * actually replaces the element's children with a text node. */
+	duk_push_string(duk, "textContent");
+	duk_push_c_function(duk, macsurf_getTextContent, 0);
+	duk_push_c_function(duk, macsurf_setTextContent, 1);
 	duk_def_prop(duk, -4,
 			DUK_DEFPROP_HAVE_GETTER | DUK_DEFPROP_HAVE_SETTER |
 			DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE |
@@ -217,6 +235,8 @@ macsurf_getElementById(duk_context *duk)
 	}
 	macsurf_dom_string_unref(id_str);
 
+	macsurf_debug_log_writef(
+		"getElementById('%s') -> %s", id, el ? "FOUND" : "null");
 	macsurf_push_element(duk, el);
 	return 1;
 }
@@ -277,6 +297,82 @@ macsurf_setInnerHTML(duk_context *duk)
 	duk_put_prop_string(duk, -2, "__innerHTML");
 	duk_pop(duk);
 	/* TODO stage 10+: actually parse html and replace element children. */
+	return 0;
+}
+
+/* fixes319d — textContent getter/setter. Routes through the libdom
+ * dom_node_set_text_content vtable call so writes propagate to the
+ * actual DOM tree (and so subsequent reads from libcss / layout see
+ * the updated text). */
+static duk_ret_t
+macsurf_getTextContent(duk_context *duk)
+{
+	dom_element *el = element_from_this(duk);
+	dom_string *out = NULL;
+	if (el == NULL ||
+	    macsurf_dom_node_get_text_content((dom_node *)el, &out) !=
+			DOM_NO_ERR || out == NULL) {
+		duk_push_string(duk, "");
+		return 1;
+	}
+	duk_push_lstring(duk, dom_string_data(out), dom_string_length(out));
+	macsurf_dom_string_unref(out);
+	return 1;
+}
+
+static duk_ret_t
+macsurf_setTextContent(duk_context *duk)
+{
+	dom_element *el = element_from_this(duk);
+	const char *txt;
+	dom_string *str = NULL;
+	dom_exception ex;
+	if (el == NULL) {
+		MS_LOG("setTextContent: el is NULL");
+		return 0;
+	}
+	txt = duk_safe_to_string(duk, 0);
+	if (txt == NULL) {
+		MS_LOG("setTextContent: txt is NULL");
+		return 0;
+	}
+	if (dom_string_create((const unsigned char *)txt, strlen(txt),
+			&str) != DOM_NO_ERR || str == NULL) {
+		MS_LOG("setTextContent: dom_string_create failed");
+		return 0;
+	}
+	ex = macsurf_dom_node_set_text_content((dom_node *)el, str);
+	macsurf_debug_log_writef(
+		"setTextContent: ex=%d len=%d", (int)ex, (int)strlen(txt));
+	macsurf_dom_string_unref(str);
+#ifdef __MACOS9__
+	/* fixes320j — JS DOM mutation needs a reformat (DOM → box tree →
+	 * layout) so the new text is in the box tree before paint. An
+	 * invalidate alone forces a paint from the stale box tree, so
+	 * e.g. prompt's output box still shows '(click)' even though
+	 * the DOM has 'prompt: default name'.
+	 *
+	 * Walk window_list head → g->bw → schedule_reformat. */
+	{
+		struct gui_window *win;
+		struct browser_window *bw;
+		extern struct gui_window *macos9_window_list_head(void);
+		extern int browser_window_schedule_reformat(
+				struct browser_window *bw);
+		extern void macos9_window_invalidate_content(
+				struct gui_window *g);
+		extern struct browser_window *macos9_gw_bw(
+				struct gui_window *g);
+		win = macos9_window_list_head();
+		if (win != NULL) {
+			bw = macos9_gw_bw(win);
+			if (bw != NULL) {
+				(void)browser_window_schedule_reformat(bw);
+			}
+			macos9_window_invalidate_content(win);
+		}
+	}
+#endif
 	return 0;
 }
 
@@ -469,10 +565,33 @@ static duk_ret_t
 macsurf_document_set_title(duk_context *duk)
 {
 	const char *title = duk_safe_to_string(duk, 0);
+	macsurf_debug_log_writef("set_title fired: '%s'",
+			title ? title : "(null)");
 	duk_push_this(duk);
 	duk_push_string(duk, title);
 	duk_put_prop_string(duk, -2, "__title");
 	duk_pop(duk);
+#ifdef __MACOS9__
+	/* fixes320h — go through macos9_gw_set_title_from_js which sets
+	 * the JS title lock so the subsequent NetSurf core reformat-time
+	 * vtable call doesn't reset the title back to the HTML <title>. */
+	{
+		extern struct gui_window *macos9_window_list_head(void);
+		extern void macos9_gw_set_title_from_js(struct gui_window *g,
+				const char *t);
+		struct gui_window *win = macos9_window_list_head();
+		if (win == NULL) {
+			MS_LOG("set_title: window_list head is NULL");
+		} else if (title == NULL) {
+			MS_LOG("set_title: title is NULL");
+		} else {
+			macsurf_debug_log_writef(
+				"set_title: calling set_title_from_js win=%p",
+				win);
+			macos9_gw_set_title_from_js(win, title);
+		}
+	}
+#endif
 	return 0;
 }
 
@@ -715,11 +834,26 @@ macsurf_js_dispatch_event(struct jscontext *ctx,
 			if (macsurf_dom_element_get_attribute(el, attr_name,
 					&attr_val) == DOM_NO_ERR &&
 			    attr_val != NULL) {
-				if (duk_peval_lstring(ctx->duk,
+				int rc = duk_peval_lstring(ctx->duk,
 						dom_string_data(attr_val),
-						dom_string_length(attr_val))
-						== 0) {
+						dom_string_length(attr_val));
+				if (rc == 0) {
 					fired = true;
+				} else {
+					/* fixes320i — log Duktape's error
+					 * and the attr bytes so we can see
+					 * why peval fails. */
+					const char *em = duk_safe_to_string(
+							ctx->duk, -1);
+					int blen = (int)dom_string_length(
+							attr_val);
+					if (blen > 200) blen = 200;
+					macsurf_debug_log_writef(
+						"dispatch peval rc=%d err='%s'",
+						rc, em ? em : "(null)");
+					macsurf_debug_log_writef(
+						"dispatch attr[%d]: %s",
+						blen, dom_string_data(attr_val));
 				}
 				duk_pop(ctx->duk);
 				macsurf_dom_string_unref(attr_val);
