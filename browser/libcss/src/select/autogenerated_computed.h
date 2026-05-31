@@ -412,6 +412,11 @@ struct css_computed_style {
 	 * via arena__compare_grid_row_tracks. */
 	int32_t *macsurf_grid_row_tracks;
 
+	struct css_computed_style *next;
+	uint32_t count;
+	uint32_t bin;
+	css_calculator *calc;
+
 	/* fixes344b: heap-allocated 2-element css_color array carrying
 	 * full ARGB for the gradient stops [c1, c2]. The packed int32
 	 * in `_i.macsurf_gradient` stays RGB565+R4G6B4 for the existing
@@ -420,13 +425,12 @@ struct css_computed_style {
 	 * uses rgba(...) or `transparent` stops. NULL when the gradient
 	 * is unset or both stops are fully opaque. Compared via raw
 	 * memcmp of 8 bytes in arena__compare_macsurf_gradient_full;
-	 * lifetime owned by this style's destroy path. */
+	 * lifetime owned by this style's destroy path.
+	 *
+	 * Field appended at struct end so existing field offsets in
+	 * stale CW8 .o files don't shift (per the
+	 * project_libcss_struct_mid_insert_crash memory note). */
 	css_color *macsurf_gradient_full;
-
-	struct css_computed_style *next;
-	uint32_t count;
-	uint32_t bin;
-	css_calculator *calc;
 };
 
 #endif
