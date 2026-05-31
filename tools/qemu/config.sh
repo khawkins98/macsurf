@@ -22,7 +22,9 @@ QEMU_XFERDISK="$QEMU_IMAGES/transfer.hfs.img"  # raw HFS image for host<->guest 
 
 # ---- VM hardware (locked from 6-dimension research; see SETUP.md) ----------
 QEMU_BIN="${QEMU_BIN:-qemu-system-ppc}"
-QEMU_MACHINE="${QEMU_MACHINE:-mac99,via=pmu}"  # New World G4; via=pmu enables USB
+# mac99 (no via=pmu) is REQUIRED for the usb-tablet INIT (absolute clicks). via=pmu
+# is the alternative if you revert to usb-mouse (motion-only; QMP clicks won't register).
+QEMU_MACHINE="${QEMU_MACHINE:-mac99}"
 QEMU_CPU="${QEMU_CPU:-g4}"                      # g4 ok for 9.2.x (g3 only for 9.0/9.1)
 QEMU_RAM_MB="${QEMU_RAM_MB:-512}"              # HARD: OS 9 won't boot <=64MB; unstable/no-audio >=1024MB. Stay 256-512.
 QEMU_VIDEO="${QEMU_VIDEO:-1024x768x32}"        # OS 9 has no arbitrary-res driver; pin a known-good mode. x32/x16 reliable, x8 flaky.
@@ -35,9 +37,10 @@ QEMU_ACCEL="${QEMU_ACCEL:-tcg,split-wx=on,tb-size=512}"
 # sungem = Apple GMAC, OS 9 has a built-in Open Transport driver (no install).
 # SLIRP NAT: guest=10.0.2.15  gateway/HOST=10.0.2.2  DNS=10.0.2.3
 QEMU_NIC="${QEMU_NIC:-sungem}"
-# Pointer: usb-mouse = RELATIVE (OS 9 native, hard to script-click); usb-tablet =
-# ABSOLUTE (scriptable clicks, but OS 9 HID support unproven — probe before relying).
-QEMU_POINTER="${QEMU_POINTER:-usb-mouse}"
+# Pointer: usb-tablet = ABSOLUTE coords + working QMP clicks, REQUIRES the
+# kanjitalk755 "USB Tablet INIT" in the guest System Folder:Extensions: AND -M mac99
+# (no via=pmu). usb-mouse = relative motion only; QMP clicks do NOT register on OS 9.
+QEMU_POINTER="${QEMU_POINTER:-usb-tablet}"
 # host->guest port forwards (for SSH/FTP into the guest later); guest->host needs none.
 QEMU_HOSTFWD="${QEMU_HOSTFWD:-hostfwd=tcp::2222-:22,hostfwd=tcp::2121-:21}"
 # The MacSurf TLS proxy, as the OS 9 guest must address it (host = SLIRP gateway).
