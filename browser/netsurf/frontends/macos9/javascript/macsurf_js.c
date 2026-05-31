@@ -373,6 +373,61 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "location");
 	}
 
+	/* fixes338 — common window properties + event helpers. Stubs
+	 * for the most-feature-detected window APIs:
+	 *   - scrollTo / scrollBy / scroll
+	 *   - addEventListener / removeEventListener (window-level)
+	 *   - getComputedStyle (returns empty object with getPropertyValue)
+	 *   - matchMedia (returns matches:false)
+	 *   - dispatchEvent
+	 *   - requestIdleCallback / cancelIdleCallback
+	 *   - innerWidth / innerHeight / outerWidth / outerHeight
+	 *   - scrollY / scrollX / pageYOffset / pageXOffset
+	 */
+	duk_eval_string_noresult(ctx,
+		"this.scrollTo=function(){};"
+		"this.scrollBy=function(){};"
+		"this.scroll=function(){};"
+		"this._winListeners={};"
+		"this.addEventListener=function(t,fn){"
+			"if(!this._winListeners[t])this._winListeners[t]=[];"
+			"this._winListeners[t].push(fn);};"
+		"this.removeEventListener=function(t,fn){"
+			"var arr=this._winListeners[t];if(!arr)return;"
+			"for(var i=0;i<arr.length;i++)if(arr[i]===fn){arr.splice(i,1);return;}};"
+		"this.dispatchEvent=function(ev){"
+			"var t=ev&&ev.type;var arr=t&&this._winListeners[t];"
+			"if(arr)arr.forEach(function(f){try{f(ev);}catch(e){}});return true;};"
+		"this.getComputedStyle=function(el){"
+			"return {"
+				"getPropertyValue:function(p){"
+					"if(el&&el.style&&el.style.getPropertyValue)"
+						"return el.style.getPropertyValue(p);"
+					"return '';},"
+				"cssText:''"
+			"};};"
+		"this.matchMedia=function(q){"
+			"return {matches:false,media:q||'',"
+				"addListener:function(){},removeListener:function(){},"
+				"addEventListener:function(){},removeEventListener:function(){}};};"
+		"this.requestIdleCallback=function(fn){return setTimeout(fn,0);};"
+		"this.cancelIdleCallback=function(id){clearTimeout(id);};"
+		"this.innerWidth=949;this.innerHeight=613;"
+		"this.outerWidth=949;this.outerHeight=613;"
+		"this.scrollY=0;this.scrollX=0;"
+		"this.pageYOffset=0;this.pageXOffset=0;"
+		"this.devicePixelRatio=1;"
+		"this.screen={width:1024,height:768,availWidth:1024,availHeight:740,colorDepth:24};"
+		"this.performance={now:function(){return Date.now();}};"
+		"this.Promise=this.Promise||function(executor){"
+			"var self=this;self._then=[];self._catch=[];"
+			"self.then=function(cb){self._then.push(cb);return self;};"
+			"self.catch=function(cb){self._catch.push(cb);return self;};"
+			"function resolve(v){self._then.forEach(function(f){try{f(v);}catch(e){}});}"
+			"function reject(e){self._catch.forEach(function(f){try{f(e);}catch(_){}});}"
+			"try{executor(resolve,reject);}catch(e){reject(e);}"
+		"};");
+
 	/* fixes331 (#125) — DOMParser. V1 returns a plain object with
 	 * a single nominal document property. Real DOM tree construction
 	 * from a string would require libhubbub-on-string + dom_document
