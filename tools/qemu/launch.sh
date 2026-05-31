@@ -41,6 +41,7 @@ rm -f "$QEMU_QMP_SOCK" "$QEMU_MON_SOCK"
 # ---- assemble args ---------------------------------------------------------
 ARGS=(
   -L /opt/homebrew/share/qemu
+  -accel "$QEMU_ACCEL"
   -M "$QEMU_MACHINE"
   -cpu "$QEMU_CPU"
   -m "$QEMU_RAM_MB"

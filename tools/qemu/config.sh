@@ -23,6 +23,10 @@ QEMU_MACHINE="${QEMU_MACHINE:-mac99,via=pmu}"  # New World G4; via=pmu enables U
 QEMU_CPU="${QEMU_CPU:-g4}"                      # g4 ok for 9.2.x (g3 only for 9.0/9.1)
 QEMU_RAM_MB="${QEMU_RAM_MB:-512}"              # HARD: OS 9 won't boot <=64MB; unstable/no-audio >=1024MB. Stay 256-512.
 QEMU_VIDEO="${QEMU_VIDEO:-1024x768x32}"        # OS 9 has no arbitrary-res driver; pin a known-good mode. x32/x16 reliable, x8 flaky.
+# Accel: PPC-on-arm64 is ALWAYS pure TCG (no KVM/HVF; no MTTCG for ppc => -smp 1).
+# split-wx=on is required for the JIT under macOS hardened runtime; tb-size enlarges
+# the translation-block cache so a big CodeWarrior build doesn't thrash re-translating.
+QEMU_ACCEL="${QEMU_ACCEL:-tcg,split-wx=on,tb-size=512}"
 
 # ---- Networking (SLIRP user-mode) ------------------------------------------
 # sungem = Apple GMAC, OS 9 has a built-in Open Transport driver (no install).
