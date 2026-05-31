@@ -2468,6 +2468,59 @@ macsurf__rewrite_background_shorthand_gradient(const char *data,
 			}
 		}
 
+		/* fixes344 — alpha-aware skip. Our css_color → RGB565 codec
+		 * drops the alpha byte, so rgba(...,.X) low-alpha stops and
+		 * `transparent` keyword stops render as fully-opaque colour
+		 * instead of the intended soft overlay / fade-to-nothing.
+		 *
+		 * If the extracted gradient's body contains `rgba(` or the
+		 * `transparent` keyword, skip the extraction. The original
+		 * `background:` shorthand falls through unchanged; libcss
+		 * silently drops the un-recognised gradient value; the
+		 * element shows whatever its base background-color provides
+		 * (which is usually a sensible parent inherit / paper cream
+		 * rather than opaque-gold or opaque-black). */
+		{
+			size_t s2;
+			bool has_alpha = false;
+			for (s2 = grad_start + 16; s2 + 5 <= grad_end; s2++) {
+				/* `rgba(` */
+				if ((data[s2]=='r'||data[s2]=='R') &&
+				    (data[s2+1]=='g'||data[s2+1]=='G') &&
+				    (data[s2+2]=='b'||data[s2+2]=='B') &&
+				    (data[s2+3]=='a'||data[s2+3]=='A') &&
+				     data[s2+4]=='(') {
+					has_alpha = true;
+					break;
+				}
+				/* `transparent` keyword (11 chars) */
+				if (s2 + 11 <= grad_end &&
+				    (data[s2]=='t'||data[s2]=='T') &&
+				    (data[s2+1]=='r'||data[s2+1]=='R') &&
+				    (data[s2+2]=='a'||data[s2+2]=='A') &&
+				    (data[s2+3]=='n'||data[s2+3]=='N') &&
+				    (data[s2+4]=='s'||data[s2+4]=='S') &&
+				    (data[s2+5]=='p'||data[s2+5]=='P') &&
+				    (data[s2+6]=='a'||data[s2+6]=='A') &&
+				    (data[s2+7]=='r'||data[s2+7]=='R') &&
+				    (data[s2+8]=='e'||data[s2+8]=='E') &&
+				    (data[s2+9]=='n'||data[s2+9]=='N') &&
+				    (data[s2+10]=='t'||data[s2+10]=='T')) {
+					has_alpha = true;
+					break;
+				}
+			}
+			if (has_alpha) {
+				/* Skip extraction; pass-through one byte and
+				 * keep scanning. The original shorthand stays
+				 * intact for libcss to drop / parse as it
+				 * pleases. */
+				if (pos + 1 >= cap) { free(out); return NULL; }
+				out[pos++] = data[i++];
+				continue;
+			}
+		}
+
 		/* Emit `-macsurf-gradient` in place of `background`. */
 		if (pos + REPLACE_LEN >= cap) { free(out); return NULL; }
 		memcpy(out + pos, REPLACE, REPLACE_LEN);
