@@ -103,6 +103,81 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 		box = next;
 	}
 
+	/* fixes329 (#110) — <summary> click toggles parent <details>'s
+	 * `open` attribute. Walk up from the clicked box to find a
+	 * summary, then mutate its parent details. Skip the onclick
+	 * dispatch for this case since the toggle is a native widget
+	 * behaviour. */
+	{
+		struct box *cand = box;
+		while (cand != NULL && cand->node != NULL) {
+			dom_string *tname = NULL;
+			dom_node_type ntype;
+			if (dom_node_get_node_type(cand->node, &ntype) ==
+					DOM_NO_ERR &&
+			    ntype == DOM_ELEMENT_NODE &&
+			    dom_node_get_node_name(cand->node, &tname) ==
+					DOM_NO_ERR && tname != NULL) {
+				bool is_summary = false;
+				const char *n = dom_string_data(tname);
+				size_t nl = dom_string_length(tname);
+				if (nl == 7 &&
+				    (n[0]=='S'||n[0]=='s') &&
+				    (n[1]=='U'||n[1]=='u') &&
+				    (n[2]=='M'||n[2]=='m') &&
+				    (n[3]=='M'||n[3]=='m') &&
+				    (n[4]=='A'||n[4]=='a') &&
+				    (n[5]=='R'||n[5]=='r') &&
+				    (n[6]=='Y'||n[6]=='y'))
+					is_summary = true;
+				dom_string_unref(tname);
+				if (is_summary && cand->parent != NULL &&
+				    cand->parent->node != NULL) {
+					dom_string *open_name = NULL;
+					if (dom_string_create(
+						(const unsigned char *)"open", 4,
+						&open_name) == DOM_NO_ERR &&
+					    open_name != NULL) {
+						bool has = false;
+						dom_string *val = NULL;
+						if (dom_element_get_attribute(
+							(dom_element *)cand->parent->node,
+							open_name, &val) ==
+								DOM_NO_ERR &&
+						    val != NULL) {
+							has = true;
+							dom_string_unref(val);
+						}
+						if (has) {
+							dom_element_remove_attribute(
+								(dom_element *)cand->parent->node,
+								open_name);
+						} else {
+							dom_string *empty = NULL;
+							if (dom_string_create(
+								(const unsigned char *)"",
+								0, &empty) ==
+									DOM_NO_ERR) {
+								dom_element_set_attribute(
+									(dom_element *)cand->parent->node,
+									open_name, empty);
+								dom_string_unref(empty);
+							}
+						}
+						dom_string_unref(open_name);
+						{
+							extern int browser_window_schedule_reformat(
+								struct browser_window *bw);
+							(void)browser_window_schedule_reformat(bw);
+						}
+						return true;
+					}
+				}
+			}
+			cand = cand->parent;
+		}
+	}
+
 	target = box;
 	while (target != NULL) {
 		if (target->node != NULL &&
