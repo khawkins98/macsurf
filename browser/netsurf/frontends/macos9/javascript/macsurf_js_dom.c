@@ -89,6 +89,50 @@ extern dom_exception macsurf_dom_node_append_child(dom_node *parent,
  * shim doesn't break ALL element wrappers. */
 extern void macsurf_js__safe_eval(duk_context *ctx, const char *src);
 
+/* fixes349 — install_per_element runs a JS function expression of the
+ * form  (function(el){ ... })  with the wrapper currently on top of the
+ * value stack passed as the `el` argument. Replaces the old pattern
+ *
+ *     macsurf_js__safe_eval(duk, "(function(el){...})");
+ *     duk_dup(duk, -2);
+ *     duk_call(duk, 1);
+ *     duk_pop(duk);
+ *
+ * which was broken by fixes342: safe_eval uses duk_peval_string_noresult
+ * which DISCARDS the function result, leaving the stack as [wrapper]
+ * instead of [wrapper, fn]. duk_dup(-2) then grabbed whatever was below
+ * the wrapper (in element_finalizer/getElementById callers, the wrapper
+ * itself or a string arg) and duk_call(1) tried to call THAT — which
+ * produced the visible "TypeError: [object Object] not callable" that
+ * killed the entire per-element wrapper install. The whole element gets
+ * left without classList/style/matches/closest/getBoundingClientRect/etc.
+ *
+ * This helper does the eval-then-pcall sequence with proper stack
+ * management and pcall-based error trapping so one bad shim can't kill
+ * the rest. Stack on entry: [..., wrapper]. Stack on exit: same.
+ */
+static void macsurf_js__install_per_element(duk_context *duk,
+		const char *src)
+{
+	if (duk_peval_string(duk, src) != 0) {
+		const char *err = duk_safe_to_string(duk, -1);
+		macsurf_debug_log_writef(
+			"js per-elem eval failed: %s",
+			err ? err : "(null)");
+		duk_pop(duk);
+		return;
+	}
+	/* stack: [..., wrapper, fn] */
+	duk_dup(duk, -2);                       /* dup wrapper as arg */
+	if (duk_pcall(duk, 1) != 0) {
+		const char *err = duk_safe_to_string(duk, -1);
+		macsurf_debug_log_writef(
+			"js per-elem call failed: %s",
+			err ? err : "(null)");
+	}
+	duk_pop(duk);                           /* pop result or error */
+}
+
 /* ----------------------------------------------------------------- */
 /* Current document — set by the html handler on page load.          */
 /* ----------------------------------------------------------------- */
@@ -192,7 +236,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	 * dispatchEvent, dataset. All V1 stubs returning sensible values.
 	 * Real impls queued for future rounds when the visual path
 	 * matters per-method. */
-	macsurf_js__safe_eval(duk,
+	macsurf_js__install_per_element(duk,
 		"(function(el){"
 		"  el.getBoundingClientRect=function(){"
 		"    return {top:0,left:0,right:0,bottom:0,width:0,height:0,x:0,y:0};"
@@ -218,16 +262,13 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 		"  };"
 		"  el.dataset=el.dataset||{};"
 		"})");
-	duk_dup(duk, -2);
-	duk_call(duk, 1);
-	duk_pop(duk);
 
 	/* fixes336 — common element methods (matches, closest, children,
 	 * firstChild / lastChild / parentNode / nextSibling / cloneNode).
 	 * Currently all stubs except matches (uses getAttribute on the
 	 * wrapper to mock-check id / class / tag patterns). Stubs return
 	 * sensible defaults so feature-detection succeeds. */
-	macsurf_js__safe_eval(duk,
+	macsurf_js__install_per_element(duk,
 		"(function(el){"
 		"  el.matches=function(sel){"
 		"    if(!sel)return false;"
@@ -265,15 +306,12 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 		"  el.hasAttribute=function(name){return el.getAttribute(name)!==null;};"
 		"  el.removeAttribute=function(name){el.setAttribute(name,'');};"
 		"})");
-	duk_dup(duk, -2);
-	duk_call(duk, 1);
-	duk_pop(duk);
 
 	/* fixes326 (#30) — classList helper object. .add / .remove /
 	 * .toggle / .contains operate on the element's `class` attribute
 	 * via getAttribute / setAttribute. Implemented in JS so it's
 	 * simpler and the underlying attribute calls already DOM-write. */
-	macsurf_js__safe_eval(duk,
+	macsurf_js__install_per_element(duk,
 		"(function(el){"
 		"  Object.defineProperty(el,'classList',{"
 		"    get:function(){"
@@ -311,16 +349,13 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 		"    },configurable:true"
 		"  });"
 		"})");
-	duk_dup(duk, -2); /* wrapper */
-	duk_call(duk, 1);
-	duk_pop(duk);
 
 	/* fixes327 (#32) — element.style with setProperty / cssText.
 	 * Duktape is ES5 (no Proxy), so we install Object.defineProperty
 	 * accessors for the most common camelCase property names. Anything
 	 * else can use the standard CSS Object Model methods
 	 * setProperty / getPropertyValue / cssText. */
-	macsurf_js__safe_eval(duk,
+	macsurf_js__install_per_element(duk,
 		"(function(el){"
 		"  function _kebab(p){return p.replace(/([A-Z])/g,'-$1').toLowerCase();}"
 		"  function _set(p,v){"
@@ -369,9 +404,6 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 		"  });"
 		"  Object.defineProperty(el,'style',{value:style,configurable:true});"
 		"})");
-	duk_dup(duk, -2);
-	duk_call(duk, 1);
-	duk_pop(duk);
 
 	duk_push_c_function(duk, element_finalizer, 1);
 	duk_set_finalizer(duk, -2);
