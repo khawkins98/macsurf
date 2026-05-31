@@ -61,6 +61,11 @@ struct jsthread {
 
 static struct jsheap *global_heap = NULL;
 
+/* fixes342a — forward declaration so call sites in
+ * register_browser_globals (above the definition further down) don't
+ * trigger CW8 implicit-int and mismatch the definition's void return. */
+void macsurf_js__safe_eval(duk_context *ctx, const char *src);
+
 /* fixes319 (#115) — console.{log,warn,error,info,debug}.
  * All five route to MS_LOG with a level-tagged prefix. Real browsers
  * differentiate streams; on OS 9 we only have one log channel, so the
