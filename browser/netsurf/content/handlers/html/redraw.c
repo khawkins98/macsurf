@@ -637,6 +637,23 @@ static bool html_redraw_box_has_background(struct box *box)
 		if (css_computed_macsurf_gradient(box->style, &grad_col)
 				== CSS_MACSURF_GRADIENT_SET)
 			return true;
+
+		/* fixes347 — same defect class as fixes74d, but for
+		 * `background-image: url(...)`. A box whose only background
+		 * declaration is an image (no background-color, no gradient)
+		 * was returning false here, meaning html_redraw_find_bg_box
+		 * gave bg_box=NULL and html_redraw_background never ran.
+		 * Mactrove's header tile pseudo (.page__header--has-tile
+		 * ::before) hit this exact path. */
+		{
+			lwc_string *bgimage_uri = NULL;
+			if (css_computed_background_image(box->style,
+					&bgimage_uri) ==
+					CSS_BACKGROUND_IMAGE_IMAGE &&
+					bgimage_uri != NULL) {
+				return true;
+			}
+		}
 	}
 
 	return false;

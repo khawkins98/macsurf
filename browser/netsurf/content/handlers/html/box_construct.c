@@ -543,6 +543,38 @@ box_construct_generate(struct box_construct_ctx *ctx,
 				style, box_is_root(n))];
 
 		box_add_child(box, gen);
+
+		/* fixes347 — fetch background-image on the pseudo box. The
+		 * existing element-level fetch at the bottom of
+		 * box_construct_element fires for elements but NEVER for
+		 * pseudos, so `gen->background` stays NULL forever and the
+		 * texture (e.g. mactrove's --header-tile cloth pattern via
+		 * `.page__header--has-tile::before { background-image:
+		 * var(--header-tile); }`) is silently never painted. */
+		{
+			lwc_string *bgimage_uri = NULL;
+			if (css_computed_background_image(gen->style,
+					&bgimage_uri) ==
+					CSS_BACKGROUND_IMAGE_IMAGE &&
+					bgimage_uri != NULL &&
+					nsoption_bool(background_images)
+					== true) {
+				nsurl *url = NULL;
+				nserror error = nsurl_create(
+					lwc_string_data(bgimage_uri),
+					&url);
+				if (error == NSERROR_OK) {
+					if (html_fetch_object(ctx->content,
+							url, gen,
+							image_types,
+							true) == false) {
+						nsurl_unref(url);
+						return;
+					}
+					nsurl_unref(url);
+				}
+			}
+		}
 	}
 
 	/*

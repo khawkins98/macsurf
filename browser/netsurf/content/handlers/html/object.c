@@ -80,8 +80,38 @@ struct content_html_object *html_get_objects(hlcache_handle *h, unsigned int *n)
 static void
 html_object_failed(struct box *box, html_content *content, bool background)
 {
-	/* Nothing to do */
-	return;
+	/* fixes347 — formerly a no-op `return;`. That left every box
+	 * with a failed-fetch <img> sitting at IS_REPLACED + box->object
+	 * == NULL forever, so layout fell into the "replaced with no
+	 * object" 1em × 1em fallback and any container relying on the
+	 * image's natural size (e.g. mactrove's Welcome panel banner
+	 * slider with `width:100%; height:100%; object-fit:contain`)
+	 * collapsed to roughly zero height. The user then saw the
+	 * surrounding chrome (gradient/window bg) where the banners
+	 * should have rendered.
+	 *
+	 * For foreground (`background == false`) failures we clear
+	 * IS_REPLACED so layout treats the box as a normal inline that
+	 * can flow its alt text, and we walk parents invalidating
+	 * max_width so the next layout pass picks up the new flag
+	 * state. Background failures (`background == true`) just leave
+	 * box->background NULL — the box still paints its colour /
+	 * gradient / parent surface, no collapse risk, no recovery
+	 * needed beyond NOT corrupting anything. */
+	struct box *b;
+	(void)content;
+
+	if (background) {
+		/* nothing more to do — element keeps its other backgrounds */
+		return;
+	}
+
+	box->flags &= ~IS_REPLACED;
+
+	/* mirror html_object_done's invalidation walk so the next
+	 * reformat picks up the post-failure flag state cleanly. */
+	for (b = box; b != NULL; b = b->parent)
+		b->max_width = UNKNOWN_MAX_WIDTH;
 }
 
 /**
