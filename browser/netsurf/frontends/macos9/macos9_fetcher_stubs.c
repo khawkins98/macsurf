@@ -514,6 +514,94 @@ stub_setup_scheme(struct fetch *parent_fetch, struct nsurl *url,
 		}
 	}
 
+	/* fixes335 (#99 #107) — diagnostic about: pages. */
+	if (scheme == SCH_ABOUT) {
+		int rn = 0;
+		if (strncmp(ctx->path, "cache", 5) == 0 &&
+		    (ctx->path[5] == '\0' || ctx->path[5] == '/')) {
+			extern long macsurf__site_css_skip;
+			extern unsigned long macsurf__site_css_total_bytes;
+			rn = sprintf(ctx->body_buf,
+				"<html><head><title>about:cache</title>"
+				"<style>body{font-family:Geneva,sans-serif;"
+				"background:#FFF4D0;color:#002030;padding:24px;}"
+				"h1{color:#002030;font-size:20pt;}"
+				"table{border-collapse:collapse;}"
+				"td,th{border:1px solid #B05030;padding:4px 10px;"
+				"text-align:left;}"
+				"th{background:#E07010;color:#fff;}"
+				"</style></head><body>"
+				"<h1>about:cache</h1>"
+				"<table>"
+				"<tr><th>Metric</th><th>Value</th></tr>"
+				"<tr><td>CSS bytes this page</td><td>%lu</td></tr>"
+				"<tr><td>CSS sheets skipped</td><td>%ld</td></tr>"
+				"</table>"
+				"<p>HTTP cache is on-disk; entries persist across "
+				"sessions. Press Reload (\xE2\x8C\x98R) to force "
+				"a fresh fetch bypassing the cache.</p>"
+				"</body></html>",
+				(unsigned long)macsurf__site_css_total_bytes,
+				(long)macsurf__site_css_skip);
+		} else if (strncmp(ctx->path, "memory", 6) == 0 &&
+			   (ctx->path[6] == '\0' || ctx->path[6] == '/')) {
+			rn = sprintf(ctx->body_buf,
+				"<html><head><title>about:memory</title>"
+				"<style>body{font-family:Geneva,sans-serif;"
+				"background:#FFF4D0;color:#002030;padding:24px;}"
+				"h1{color:#002030;}p{line-height:1.5;}"
+				"</style></head><body>"
+				"<h1>about:memory</h1>"
+				"<p>MacSurf is a Carbon CFM application with a "
+				"16 MB preferred / 8 MB minimum partition. "
+				"libcss / libdom / libhubbub each maintain their "
+				"own arenas; memory usage scales with page DOM "
+				"and CSS size.</p>"
+				"<p>Bumping the Carbon partition in Get Info "
+				"helps with large pages.</p>"
+				"</body></html>");
+		} else if (strncmp(ctx->path, "config", 6) == 0 &&
+			   (ctx->path[6] == '\0' || ctx->path[6] == '/')) {
+			rn = sprintf(ctx->body_buf,
+				"<html><head><title>about:config</title>"
+				"<style>body{font-family:Geneva,sans-serif;"
+				"background:#FFF4D0;color:#002030;padding:24px;}"
+				"h1{color:#002030;}table{border-collapse:collapse;}"
+				"td,th{border:1px solid #B05030;padding:4px 10px;"
+				"text-align:left;}th{background:#E07010;color:#fff;}"
+				"</style></head><body>"
+				"<h1>about:config</h1>"
+				"<table>"
+				"<tr><th>Option</th><th>Value</th></tr>"
+				"<tr><td>enable_javascript</td><td>true</td></tr>"
+				"<tr><td>foreground_images</td><td>true</td></tr>"
+				"<tr><td>background_images</td><td>true</td></tr>"
+				"<tr><td>author_level_css</td><td>true</td></tr>"
+				"<tr><td>max_fetchers</td><td>128</td></tr>"
+				"<tr><td>memory_cache_size</td><td>32 MB</td></tr>"
+				"</table>"
+				"<p>V1 is read-only. Future round will expose "
+				"editable preferences.</p>"
+				"</body></html>");
+		} else if (strncmp(ctx->path, "perf", 4) == 0 &&
+			   (ctx->path[4] == '\0' || ctx->path[4] == '/')) {
+			rn = sprintf(ctx->body_buf,
+				"<html><head><title>about:perf</title>"
+				"<style>body{font-family:Geneva,sans-serif;"
+				"background:#FFF4D0;color:#002030;padding:24px;}"
+				"h1{color:#002030;}</style></head>"
+				"<body><h1>about:perf</h1>"
+				"<p>Per-page layout / fetch / paint timing is "
+				"logged to MacSurf Debug.log on the Desktop "
+				"(SITE log lines after every reformat).</p>"
+				"<p>Future round will surface timing here.</p>"
+				"</body></html>");
+		}
+		if (rn > 0 && (size_t)rn < sizeof(ctx->body_buf)) {
+			ctx->body_used = (size_t)rn;
+		}
+	}
+
 	stub_ring_insert(ctx);
 	MS_LOG("stub setup");
 	return ctx;
