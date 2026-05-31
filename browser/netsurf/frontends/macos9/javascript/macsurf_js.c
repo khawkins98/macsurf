@@ -850,8 +850,42 @@ unsigned char js_exec(struct jsthread *thread,
 unsigned char js_fire_event(struct jsthread *thread, const char *type,
 		struct dom_document *doc, struct dom_node *target)
 {
-	(void)thread; (void)type; (void)doc; (void)target;
-	return 0;
+	/* fixes328 (#31) — route NetSurf core's event-fire (load,
+	 * DOMContentLoaded, etc.) to the JS bridge. If target is an
+	 * element, dispatch listeners via macsurf_js_dispatch_event.
+	 * For document/window-level events (target == NULL), fire any
+	 * window.on<type> handler by peval'ing it. */
+	(void)doc;
+	if (thread == NULL || thread->ctx == NULL || type == NULL) return 0;
+	if (target != NULL) {
+		extern bool macsurf_js_dispatch_event(struct jscontext *ctx,
+				struct dom_element *el, const char *event_type);
+		struct jscontext jc;
+		jc.duk = thread->ctx;
+		jc.win_priv = thread->win_priv;
+		jc.doc_priv = thread->doc_priv;
+		(void)macsurf_js_dispatch_event(&jc,
+			(struct dom_element *)target, type);
+	} else {
+		/* window-level: look for window.on<type> and call it. */
+		char buf[64];
+		size_t tl = strlen(type);
+		if (tl + 2 < sizeof buf) {
+			buf[0] = 'o'; buf[1] = 'n';
+			memcpy(buf + 2, type, tl);
+			buf[2 + tl] = '\0';
+			duk_push_global_object(thread->ctx);
+			if (duk_get_prop_string(thread->ctx, -1, buf) != 0 &&
+			    duk_is_callable(thread->ctx, -1)) {
+				if (duk_pcall(thread->ctx, 0) != 0) {
+					MS_LOG(duk_safe_to_string(
+						thread->ctx, -1));
+				}
+			}
+			duk_pop_2(thread->ctx);
+		}
+	}
+	return 1;
 }
 
 void js_handle_new_element(struct jsthread *thread, struct dom_element *node)
