@@ -1334,8 +1334,68 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                colour gc1, gc2;
 	                bool grad_h = false;
 	                bool grad_r = false;
+	                const css_color *full_stops;
 	                macsurf_gradient_unpack(grad_col, &gc1, &gc2,
 	                                        &grad_h, &grad_r);
+	                /* fixes344b — when the rule used rgba(.../X) or
+	                 * `transparent` stops, libcss stored the full
+	                 * ARGB in the outer style side-channel. Pre-
+	                 * blend toward the body's background-color so
+	                 * the painter (which has no alpha pipeline) gets
+	                 * a colour that visually approximates the
+	                 * intended alpha compositing. Assumed surface =
+	                 * the box's effective background-color when
+	                 * resolvable, else white. */
+	                full_stops = css_computed_macsurf_gradient_full(
+	                        background->style);
+	                if (full_stops != NULL) {
+	                        css_color bg_argb = 0xFFFFFFFFu; /* white */
+	                        css_color css_bg = 0;
+	                        if (css_computed_background_color(
+	                                        background->style, &css_bg) ==
+	                                        CSS_BACKGROUND_COLOR_COLOR) {
+	                                if (((css_bg >> 24) & 0xff) != 0)
+	                                        bg_argb = css_bg;
+	                        }
+	                        {
+	                                int i;
+	                                css_color stops[2];
+	                                stops[0] = full_stops[0];
+	                                stops[1] = full_stops[1];
+	                                for (i = 0; i < 2; i++) {
+	                                        css_color v = stops[i];
+	                                        unsigned int a =
+	                                                (v >> 24) & 0xff;
+	                                        unsigned int r =
+	                                                (v >> 16) & 0xff;
+	                                        unsigned int g =
+	                                                (v >>  8) & 0xff;
+	                                        unsigned int b =
+	                                                (v >>  0) & 0xff;
+	                                        unsigned int br =
+	                                                (bg_argb >> 16) & 0xff;
+	                                        unsigned int bgn =
+	                                                (bg_argb >>  8) & 0xff;
+	                                        unsigned int bb =
+	                                                (bg_argb >>  0) & 0xff;
+	                                        unsigned int inv = 255 - a;
+	                                        unsigned int blR =
+	                                                (r * a + br * inv) / 255;
+	                                        unsigned int blG =
+	                                                (g * a + bgn * inv) / 255;
+	                                        unsigned int blB =
+	                                                (b * a + bb * inv) / 255;
+	                                        /* Repack to NetSurf
+	                                         * colour (BGR low to high). */
+	                                        stops[i] =
+	                                                (blB << 16) |
+	                                                (blG <<  8) |
+	                                                 blR;
+	                                }
+	                                gc1 = (colour)stops[0];
+	                                gc2 = (colour)stops[1];
+	                        }
+	                }
 	                pstyle_fill_bg.fill_type = grad_r ?
 	                        PLOT_OP_TYPE_RADIAL_GRADIENT :
 	                        (grad_h ? PLOT_OP_TYPE_LINEAR_GRADIENT_H :
