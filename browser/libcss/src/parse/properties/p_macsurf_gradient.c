@@ -269,7 +269,23 @@ css_error css__parse_macsurf_gradient(css_language *c,
 			last_color = tmp_color;
 			color_count++;
 			consumeWhitespace(vector, ctx);
+			/* fixes318 (#148) — accept and ignore optional stop
+			 * position after each colour. CSS modern syntax allows
+			 * `c1 0%, c2 100%` or `c1 50px, c2 75%`. The 2-stop
+			 * storage slot can't express stops other than 0%/100%
+			 * anyway, so we silently consume the position token to
+			 * keep parsing alive. Without this, the parser bails
+			 * with CSS_INVALID on the percentage token and the
+			 * entire gradient declaration drops. */
 			token = parserutils_vector_peek(vector, *ctx);
+			if (token != NULL &&
+			    (token->type == CSS_TOKEN_PERCENTAGE ||
+			     token->type == CSS_TOKEN_DIMENSION ||
+			     token->type == CSS_TOKEN_NUMBER)) {
+				parserutils_vector_iterate(vector, ctx);
+				consumeWhitespace(vector, ctx);
+				token = parserutils_vector_peek(vector, *ctx);
+			}
 			if (token != NULL && token->type == CSS_TOKEN_CHAR &&
 			    lwc_string_data(token->idata)[0] == ',')
 				parserutils_vector_iterate(vector, ctx);
