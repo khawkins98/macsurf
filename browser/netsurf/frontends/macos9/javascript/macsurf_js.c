@@ -344,7 +344,7 @@ static void register_browser_globals(duk_context *ctx)
 	{
 		extern duk_ret_t macsurf_js_settimeout(duk_context *duk);
 		extern duk_ret_t macsurf_js_cleartimeout(duk_context *duk);
-		duk_eval_string_noresult(ctx,
+		macsurf_js__safe_eval(ctx,
 			"function requestAnimationFrame(fn){"
 				"return setTimeout(fn,16);"
 			"}"
@@ -376,7 +376,7 @@ static void register_browser_globals(duk_context *ctx)
 	/* fixes339 — Event + CustomEvent constructors. Common pattern is
 	 * `new Event('click')` or `new CustomEvent('foo', {detail:bar})`.
 	 * Required by many scripts for dispatchEvent. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"function Event(type,opts){"
 			"opts=opts||{};"
 			"this.type=String(type);"
@@ -421,7 +421,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * bindings already provide getElementById/createElement/querySelector;
 	 * we add stubs for the remaining ones so site code that walks them
 	 * doesn't ReferenceError. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"if(typeof document!=='undefined'){"
 			"document.body=document.body||null;"
 			"document.head=document.head||null;"
@@ -460,7 +460,7 @@ static void register_browser_globals(duk_context *ctx)
 					"if(L)L.forEach(function(f){try{f(ev);}catch(e){}});return true;};"
 		"}");
 
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"if(typeof navigator!=='undefined'){"
 			"navigator.cookieEnabled=false;"
 			"navigator.onLine=true;"
@@ -480,7 +480,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * stubs. Many sites guard their setup with `if(MutationObserver)`.
 	 * The stub satisfies the guard; observe() is a no-op so the page
 	 * doesn't pile up callbacks on a non-firing observer. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"function _Observer(cb){this._cb=cb;}"
 		"_Observer.prototype.observe=function(){};"
 		"_Observer.prototype.unobserve=function(){};"
@@ -502,7 +502,7 @@ static void register_browser_globals(duk_context *ctx)
 	 *   - innerWidth / innerHeight / outerWidth / outerHeight
 	 *   - scrollY / scrollX / pageYOffset / pageXOffset
 	 */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"this.scrollTo=function(){};"
 		"this.scrollBy=function(){};"
 		"this.scroll=function(){};"
@@ -551,7 +551,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * from a string would require libhubbub-on-string + dom_document
 	 * wrapper, deferred. Many scripts feature-check DOMParser via
 	 * `typeof DOMParser !== 'undefined'`; this satisfies that. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"function DOMParser(){}"
 		"DOMParser.prototype.parseFromString=function(s,m){"
 			"return {body:{innerHTML:s||''},documentElement:null,"
@@ -565,7 +565,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * append / get / set / has / delete / forEach. Lacks file-input
 	 * iteration; future work when multipart/form-data is supported
 	 * end-to-end. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"function FormData(form){"
 			"this._k=[];this._v=[];"
 			"if(form&&form.elements){"
@@ -602,7 +602,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * .then(cb) fires synchronously when the XHR completes; .catch is
 	 * supported. Sufficient for fetch(url).then(r=>r.text()).then(...)
 	 * patterns common in inline scripts. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"this.fetch=function(url,opts){"
 			"opts=opts||{};"
 			"var ok=false,status=0,respText='',respHeaders='';"
@@ -637,7 +637,7 @@ static void register_browser_globals(duk_context *ctx)
 	/* fixes333 (#46) — localStorage / sessionStorage shim. V1 is
 	 * RAM-only (lost on quit). Future round persists localStorage to
 	 * a file in the Preferences folder. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"function _Storage(){this._m={};}"
 		"_Storage.prototype.getItem=function(k){"
 			"return k in this._m?this._m[k]:null;};"
@@ -656,7 +656,7 @@ static void register_browser_globals(duk_context *ctx)
 	 * .href / .pathname / .search / .hash / .host / .protocol and
 	 * `new URLSearchParams(str)` with .get / .set / .has / .toString.
 	 * Full WHATWG URL parsing isn't needed for the common usage. */
-	duk_eval_string_noresult(ctx,
+	macsurf_js__safe_eval(ctx,
 		"(function(){"
 		"function _parseURL(u){"
 			"var s=String(u);"
@@ -950,6 +950,22 @@ duk_ret_t macsurf_js_history_go(duk_context *ctx)
 	(void)ctx;
 #endif
 	return 0;
+}
+
+/* fixes342 — safe JS-init eval helper. Any of the polyfill shims
+ * below could fail to parse on an exotic Duktape build; without this
+ * helper a single bad shim throws up through register_browser_globals
+ * and breaks ALL bindings. peval + log + pop isolates per-shim.
+ * Non-static so macsurf_js_dom.c can use it for its per-element
+ * wrapper polyfill installs. */
+void macsurf_js__safe_eval(duk_context *ctx, const char *src)
+{
+	if (duk_peval_string_noresult(ctx, src) != 0) {
+		const char *err = duk_safe_to_string(ctx, -1);
+		macsurf_debug_log_writef("js init eval failed: %s",
+			err ? err : "(null)");
+		duk_pop(ctx);
+	}
 }
 
 /* fixes321 (#103) — pump bridge. macos9_poll calls this every event

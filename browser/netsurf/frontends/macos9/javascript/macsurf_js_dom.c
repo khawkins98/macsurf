@@ -84,6 +84,11 @@ extern dom_exception macsurf_dom_element_set_attribute(dom_element *el,
 extern dom_exception macsurf_dom_node_append_child(dom_node *parent,
 		dom_node *new_child, dom_node **result);
 
+/* fixes342 — safe JS-init eval (defined in macsurf_js.c). Used for
+ * per-element wrapper polyfill installs so a parse error in one
+ * shim doesn't break ALL element wrappers. */
+extern void macsurf_js__safe_eval(duk_context *ctx, const char *src);
+
 /* ----------------------------------------------------------------- */
 /* Current document — set by the html handler on page load.          */
 /* ----------------------------------------------------------------- */
@@ -187,7 +192,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	 * dispatchEvent, dataset. All V1 stubs returning sensible values.
 	 * Real impls queued for future rounds when the visual path
 	 * matters per-method. */
-	duk_eval_string_noresult(duk,
+	macsurf_js__safe_eval(duk,
 		"(function(el){"
 		"  el.getBoundingClientRect=function(){"
 		"    return {top:0,left:0,right:0,bottom:0,width:0,height:0,x:0,y:0};"
@@ -222,7 +227,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	 * Currently all stubs except matches (uses getAttribute on the
 	 * wrapper to mock-check id / class / tag patterns). Stubs return
 	 * sensible defaults so feature-detection succeeds. */
-	duk_eval_string_noresult(duk,
+	macsurf_js__safe_eval(duk,
 		"(function(el){"
 		"  el.matches=function(sel){"
 		"    if(!sel)return false;"
@@ -268,7 +273,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	 * .toggle / .contains operate on the element's `class` attribute
 	 * via getAttribute / setAttribute. Implemented in JS so it's
 	 * simpler and the underlying attribute calls already DOM-write. */
-	duk_eval_string_noresult(duk,
+	macsurf_js__safe_eval(duk,
 		"(function(el){"
 		"  Object.defineProperty(el,'classList',{"
 		"    get:function(){"
@@ -315,7 +320,7 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 	 * accessors for the most common camelCase property names. Anything
 	 * else can use the standard CSS Object Model methods
 	 * setProperty / getPropertyValue / cssText. */
-	duk_eval_string_noresult(duk,
+	macsurf_js__safe_eval(duk,
 		"(function(el){"
 		"  function _kebab(p){return p.replace(/([A-Z])/g,'-$1').toLowerCase();}"
 		"  function _set(p,v){"
