@@ -67,6 +67,9 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 	uint32_t packed = 0;
 	bool horizontal = false;
 	bool radial = false;
+	/* fixes345 — radial size+position tail. */
+	bool rad_set = false;
+	int32_t rad_sx = -1, rad_sy = -1, rad_px = -1, rad_py = -1;
 
 	if (hasFlagValue(opv) == false) {
 		switch (getValue(opv)) {
@@ -81,6 +84,26 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 			c2 = *((css_color *) style->bytecode);
 			advance_bytecode(style, sizeof(css_color));
 			packed = macsurf_gradient_pack(c1, c2, false, true);
+			/* fixes345 — radial bytecode tail: 5 uint32 with
+			 * [set_flag, sx, sy, px, py]. */
+			{
+				uint32_t rad_flag =
+					*((uint32_t *) style->bytecode);
+				advance_bytecode(style, sizeof(uint32_t));
+				rad_sx = (int32_t)(*((uint32_t *)
+					style->bytecode));
+				advance_bytecode(style, sizeof(uint32_t));
+				rad_sy = (int32_t)(*((uint32_t *)
+					style->bytecode));
+				advance_bytecode(style, sizeof(uint32_t));
+				rad_px = (int32_t)(*((uint32_t *)
+					style->bytecode));
+				advance_bytecode(style, sizeof(uint32_t));
+				rad_py = (int32_t)(*((uint32_t *)
+					style->bytecode));
+				advance_bytecode(style, sizeof(uint32_t));
+				rad_set = (rad_flag != 0);
+			}
 			break;
 		case 0x00C0: /* SET horizontal (fixes48) */
 			horizontal = true;
@@ -144,6 +167,26 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 				}
 			}
 		}
+		/* fixes345 — stash radial size+position when set. */
+		if (radial && rad_set) {
+			int32_t *rad = (int32_t *)malloc(4 * sizeof(int32_t));
+			if (rad != NULL) {
+				rad[0] = rad_sx;
+				rad[1] = rad_sy;
+				rad[2] = rad_px;
+				rad[3] = rad_py;
+				if (state->computed->macsurf_gradient_radial
+						!= NULL) {
+					free(state->computed->macsurf_gradient_radial);
+				}
+				state->computed->macsurf_gradient_radial = rad;
+			}
+		} else if (value == CSS_MACSURF_GRADIENT_SET) {
+			if (state->computed->macsurf_gradient_radial != NULL) {
+				free(state->computed->macsurf_gradient_radial);
+				state->computed->macsurf_gradient_radial = NULL;
+			}
+		}
 		return set_macsurf_gradient(state->computed, value,
 				(int32_t)packed);
 	}
@@ -189,6 +232,20 @@ css_error css__copy_macsurf_gradient(
 			memcpy(copy, from->macsurf_gradient_full,
 				2 * sizeof(css_color));
 			to->macsurf_gradient_full = copy;
+		}
+	}
+
+	/* fixes345 — also propagate the radial size+position. */
+	if (to->macsurf_gradient_radial != NULL) {
+		free(to->macsurf_gradient_radial);
+		to->macsurf_gradient_radial = NULL;
+	}
+	if (from->macsurf_gradient_radial != NULL) {
+		int32_t *copy = (int32_t *)malloc(4 * sizeof(int32_t));
+		if (copy != NULL) {
+			memcpy(copy, from->macsurf_gradient_radial,
+				4 * sizeof(int32_t));
+			to->macsurf_gradient_radial = copy;
 		}
 	}
 	return CSS_OK;

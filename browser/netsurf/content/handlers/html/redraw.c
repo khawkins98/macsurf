@@ -1402,6 +1402,26 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                                  PLOT_OP_TYPE_LINEAR_GRADIENT);
 	                pstyle_fill_bg.fill_colour  = gc1;
 	                pstyle_fill_bg.fill_colour2 = gc2;
+	                /* fixes345 — plumb the radial size+position prefix
+	                 * through to the painter. radial_set=false means
+	                 * fall back to existing centered-fill behaviour. */
+	                pstyle_fill_bg.radial_set = false;
+	                pstyle_fill_bg.radial_sx = -1;
+	                pstyle_fill_bg.radial_sy = -1;
+	                pstyle_fill_bg.radial_px = -1;
+	                pstyle_fill_bg.radial_py = -1;
+	                if (grad_r) {
+	                        const int32_t *rad =
+	                                css_computed_macsurf_gradient_radial(
+	                                        background->style);
+	                        if (rad != NULL) {
+	                                pstyle_fill_bg.radial_set = true;
+	                                pstyle_fill_bg.radial_sx = (int)rad[0];
+	                                pstyle_fill_bg.radial_sy = (int)rad[1];
+	                                pstyle_fill_bg.radial_px = (int)rad[2];
+	                                pstyle_fill_bg.radial_py = (int)rad[3];
+	                        }
+	                }
 	        }
 	}	if (ctx->background_images == false)
 		return true;

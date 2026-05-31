@@ -114,6 +114,17 @@ typedef struct plot_style_s {
         /* fixes73: scale companion. bits 31..16 sx_q88, bits 15..0 sy_q88.
          * 0x01000100 = identity (1.0, 1.0). 0 = collapse. */
         int transform_b;
+        /* fixes345: radial-gradient size + position. When radial_set
+         * is false the painter falls back to centered, fill-bounding-rect
+         * (the existing behaviour). When true, radial_sx/sy are the
+         * gradient ellipse size in pixels (-1 = unset / use bounding
+         * dimension), and radial_px/py are position percentages × 100
+         * (e.g. 78% = 7800; -1 = center). */
+        bool radial_set;
+        int radial_sx;
+        int radial_sy;
+        int radial_px;
+        int radial_py;
 } plot_style_t;
 
 /**
