@@ -2300,6 +2300,230 @@ macsurf__rewrite_background_image_gradient(const char *data, size_t in_size,
 }
 
 
+/* fixes318 (#145) — extract gradient from `background:` shorthand.
+ *
+ * Authors commonly write `background: <colour> linear-gradient(...)` or
+ * just `background: linear-gradient(...)` instead of the longhand
+ * `background-image: linear-gradient(...)`. fixes266 only handles the
+ * longhand, so shorthand-form gradients silently drop.
+ *
+ * This pass walks `background:` declarations (NOT `background-image`,
+ * `background-color`, etc.) and looks for `linear-gradient(` /
+ * `radial-gradient(` somewhere in the value. When found:
+ *   1. Records the gradient's bounds (function-call open through balanced
+ *      close-paren).
+ *   2. Replaces the entire `background:` declaration's name with
+ *      `-macsurf-gradient` and the value with just the extracted gradient
+ *      call. Tokens before and after the gradient (colour, position,
+ *      repeat, etc.) are wiped to spaces.
+ *
+ * Loss: any solid colour or other shorthand parts are dropped. Same
+ * loss-budget as fixes266 — single-gradient cases paint correctly,
+ * stacked or complex shorthand drop. Authors who need the colour can
+ * add a separate `background-color:` declaration.
+ *
+ * In-place same-size rewrite using a fresh output buffer (capacity is
+ * input + per-match REPLACE_LEN delta, same shape as fixes266).
+ *
+ * REPLACE is 17 bytes (-macsurf-gradient), NEEDLE is 10 bytes
+ * (background), so each match grows the output by 7 bytes plus the
+ * surrounding-whitespace fill.
+ */
+static char *
+macsurf__rewrite_background_shorthand_gradient(const char *data,
+		size_t in_size, size_t *out_size_p)
+{
+	static const char NEEDLE[]  = "background";
+	static const size_t NEEDLE_LEN  = 10;
+	static const char REPLACE[] = "-macsurf-gradient";
+	static const size_t REPLACE_LEN = 17;
+	static const size_t DELTA = REPLACE_LEN - NEEDLE_LEN; /* 7 */
+	char *out;
+	size_t cap;
+	size_t pos = 0;
+	size_t i = 0;
+	int changed = 0;
+
+	cap = in_size +
+		(in_size / NEEDLE_LEN + 1) * DELTA + 256;
+	out = (char *)malloc(cap);
+	if (out == NULL) return NULL;
+
+	while (i < in_size) {
+		size_t j, k, value_start, val_end;
+		bool gradient_at;
+		size_t grad_start = 0;
+		size_t grad_end = 0;
+		int paren;
+
+		if (!macsurf__match_prop_name(data, in_size, i,
+				NEEDLE, NEEDLE_LEN)) {
+			if (pos + 1 >= cap) { free(out); return NULL; }
+			out[pos++] = data[i++];
+			continue;
+		}
+		/* Reject `background-image`, `background-color`, etc.
+		 * Only match BARE `background` followed by ':' (after
+		 * optional whitespace). */
+		j = i + NEEDLE_LEN;
+		if (j < in_size && data[j] == '-') {
+			/* It's a longhand like background-image; pass through. */
+			if (pos + 1 >= cap) { free(out); return NULL; }
+			out[pos++] = data[i++];
+			continue;
+		}
+		while (j < in_size && (data[j] == ' ' || data[j] == '\t' ||
+				data[j] == '\n' || data[j] == '\r')) j++;
+		if (j >= in_size || data[j] != ':') {
+			if (pos + 1 >= cap) { free(out); return NULL; }
+			out[pos++] = data[i++];
+			continue;
+		}
+		value_start = j + 1;
+
+		/* Find end of value (the next depth-0 `;`, `}`, or `!`). */
+		k = value_start;
+		paren = 0;
+		while (k < in_size) {
+			char c = data[k];
+			if (c == '(') paren++;
+			else if (c == ')') { if (paren > 0) paren--; }
+			else if (paren == 0 &&
+					(c == ';' || c == '}' || c == '!')) break;
+			k++;
+		}
+		val_end = k;
+
+		/* Scan value for `linear-gradient(` or `radial-gradient(`. */
+		gradient_at = false;
+		{
+			size_t s;
+			for (s = value_start; s < val_end; s++) {
+				if (s + 16 > val_end) break;
+				if ((data[s] == 'l' || data[s] == 'L') &&
+				    (data[s+1] == 'i' || data[s+1] == 'I') &&
+				    (data[s+2] == 'n' || data[s+2] == 'N') &&
+				    (data[s+3] == 'e' || data[s+3] == 'E') &&
+				    (data[s+4] == 'a' || data[s+4] == 'A') &&
+				    (data[s+5] == 'r' || data[s+5] == 'R') &&
+				     data[s+6] == '-' &&
+				    (data[s+7] == 'g' || data[s+7] == 'G') &&
+				    (data[s+8] == 'r' || data[s+8] == 'R') &&
+				    (data[s+9] == 'a' || data[s+9] == 'A') &&
+				    (data[s+10] == 'd' || data[s+10] == 'D') &&
+				    (data[s+11] == 'i' || data[s+11] == 'I') &&
+				    (data[s+12] == 'e' || data[s+12] == 'E') &&
+				    (data[s+13] == 'n' || data[s+13] == 'N') &&
+				    (data[s+14] == 't' || data[s+14] == 'T') &&
+				     data[s+15] == '(') {
+					grad_start = s;
+					gradient_at = true;
+					break;
+				}
+				if ((data[s] == 'r' || data[s] == 'R') &&
+				    (data[s+1] == 'a' || data[s+1] == 'A') &&
+				    (data[s+2] == 'd' || data[s+2] == 'D') &&
+				    (data[s+3] == 'i' || data[s+3] == 'I') &&
+				    (data[s+4] == 'a' || data[s+4] == 'A') &&
+				    (data[s+5] == 'l' || data[s+5] == 'L') &&
+				     data[s+6] == '-' &&
+				    (data[s+7] == 'g' || data[s+7] == 'G') &&
+				    (data[s+8] == 'r' || data[s+8] == 'R') &&
+				    (data[s+9] == 'a' || data[s+9] == 'A') &&
+				    (data[s+10] == 'd' || data[s+10] == 'D') &&
+				    (data[s+11] == 'i' || data[s+11] == 'I') &&
+				    (data[s+12] == 'e' || data[s+12] == 'E') &&
+				    (data[s+13] == 'n' || data[s+13] == 'N') &&
+				    (data[s+14] == 't' || data[s+14] == 'T') &&
+				     data[s+15] == '(') {
+					grad_start = s;
+					gradient_at = true;
+					break;
+				}
+			}
+		}
+		if (!gradient_at) {
+			if (pos + 1 >= cap) { free(out); return NULL; }
+			out[pos++] = data[i++];
+			continue;
+		}
+
+		/* Find matching close paren for the gradient call. */
+		{
+			size_t s = grad_start + 16; /* past `(` */
+			int p = 1;
+			while (s < val_end && p > 0) {
+				if (data[s] == '(') p++;
+				else if (data[s] == ')') p--;
+				if (p == 0) { grad_end = s; break; }
+				s++;
+			}
+			if (p != 0) {
+				/* Unbalanced; bail. */
+				if (pos + 1 >= cap) { free(out); return NULL; }
+				out[pos++] = data[i++];
+				continue;
+			}
+		}
+
+		/* Emit `-macsurf-gradient` in place of `background`. */
+		if (pos + REPLACE_LEN >= cap) { free(out); return NULL; }
+		memcpy(out + pos, REPLACE, REPLACE_LEN);
+		pos += REPLACE_LEN;
+
+		/* Emit whitespace/colon up to value_start unchanged. */
+		{
+			size_t span = value_start - (i + NEEDLE_LEN);
+			if (pos + span >= cap) { free(out); return NULL; }
+			memcpy(out + pos, data + i + NEEDLE_LEN, span);
+			pos += span;
+		}
+
+		/* Emit spaces for any tokens between value_start and grad_start. */
+		{
+			size_t span = grad_start - value_start;
+			size_t s2;
+			if (pos + span >= cap) { free(out); return NULL; }
+			for (s2 = 0; s2 < span; s2++) out[pos + s2] = ' ';
+			pos += span;
+		}
+
+		/* Emit the gradient call itself, unchanged. */
+		{
+			size_t span = (grad_end + 1) - grad_start;
+			if (pos + span >= cap) { free(out); return NULL; }
+			memcpy(out + pos, data + grad_start, span);
+			pos += span;
+		}
+
+		/* Emit spaces for anything between grad_end+1 and val_end. */
+		{
+			size_t span = val_end - (grad_end + 1);
+			size_t s2;
+			if (pos + span >= cap) { free(out); return NULL; }
+			for (s2 = 0; s2 < span; s2++) out[pos + s2] = ' ';
+			pos += span;
+		}
+
+		i = val_end;
+		changed++;
+	}
+
+	out[pos] = '\0';
+	if (out_size_p != NULL) *out_size_p = pos;
+#ifdef MACSURF_DEBUG
+	macsurf_debug_log_writef(
+		"fixes318 bg-short: in=%ld out=%ld matches=%d",
+		(long)in_size, (long)pos, changed);
+#endif
+	if (!changed) {
+		free(out);
+		return NULL;
+	}
+	return out;
+}
+
+
 /* fixes279 (#27) — strip trailing stacked gradients from
  * `-macsurf-gradient:` declarations. Author CSS commonly stacks layered
  * backgrounds like `background-image: linear-gradient(a), linear-gradient(b)`.
@@ -4149,6 +4373,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	char *rewritten_logical = NULL;    /* fixes277 logical properties */
 	char *rewritten_calc = NULL;       /* fixes280 calc() arithmetic */
 	char *rewritten_rep_grad = NULL;   /* fixes281 repeating-gradient -> solid */
+	char *rewritten_bg_short = NULL;   /* fixes318 background: shorthand gradient */
 	size_t col_span_size = 0;
 	size_t text_shadow_size = 0;
 	size_t transform_size = 0;
@@ -4398,6 +4623,22 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 		final_size = (unsigned int)inset_size;
 	}
 
+	/* fixes318 (#145) — background: shorthand → -macsurf-gradient:.
+	 * Runs BEFORE fixes266 so by the time fixes266's matcher inspects
+	 * the data, any shorthand-form gradient has already been extracted
+	 * into a longhand `-macsurf-gradient:` declaration. */
+	{
+		size_t bg_short_size = 0;
+		rewritten_bg_short =
+			macsurf__rewrite_background_shorthand_gradient(
+				final_data, (size_t)final_size, &bg_short_size);
+		if (rewritten_bg_short != NULL &&
+				bg_short_size <= (size_t)0x7fffffff) {
+			final_data = (const char *)rewritten_bg_short;
+			final_size = (unsigned int)bg_short_size;
+		}
+	}
+
 	/* fixes266 — background-image: linear-gradient(...) → -macsurf-gradient:
 	 * linear-gradient(...) so author CSS reaches the existing gradient
 	 * paint path. Net +1 byte per match. */
@@ -4442,6 +4683,7 @@ nscss_process_data(struct content *c, const char *data, unsigned int size)
 	if (rewritten_logical != NULL) free(rewritten_logical); /* fixes277 */
 	if (rewritten_calc != NULL) free(rewritten_calc); /* fixes280 */
 	if (rewritten_rep_grad != NULL) free(rewritten_rep_grad); /* fixes281 */
+	if (rewritten_bg_short != NULL) free(rewritten_bg_short); /* fixes318 */
 
 	if (error != CSS_OK && error != CSS_NEEDDATA) {
 		content_broadcast_error(c, NSERROR_CSS, NULL);

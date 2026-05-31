@@ -90,6 +90,21 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 			advance_bytecode(style, sizeof(css_color));
 			packed = macsurf_gradient_pack(c1, c2, horizontal,
 					false);
+#ifdef MACSURF_DEBUG
+			/* fixes318 (#147) probe — log raw bytecode values so
+			 * we can see on hardware whether c1 / c2 actually
+			 * differ, or whether one slot reads as the other.
+			 * Custom logger only supports %d %ld %p %s %% — emit
+			 * as decimal longs and decode visually. */
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				macsurf_debug_log_writef(
+					"grad cascade: opv=%ld c1=%ld c2=%ld packed=%ld h=%d",
+					(long)opv, (long)c1, (long)c2,
+					(long)packed, horizontal ? 1 : 0);
+			}
+#endif
 			break;
 		}
 	}
