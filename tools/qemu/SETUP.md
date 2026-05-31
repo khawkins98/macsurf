@@ -187,11 +187,15 @@ tools/qemu/read-results.sh ~/macsurf-qemu/images/transfer.img ~/macsurf-qemu/res
 
 ## Status
 
-Validated on this host (macOS 26.4.1, Apple Silicon, QEMU 11.0.1):
-- ✅ OS 9.2.1 install ISO boots to a usable desktop on `mac99,via=pmu`
+Validated on this host (macOS 26.x, Apple Silicon, QEMU 11.0.1):
+- ✅ OS 9.2.1 boots to a usable desktop (UTM prebuilt image; from-ISO also boots, just slow under TCG)
 - ✅ Headless + Cocoa display, QMP control, framebuffer screenshots
-- ✅ HFS transfer round-trip: LF→CR conversion + `TEXT/CWIE` type/creator confirmed on-volume
-- ⏳ OS 9 install to disk → CodeWarrior install → manual build → `os9_cw_ready` snapshot
-- ⏳ usb-tablet absolute-click probe
-- ⏳ end-to-end automated build loop
+- ✅ HFS transfer round-trip: LF→CR + `TEXT/CWIE` confirmed on-volume (machfs)
+- ✅ **CodeWarrior 8 installed entirely host-side** (mount HFS+, ditto IDE + CarbonLib 1.5 + MetroNub + MRO) — IDE launches
+- ✅ Keyboard automation; relative-mouse motion; keyboard confirmed under `-M mac99` (no via=pmu)
+- 🔬 usb-tablet + `kanjitalk755` INIT for absolute clicks — under test (INIT in Extensions; `-M mac99 -device usb-tablet`)
+- ⏳ MacSurf project wired (XML import / matching access paths) → first green build → `os9_cw_ready` snapshot
+- ⏳ end-to-end automated build loop (keyboard + AppleScript; see docs/INPUT.md)
+
+See **docs/INPUT.md** for the full input/automation strategy and **MORNING-STATUS.md** for the live handoff.
 ```
