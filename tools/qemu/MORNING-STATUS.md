@@ -29,17 +29,27 @@ through autonomously. This removes the click blocker that capped the previous ru
 - Driver verbs: `vm.py screenshot/key/type/move/click/settle/snapshot/revert/quit`.
 
 ## In progress: getting MacSurf to build
-- The project's access paths are **absolute** to a volume named **`Back40`**
-  (`Back40:Desktop Folder:patrick:macsurf-source Folder:browser:…`). Plan: stage a
-  "Back40" source disk matching that layout so the existing `.mcp` resolves unchanged.
-- `stage-project.sh` builds it — but `machfs/MakeHFS` force-decodes TEXT files as
-  UTF-8 and some source has non-UTF-8 bytes (0x81), so the charset-agnostic path is
-  HFS+ mount + `ditto` + `SetFile` (type/creator) + a byte-safe LF→CR pass instead.
-- **Open question being tested:** the git `MacSurf.mcp` is data-fork-only (176 KB, no
-  resource fork). Testing whether CW8 opens it as a valid project (type set to
-  `MMPr`/`CWIE`). If yes → full source staging + a Make. If CW rejects it, the build
-  needs the user's authoritative `.mcp` (CLAUDE.md: "user maintains the project file
-  list on the Mac side") and/or a CodeWarrior XML project export to import.
+
+**Key discovery:** the repo's `MacSurf.mcp` is **NOT a binary project** — it's a
+CodeWarrior **XML project export** (`<?xml …>`, 531 `<FILE>` entries, 1 target
+"MacSurf", **relative** file paths like `../../../utils/utils.c`, no Back40/patrick
+absolutes). Trying to *Open* it gives "Resource File Error 207008 — not a resource
+file" because CW8 binary projects live in the resource fork (which git strips). The
+right move is **File → Import Project** on the XML, which regenerates a real `.mcp`.
+The separate `Access Paths.xml` carries the absolute Back40 include paths.
+
+**Staging approach (running):** `stage-on-bootvol.sh` renames the boot volume to
+**Back40** and stages the source at `Back40:Desktop Folder:patrick:macsurf-source
+Folder:browser:…` — so BOTH the `.mcp`'s relative file paths AND `Access Paths.xml`'s
+absolute Back40 includes resolve unchanged. (Uses HFS+ mount + `ditto` + `SetFile`
+TEXT/CWIE + byte-safe LF→CR, because `machfs/MakeHFS` force-decodes TEXT as UTF-8 and
+chokes on non-UTF-8 source bytes.)
+
+**Remaining to a verified build (all now unblocked — full GUI control + importable
+project):** boot → `File → Import Project` (MacSurf.mcp XML) → save the binary `.mcp`
+→ (if needed) import `Access Paths.xml` into the Access Paths panel → `Make` (Cmd-M).
+Expect a slow first build under TCG and likely a few iterations on access
+paths / missing CW components. This is the natural next step.
 
 ## The no-mouse build path (works regardless of clicks)
 Per the research sweep: CodeWarrior is fully scriptable via AppleEvents. Run a build
