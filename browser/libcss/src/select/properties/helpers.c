@@ -64,6 +64,7 @@ css_error css__cascade_uri_none(uint32_t opv, css_style *style,
 {
 	uint16_t value = CSS_BACKGROUND_IMAGE_INHERIT;
 	lwc_string *uri = NULL;
+	int outranks;
 
 	if (hasFlagValue(opv) == false) {
 		switch (getValue(opv)) {
@@ -71,16 +72,62 @@ css_error css__cascade_uri_none(uint32_t opv, css_style *style,
 			value = CSS_BACKGROUND_IMAGE_NONE;
 			break;
 		case BACKGROUND_IMAGE_URI:
-			value = CSS_BACKGROUND_IMAGE_IMAGE;
-			css__stylesheet_string_get(style->sheet, *((css_code_t *) style->bytecode), &uri);
+		{
+			/* fixes347f — error-check the URI lookup so a failure
+			 * (sheet/snumber mismatch, out-of-bounds) downgrades
+			 * to NONE rather than silently writing IMAGE with a
+			 * NULL string pointer (which presents as kind=IMAGE
+			 * uri=null at the box-construct fetch site and looks
+			 * like a fetch path bug rather than what it is). */
+			css_error gerr = css__stylesheet_string_get(
+					style->sheet,
+					*((css_code_t *) style->bytecode),
+					&uri);
 			advance_bytecode(style, sizeof(css_code_t));
+			if (gerr != CSS_OK || uri == NULL) {
+				value = CSS_BACKGROUND_IMAGE_NONE;
+				uri = NULL;
+			} else {
+				value = CSS_BACKGROUND_IMAGE_IMAGE;
+			}
 			break;
+		}
 		}
 	}
 
 	/** \todo lose fun != NULL once all properties have set routines */
-	if (fun != NULL && css__outranks_existing(getOpcode(opv),
-			isImportant(opv), state, getFlagValue(opv))) {
+	outranks = (fun != NULL && css__outranks_existing(getOpcode(opv),
+			isImportant(opv), state, getFlagValue(opv))) ? 1 : 0;
+
+#ifdef MACSURF_DEBUG
+	if (getOpcode(opv) == 59) {
+		extern void macsurf_debug_log_writef(
+			const char *fmt, ...);
+		macsurf_debug_log_writef(
+			"fixes347e uri_none: op=%d val=%d uri=%s outranks=%d pseudo=%d",
+			(int)getOpcode(opv), (int)value,
+			(uri != NULL) ? lwc_string_data(uri) : "(null)",
+			outranks, (int)state->current_pseudo);
+	}
+#endif
+
+	/* fixes347g — var()-resolved URIs must always land on the pseudo's
+	 * computed style. The outranks gate sometimes drops the URI write
+	 * because of interaction with the post-cascade set_initial fixup
+	 * (css_select.c:1492) — and because CSS_BACKGROUND_IMAGE_NONE and
+	 * CSS_BACKGROUND_IMAGE_IMAGE share enum value 0x1 (properties.h),
+	 * the post-fixup result presents to the box-construct fetch site
+	 * as kind=IMAGE with a NULL URI, looking exactly like a fetch path
+	 * bug. When the deferred-decl resolver produces a real URI we want
+	 * it to land, so force the write when value=IMAGE+non-null URI and
+	 * manually mark prop->set so set_initial doesn't overwrite the URI
+	 * in the fixup pass. */
+	if (outranks) {
+		return fun(state->computed, value, uri);
+	}
+
+	if (value == CSS_BACKGROUND_IMAGE_IMAGE && uri != NULL && fun != NULL) {
+		state->props[getOpcode(opv)][state->current_pseudo].set = 1;
 		return fun(state->computed, value, uri);
 	}
 
