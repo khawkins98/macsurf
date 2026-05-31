@@ -166,14 +166,16 @@ class VM:
         if evs:
             self._cmd("input-send-event", {"events": evs})
 
-    def press(self, button="left", double=False):
-        """Click at the CURRENT cursor position (no move)."""
+    def press(self, button="left", double=False, dwell=0.15):
+        """Click at the CURRENT cursor position (no move). `dwell` must exceed one
+        OS 9 HID poll interval (~16ms VBL) or the polled driver misses the press;
+        real cocoa clicks 'dwell' for tens of ms, which is why instant down+up fails."""
         def p(d):
             self._cmd("input-send-event", {"events": [
                 {"type": "btn", "data": {"button": button, "down": d}}]})
-        p(True); time.sleep(0.06); p(False)
+        p(True); time.sleep(dwell); p(False)
         if double:
-            time.sleep(0.08); p(True); time.sleep(0.06); p(False)
+            time.sleep(0.12); p(True); time.sleep(dwell); p(False)
 
     def move(self, px, py):
         self._abs(px, py)
