@@ -218,7 +218,19 @@ static const char css_internal[] =
 	/* "noscript" content survives. We already display:block above; this
 	 * is the matching rescue for sites that gate real content behind
 	 * a noscript fallback. */
-	".no-js,html.no-js{display:block !important}";
+	".no-js,html.no-js{display:block !important}"
+	/* fixes329 (#110) — HTML5 <details>/<summary> disclosure widget.
+	 * Closed details collapses everything but its summary. summary
+	 * indicates clickability. Click → toggle handled in
+	 * macos9_js_click.c by toggling the `open` attribute. */
+	" details>:not(summary){display:none}"
+	" details[open]>*{display:block}"
+	" summary{display:block;cursor:pointer;font-weight:bold;"
+	"padding:2px 0}"
+	/* fixes329 (#114) — HTML5 hidden attribute defaults. Specific
+	 * articles/main/section [hidden] rescue rules later in this
+	 * sheet still override. */
+	" [hidden]{display:none}";
 
 static const char css_quirks[] =
 	"table{font-size:inherit;font-weight:inherit;text-align:start;"
