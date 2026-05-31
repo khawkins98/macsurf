@@ -2418,6 +2418,29 @@ macsurf__rewrite_background_shorthand_gradient(const char *data,
 				    (data[s+13] == 'n' || data[s+13] == 'N') &&
 				    (data[s+14] == 't' || data[s+14] == 'T') &&
 				     data[s+15] == '(') {
+					/* fixes346 — skip if this match is
+					 * actually the `linear-gradient(` tail
+					 * of `repeating-linear-gradient(`. Without
+					 * this guard the preprocessor strips the
+					 * `repeating-` prefix and the parser
+					 * sees a non-repeating gradient, losing
+					 * the pinstripe pattern entirely. */
+					if (s >= 10 &&
+					    (data[s-10]=='r'||data[s-10]=='R') &&
+					    (data[s-9]=='e'||data[s-9]=='E') &&
+					    (data[s-8]=='p'||data[s-8]=='P') &&
+					    (data[s-7]=='e'||data[s-7]=='E') &&
+					    (data[s-6]=='a'||data[s-6]=='A') &&
+					    (data[s-5]=='t'||data[s-5]=='T') &&
+					    (data[s-4]=='i'||data[s-4]=='I') &&
+					    (data[s-3]=='n'||data[s-3]=='N') &&
+					    (data[s-2]=='g'||data[s-2]=='G') &&
+					     data[s-1]=='-') {
+						/* Skip 10 chars back and let
+						 * the loop continue past the
+						 * full token. */
+						continue;
+					}
 					grad_start = s;
 					gradient_at = true;
 					break;

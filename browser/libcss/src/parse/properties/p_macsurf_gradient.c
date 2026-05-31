@@ -50,6 +50,16 @@ css_error css__parse_macsurf_gradient(css_language *c,
 	css_color first_color = 0;
 	css_color last_color = 0;
 	int color_count = 0;
+	/* fixes346 — track the first stop colour that differs from
+	 * first_color. Used downstream so `repeating-linear-gradient`
+	 * patterns like `white 0, white 1px, gray 1px, gray 2px, white 2px,
+	 * white 3px` (mactrove's Platinum titlebar pinstripe) render as a
+	 * white→gray fade instead of white→white solid. fixes318's
+	 * preprocessor strips the `repeating-` prefix; here the same
+	 * symptom (first == last across N>=3 stops) is the recovery
+	 * trigger. */
+	css_color second_distinct = 0;
+	bool has_second_distinct = false;
 	enum flag_value flag_value;
 	bool match = false;
 
@@ -393,7 +403,13 @@ css_error css__parse_macsurf_gradient(css_language *c,
 				*ctx = orig_ctx;
 				return error;
 			}
-			if (color_count == 0) first_color = tmp_color;
+			if (color_count == 0) {
+				first_color = tmp_color;
+			} else if (!has_second_distinct &&
+			           tmp_color != first_color) {
+				second_distinct = tmp_color;
+				has_second_distinct = true;
+			}
 			last_color = tmp_color;
 			color_count++;
 			consumeWhitespace(vector, ctx);
@@ -425,6 +441,27 @@ css_error css__parse_macsurf_gradient(css_language *c,
 		}
 		/* Single-stop falls back to a uniform fill (first == last). */
 		if (color_count == 1) last_color = first_color;
+
+		/* fixes346 — pinstripe / repeating pattern recovery.
+		 * When the source was `repeating-linear-gradient(white 0, white
+		 * 1px, gray 1px, gray 2px, white 2px, white 3px)` (mactrove's
+		 * Platinum titlebar) the fixes318 preprocessor strips the
+		 * `repeating-` prefix and the loop above sees 6 colour stops
+		 * with first == last == white. Without recovery the resulting
+		 * gradient is white→white = solid white, completely losing the
+		 * pinstripe appearance.
+		 *
+		 * Rule: if there are 3+ stops AND first == last AND we saw a
+		 * distinct intermediate colour, swap last for that distinct
+		 * colour. The 2-stop storage then renders as a soft fade between
+		 * the dominant and accent colours, visually approximating the
+		 * pinstripe at any zoom. Regular 3-stop gradients
+		 * (white→mid→dark) aren't affected because first != last for
+		 * them. */
+		if (color_count >= 3 && first_color == last_color &&
+		    has_second_distinct) {
+			last_color = second_distinct;
+		}
 
 		/* Close parenthesis. */
 		consumeWhitespace(vector, ctx);
