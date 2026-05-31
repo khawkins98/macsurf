@@ -84,6 +84,15 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 			c2 = *((css_color *) style->bytecode);
 			advance_bytecode(style, sizeof(css_color));
 			packed = macsurf_gradient_pack(c1, c2, false, true);
+#ifdef MACSURF_DEBUG
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				macsurf_debug_log_writef(
+					"fixes345 RADIAL cascade firing c1=%ld c2=%ld",
+					(long)c1, (long)c2);
+			}
+#endif
 			/* fixes345 — radial bytecode tail: 5 uint32 with
 			 * [set_flag, sx, sy, px, py]. */
 			{
