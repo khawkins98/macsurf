@@ -23,16 +23,23 @@ sleep 1
 echo "=== mount boot volume rw ==="
 rm -f "$QEMU_IMAGES/os9-cw.raw"
 qemu-img convert -f qcow2 -O raw "$QEMU_IMAGES/os9-cw.qcow2" "$QEMU_IMAGES/os9-cw.raw"
-yes | hdiutil attach -noverify -imagekey diskimage-class=CRawDiskImage "$QEMU_IMAGES/os9-cw.raw" >/dev/null 2>&1
-# find the mounted volume (untitled, or Back40 if already renamed)
-VOL=""
-for v in /Volumes/untitled /Volumes/Back40; do [ -d "$v/System Folder" ] && VOL="$v"; done
-[ -n "$VOL" ] || { echo "ERROR: boot volume not mounted"; exit 1; }
-echo "mounted at $VOL"
+# attach and PARSE the actual mountpoint (the volume is "untitled" and macOS
+# appends " 1" etc. on name collisions, so never hardcode the path).
+# NB: `yes |` gets SIGPIPE when hdiutil closes stdin; under `set -o pipefail`
+# that aborts the script, so disable pipefail just for this pipeline.
+set +o pipefail
+ATTACH_OUT="$(printf 'y\ny\ny\n' | hdiutil attach -noverify -imagekey diskimage-class=CRawDiskImage "$QEMU_IMAGES/os9-cw.raw" 2>&1)"
+set -o pipefail
+VOL="$(echo "$ATTACH_OUT" | grep -i "Apple_HFS" | sed -E 's/.*Apple_HFS[[:space:]]+//' | head -1)"
+[ -n "$VOL" ] && [ -d "$VOL/System Folder" ] || { echo "ERROR: HFS volume not mounted"; echo "$ATTACH_OUT"; exit 1; }
+echo "mounted at: $VOL"
 
 echo "=== rename volume -> Back40 ==="
-diskutil rename "$VOL" Back40 >/dev/null 2>&1 || true
+DEV="$(echo "$ATTACH_OUT" | grep -i "Apple_HFS" | awk '{print $1}' | head -1)"
+diskutil rename "$DEV" Back40 >/dev/null 2>&1 || diskutil rename "$VOL" Back40 >/dev/null 2>&1 || true
+sleep 1
 VOL="/Volumes/Back40"
+[ -d "$VOL/System Folder" ] || { echo "ERROR: rename to Back40 failed"; exit 1; }
 
 DEST="$VOL/Desktop Folder/patrick/macsurf-source Folder"
 echo "=== ditto source tree -> $DEST/browser ==="
