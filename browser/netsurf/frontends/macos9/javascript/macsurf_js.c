@@ -417,6 +417,65 @@ static void register_browser_globals(duk_context *ctx)
 		"KeyboardEvent.prototype=Object.create(Event.prototype);"
 		"this.KeyboardEvent=KeyboardEvent;");
 
+	/* fixes341 — document shims for commonly-used properties. The DOM
+	 * bindings already provide getElementById/createElement/querySelector;
+	 * we add stubs for the remaining ones so site code that walks them
+	 * doesn't ReferenceError. */
+	duk_eval_string_noresult(ctx,
+		"if(typeof document!=='undefined'){"
+			"document.body=document.body||null;"
+			"document.head=document.head||null;"
+			"document.documentElement=document.documentElement||null;"
+			"document.readyState='complete';"
+			"document.cookie='';"
+			"document.URL=document.URL||(typeof location!=='undefined'?location.href:'');"
+			"document.referrer='';"
+			"document.domain='';"
+			"document.createTextNode=document.createTextNode||function(t){"
+				"return {nodeValue:String(t),textContent:String(t),"
+					"appendChild:function(){},data:String(t)};};"
+			"document.createDocumentFragment=function(){"
+				"return {appendChild:function(){},childNodes:[],"
+					"firstChild:null,lastChild:null};};"
+			"document.getElementsByTagName=document.getElementsByTagName||"
+				"function(){return [];};"
+			"document.getElementsByClassName=document.getElementsByClassName||"
+				"function(){return [];};"
+			"document.getElementsByName=document.getElementsByName||"
+				"function(){return [];};"
+			"document.querySelectorAll=document.querySelectorAll||"
+				"function(){return [];};"
+			"document.addEventListener=document.addEventListener||"
+				"function(t,fn){"
+					"if(!document._listeners)document._listeners={};"
+					"if(!document._listeners[t])document._listeners[t]=[];"
+					"document._listeners[t].push(fn);};"
+			"document.removeEventListener=document.removeEventListener||"
+				"function(t,fn){"
+					"var L=document._listeners&&document._listeners[t];if(!L)return;"
+					"for(var i=0;i<L.length;i++)if(L[i]===fn){L.splice(i,1);return;}};"
+			"document.dispatchEvent=document.dispatchEvent||"
+				"function(ev){"
+					"var L=document._listeners&&document._listeners[ev&&ev.type];"
+					"if(L)L.forEach(function(f){try{f(ev);}catch(e){}});return true;};"
+		"}");
+
+	duk_eval_string_noresult(ctx,
+		"if(typeof navigator!=='undefined'){"
+			"navigator.cookieEnabled=false;"
+			"navigator.onLine=true;"
+			"navigator.languages=navigator.languages||[navigator.language||'en-US'];"
+			"navigator.doNotTrack='1';"
+			"navigator.connection={effectiveType:'3g',downlink:1.5,rtt:300};"
+			"navigator.hardwareConcurrency=1;"
+			"navigator.deviceMemory=0.5;"
+			"navigator.vendor='Anthropic/MPLS';"
+			"navigator.product='MacSurf';"
+			"navigator.productSub='20260531';"
+			"navigator.javaEnabled=function(){return false;};"
+			"navigator.sendBeacon=function(){return false;};"
+		"}");
+
 	/* fixes340 — MutationObserver / IntersectionObserver / ResizeObserver
 	 * stubs. Many sites guard their setup with `if(MutationObserver)`.
 	 * The stub satisfies the guard; observe() is a no-op so the page
