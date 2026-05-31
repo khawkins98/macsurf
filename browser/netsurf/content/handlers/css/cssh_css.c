@@ -2344,8 +2344,10 @@ macsurf__rewrite_background_shorthand_gradient(const char *data,
 	size_t i = 0;
 	int changed = 0;
 
+	/* fixes343 — also reserve room for the per-match
+	 * `; background-repeat: no-repeat` (~32 bytes) we now emit. */
 	cap = in_size +
-		(in_size / NEEDLE_LEN + 1) * DELTA + 256;
+		(in_size / NEEDLE_LEN + 1) * (DELTA + 32) + 256;
 	out = (char *)malloc(cap);
 	if (out == NULL) return NULL;
 
@@ -2503,6 +2505,89 @@ macsurf__rewrite_background_shorthand_gradient(const char *data,
 			if (pos + span >= cap) { free(out); return NULL; }
 			for (s2 = 0; s2 < span; s2++) out[pos + s2] = ' ';
 			pos += span;
+		}
+
+		/* fixes343 — scan the original shorthand for repeat-x /
+		 * repeat-y / no-repeat / repeat keywords and emit a
+		 * `; background-repeat: X` declaration after the gradient.
+		 * Without this, every shorthand-with-gradient lost its
+		 * repeat info; libcss defaulted to `repeat` and gradients
+		 * tiled across elements like mactrove's metallic chrome.
+		 *
+		 * Scan order matters: check `no-repeat` first (longest),
+		 * then `repeat-x`, `repeat-y`, then bare `repeat`. Default
+		 * to `no-repeat` for gradients (overwhelming author intent
+		 * when using shorthand). */
+		{
+			const char *rep_keyword = "no-repeat";
+			size_t scan;
+			for (scan = value_start; scan < val_end; scan++) {
+				if (scan + 9 <= val_end &&
+				    (data[scan]=='n'||data[scan]=='N') &&
+				    (data[scan+1]=='o'||data[scan+1]=='O') &&
+				     data[scan+2]=='-' &&
+				    (data[scan+3]=='r'||data[scan+3]=='R') &&
+				    (data[scan+4]=='e'||data[scan+4]=='E') &&
+				    (data[scan+5]=='p'||data[scan+5]=='P') &&
+				    (data[scan+6]=='e'||data[scan+6]=='E') &&
+				    (data[scan+7]=='a'||data[scan+7]=='A') &&
+				    (data[scan+8]=='t'||data[scan+8]=='T')) {
+					rep_keyword = "no-repeat";
+					break;
+				}
+				if (scan + 8 <= val_end &&
+				    (data[scan]=='r'||data[scan]=='R') &&
+				    (data[scan+1]=='e'||data[scan+1]=='E') &&
+				    (data[scan+2]=='p'||data[scan+2]=='P') &&
+				    (data[scan+3]=='e'||data[scan+3]=='E') &&
+				    (data[scan+4]=='a'||data[scan+4]=='A') &&
+				    (data[scan+5]=='t'||data[scan+5]=='T') &&
+				     data[scan+6]=='-' &&
+				    (data[scan+7]=='x'||data[scan+7]=='X')) {
+					rep_keyword = "repeat-x";
+					break;
+				}
+				if (scan + 8 <= val_end &&
+				    (data[scan]=='r'||data[scan]=='R') &&
+				    (data[scan+1]=='e'||data[scan+1]=='E') &&
+				    (data[scan+2]=='p'||data[scan+2]=='P') &&
+				    (data[scan+3]=='e'||data[scan+3]=='E') &&
+				    (data[scan+4]=='a'||data[scan+4]=='A') &&
+				    (data[scan+5]=='t'||data[scan+5]=='T') &&
+				     data[scan+6]=='-' &&
+				    (data[scan+7]=='y'||data[scan+7]=='Y')) {
+					rep_keyword = "repeat-y";
+					break;
+				}
+				if (scan + 6 <= val_end &&
+				    (data[scan]=='r'||data[scan]=='R') &&
+				    (data[scan+1]=='e'||data[scan+1]=='E') &&
+				    (data[scan+2]=='p'||data[scan+2]=='P') &&
+				    (data[scan+3]=='e'||data[scan+3]=='E') &&
+				    (data[scan+4]=='a'||data[scan+4]=='A') &&
+				    (data[scan+5]=='t'||data[scan+5]=='T')) {
+					/* Avoid matching the trailing -x/-y form
+					 * here; those branches above came first.
+					 * Plain `repeat` is the libcss default
+					 * anyway, but emit it explicitly so
+					 * later author CSS overrides cleanly. */
+					rep_keyword = "repeat";
+					break;
+				}
+			}
+			{
+				static const char SEP[] = "; background-repeat: ";
+				size_t sep_len = sizeof SEP - 1;
+				size_t k_len = strlen(rep_keyword);
+				if (pos + sep_len + k_len >= cap) {
+					free(out);
+					return NULL;
+				}
+				memcpy(out + pos, SEP, sep_len);
+				pos += sep_len;
+				memcpy(out + pos, rep_keyword, k_len);
+				pos += k_len;
+			}
 		}
 
 		i = val_end;
