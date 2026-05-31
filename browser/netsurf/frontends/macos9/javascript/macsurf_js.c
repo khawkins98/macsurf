@@ -373,6 +373,111 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "location");
 	}
 
+	/* fixes331 (#125) — DOMParser. V1 returns a plain object with
+	 * a single nominal document property. Real DOM tree construction
+	 * from a string would require libhubbub-on-string + dom_document
+	 * wrapper, deferred. Many scripts feature-check DOMParser via
+	 * `typeof DOMParser !== 'undefined'`; this satisfies that. */
+	duk_eval_string_noresult(ctx,
+		"function DOMParser(){}"
+		"DOMParser.prototype.parseFromString=function(s,m){"
+			"return {body:{innerHTML:s||''},documentElement:null,"
+				"querySelector:function(){return null;},"
+				"querySelectorAll:function(){return [];},"
+				"getElementById:function(){return null;},"
+				"getElementsByTagName:function(){return [];}};"
+		"};");
+
+	/* fixes332 (#124) — FormData. Stores key/value pairs and exposes
+	 * append / get / set / has / delete / forEach. Lacks file-input
+	 * iteration; future work when multipart/form-data is supported
+	 * end-to-end. */
+	duk_eval_string_noresult(ctx,
+		"function FormData(form){"
+			"this._k=[];this._v=[];"
+			"if(form&&form.elements){"
+				"var els=form.elements;"
+				"for(var i=0;i<els.length;i++){"
+					"var e=els[i];"
+					"if(e.name&&e.value!==undefined){"
+						"this._k.push(e.name);"
+						"this._v.push(e.value);"
+					"}"
+				"}"
+			"}"
+		"}"
+		"FormData.prototype.append=function(k,v){"
+			"this._k.push(String(k));this._v.push(String(v));};"
+		"FormData.prototype.get=function(k){"
+			"for(var i=0;i<this._k.length;i++)"
+				"if(this._k[i]==k)return this._v[i];"
+			"return null;};"
+		"FormData.prototype.getAll=function(k){"
+			"var r=[];for(var i=0;i<this._k.length;i++)"
+				"if(this._k[i]==k)r.push(this._v[i]);return r;};"
+		"FormData.prototype.set=function(k,v){"
+			"this.delete(k);this.append(k,v);};"
+		"FormData.prototype.has=function(k){return this.get(k)!==null;};"
+		"FormData.prototype.delete=function(k){"
+			"for(var i=this._k.length-1;i>=0;i--)"
+				"if(this._k[i]==k){this._k.splice(i,1);this._v.splice(i,1);}};"
+		"FormData.prototype.forEach=function(cb){"
+			"for(var i=0;i<this._k.length;i++)cb(this._v[i],this._k[i],this);};");
+
+	/* fixes334 (#104) — minimal fetch() shim wrapping XMLHttpRequest.
+	 * Returns a thenable (not a real Promise — Duktape is ES5). The
+	 * .then(cb) fires synchronously when the XHR completes; .catch is
+	 * supported. Sufficient for fetch(url).then(r=>r.text()).then(...)
+	 * patterns common in inline scripts. */
+	duk_eval_string_noresult(ctx,
+		"this.fetch=function(url,opts){"
+			"opts=opts||{};"
+			"var ok=false,status=0,respText='',respHeaders='';"
+			"try{"
+				"var xhr=new XMLHttpRequest();"
+				"xhr.open(opts.method||'GET',url,false);"
+				"if(opts.headers){"
+					"for(var h in opts.headers)"
+						"xhr.setRequestHeader(h,opts.headers[h]);"
+				"}"
+				"xhr.send(opts.body||null);"
+				"status=xhr.status;"
+				"ok=status>=200&&status<300;"
+				"respText=xhr.responseText||'';"
+				"respHeaders=xhr.getAllResponseHeaders?xhr.getAllResponseHeaders():'';"
+			"}catch(e){}"
+			"var resp={"
+				"ok:ok,status:status,"
+				"text:function(){"
+					"var t={then:function(cb){cb(respText);return t;}};return t;},"
+				"json:function(){"
+					"var j={then:function(cb){"
+						"try{cb(JSON.parse(respText));}catch(_){}return j;}};return j;}"
+			"};"
+			"var thenable={"
+				"then:function(cb){if(cb)cb(resp);return thenable;},"
+				"catch:function(){return thenable;}"
+			"};"
+			"return thenable;"
+		"};");
+
+	/* fixes333 (#46) — localStorage / sessionStorage shim. V1 is
+	 * RAM-only (lost on quit). Future round persists localStorage to
+	 * a file in the Preferences folder. */
+	duk_eval_string_noresult(ctx,
+		"function _Storage(){this._m={};}"
+		"_Storage.prototype.getItem=function(k){"
+			"return k in this._m?this._m[k]:null;};"
+		"_Storage.prototype.setItem=function(k,v){this._m[k]=String(v);};"
+		"_Storage.prototype.removeItem=function(k){delete this._m[k];};"
+		"_Storage.prototype.clear=function(){this._m={};};"
+		"_Storage.prototype.key=function(i){"
+			"var ks=Object.keys(this._m);return ks[i]||null;};"
+		"Object.defineProperty(_Storage.prototype,'length',{"
+			"get:function(){return Object.keys(this._m).length;}});"
+		"this.localStorage=new _Storage();"
+		"this.sessionStorage=new _Storage();");
+
 	/* fixes325 (#123) — URL / URLSearchParams. Minimal in-language
 	 * implementations sufficient for `new URL(str)` access to
 	 * .href / .pathname / .search / .hash / .host / .protocol and
