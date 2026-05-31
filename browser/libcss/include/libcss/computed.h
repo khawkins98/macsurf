@@ -231,6 +231,15 @@ const int32_t *css_computed_macsurf_grid_row_tracks(
 const css_color *css_computed_macsurf_gradient_full(
 		const css_computed_style *style);
 
+/* fixes345: returns a pointer to a 4-int radial-gradient size+position
+ * array, or NULL when the rule had no explicit size/position prefix.
+ * Format: [size_x_px, size_y_px, pos_x_percent_x100, pos_y_percent_x100]
+ * with -1 sentinels for any field that wasn't supplied. Painter uses
+ * these to place a small concentrated radial ellipse at the author's
+ * intended position instead of filling the bounding rect. */
+const int32_t *css_computed_macsurf_gradient_radial(
+		const css_computed_style *style);
+
 /* fixes151: -macsurf-grid-col-span as a uint8_t. 0 = unset (caller
  * treats as 1). 1..254 = literal span count. 255 = "fill the
  * remainder of the row" sentinel (from `grid-column: 1 / -1`-style

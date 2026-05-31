@@ -84,6 +84,11 @@ css_error css__parse_macsurf_gradient(css_language *c,
 		bool horizontal = false;
 		bool radial = is_radial;
 		uint16_t set_value = is_radial ? 0x0100 : 0x0080;
+		/* fixes345: radial size + position prefix capture. */
+		int32_t rad_data[4];
+		bool rad_data_set = false;
+		rad_data[0] = -1; rad_data[1] = -1;
+		rad_data[2] = -1; rad_data[3] = -1;
 		(void)is_linear;
 		parserutils_vector_iterate(vector, ctx);
 		consumeWhitespace(vector, ctx);
@@ -94,7 +99,11 @@ css_error css__parse_macsurf_gradient(css_language *c,
 		 * colour at the current position; if that fails, it's a
 		 * prefix -- skip tokens up to and including the first
 		 * top-level comma. If it succeeds, rewind so the main colour
-		 * loop sees the same token first. */
+		 * loop sees the same token first.
+		 *
+		 * fixes345: also try to extract `<W>px <H>px at <X>%
+		 * <Y>%,` and capture into rad_data so the painter can place
+		 * the gradient where the author intended. */
 		if (radial) {
 			int32_t probe_ctx = *ctx;
 			css_color probe_color = 0;
@@ -103,10 +112,127 @@ css_error css__parse_macsurf_gradient(css_language *c,
 					vector, &probe_ctx, &probe_type,
 					&probe_color);
 			if (probe_err != CSS_OK) {
-				/* Prefix present -- scan to first top-level
-				 * comma and consume it. Track paren depth so
-				 * nested function arguments don't confuse the
-				 * scan. */
+				/* Prefix present. Try to extract the
+				 * specific pattern `<W>px <H>px at <X>%
+				 * <Y>%,` first; on success rad_data_set
+				 * is true and we fall through to the
+				 * generic scan-to-comma to consume any
+				 * leftover tokens. */
+				int32_t before = *ctx;
+				int got = 0;
+				int captured[4] = {-1, -1, -1, -1};
+				int i;
+				for (i = 0; i < 4 && got == i; i++) {
+					const css_token *t =
+						parserutils_vector_peek(
+							vector, *ctx);
+					if (t == NULL) break;
+					if (t->type == CSS_TOKEN_DIMENSION &&
+					    i < 2) {
+						const char *d = lwc_string_data(
+								t->idata);
+						size_t dl = lwc_string_length(
+								t->idata);
+						/* Accept "Npx" only. */
+						if (dl >= 3 &&
+						    (d[dl-2]=='p'||d[dl-2]=='P') &&
+						    (d[dl-1]=='x'||d[dl-1]=='X')) {
+							int val = 0;
+							size_t j;
+							int seen = 0;
+							for (j = 0; j < dl - 2;
+								j++) {
+								char ch = d[j];
+								if (ch >= '0' &&
+								    ch <= '9') {
+									val = val*10 + (ch-'0');
+									seen = 1;
+								} else break;
+							}
+							if (seen) {
+								captured[i] = val;
+								got++;
+								parserutils_vector_iterate(
+									vector, ctx);
+								consumeWhitespace(
+									vector, ctx);
+								continue;
+							}
+						}
+						break;
+					}
+					if (i == 2) {
+						/* Expecting `at` ident. */
+						if (t->type ==
+							CSS_TOKEN_IDENT) {
+							const char *d = lwc_string_data(
+								t->idata);
+							size_t dl = lwc_string_length(
+								t->idata);
+							if (dl == 2 &&
+							    (d[0]=='a'||d[0]=='A') &&
+							    (d[1]=='t'||d[1]=='T')) {
+								parserutils_vector_iterate(
+									vector, ctx);
+								consumeWhitespace(
+									vector, ctx);
+								/* don't bump got;
+								 * next iter
+								 * still i=2 */
+								continue;
+							}
+						}
+						break;
+					}
+					/* i==2 or 3: percent for position. */
+					if (t->type == CSS_TOKEN_PERCENTAGE) {
+						const char *d = lwc_string_data(
+								t->idata);
+						size_t dl = lwc_string_length(
+								t->idata);
+						int sign = 1;
+						int val = 0;
+						size_t j = 0;
+						int seen = 0;
+						if (dl > 0 && d[0] == '-') {
+							sign = -1; j = 1;
+						} else if (dl > 0 && d[0] == '+') {
+							j = 1;
+						}
+						for (; j < dl; j++) {
+							char ch = d[j];
+							if (ch >= '0' && ch <= '9') {
+								val = val*100 + (ch-'0')*100;
+								seen = 1;
+							} else break;
+						}
+						if (seen) {
+							captured[i] = sign * val;
+							got++;
+							parserutils_vector_iterate(
+								vector, ctx);
+							consumeWhitespace(
+								vector, ctx);
+							continue;
+						}
+						break;
+					}
+					break;
+				}
+				if (got >= 2) {
+					rad_data[0] = captured[0];
+					rad_data[1] = captured[1];
+					rad_data[2] = captured[2];
+					rad_data[3] = captured[3];
+					rad_data_set = true;
+				} else {
+					/* Pattern not matched, rewind for the
+					 * generic scan below. */
+					*ctx = before;
+				}
+				{
+				/* Generic: scan to first top-level comma
+				 * and consume it. */
 				int depth = 0;
 				while (1) {
 					token = parserutils_vector_peek(vector,
@@ -132,11 +258,13 @@ css_error css__parse_macsurf_gradient(css_language *c,
 					}
 					parserutils_vector_iterate(vector, ctx);
 				}
+				}
 			}
 			/* If colour probe succeeded, ctx is unchanged --
 			 * main loop will reparse the colour. */
 			consumeWhitespace(vector, ctx);
 		}
+		(void)rad_data; (void)rad_data_set;
 
 		/* Optional direction prefix: `to <side>` or `<angle>deg`.
 		 * Linear only — radial direction has already been consumed
@@ -309,6 +437,19 @@ css_error css__parse_macsurf_gradient(css_language *c,
 				CSS_PROP_MACSURF_GRADIENT, 0, set_value);
 		if (error != CSS_OK) return error;
 
+		/* fixes345 — radial-gradient bytecode is now extended with
+		 * a 5-slot tail: [rad_data_set_flag, sx, sy, px, py]. The
+		 * cascade reads those when set_value == 0x0100. Linear
+		 * bytecode is unchanged (2-slot c1, c2). */
+		if (set_value == 0x0100) {
+			return css__stylesheet_style_vappend(result, 7,
+					first_color, last_color,
+					(uint32_t)(rad_data_set ? 1 : 0),
+					(uint32_t)rad_data[0],
+					(uint32_t)rad_data[1],
+					(uint32_t)rad_data[2],
+					(uint32_t)rad_data[3]);
+		}
 		return css__stylesheet_style_vappend(result, 2,
 				first_color, last_color);
 	}

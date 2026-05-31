@@ -431,6 +431,21 @@ struct css_computed_style {
 	 * stale CW8 .o files don't shift (per the
 	 * project_libcss_struct_mid_insert_crash memory note). */
 	css_color *macsurf_gradient_full;
+
+	/* fixes345: heap-allocated 4-int array carrying the radial-
+	 * gradient size + position prefix the parser extracted from
+	 * `radial-gradient(<W>px <H>px at <X>% <Y>%, ...)`. Format:
+	 *   [0] size_x in px (-1 = unset / use bounding-rect width)
+	 *   [1] size_y in px (-1 = unset / use bounding-rect height)
+	 *   [2] pos_x percent × 100 (e.g. 78% = 7800; -1 = center)
+	 *   [3] pos_y percent × 100 (e.g. -4% = -400; -1 = center)
+	 *
+	 * NULL when the radial-gradient had no size or position prefix
+	 * (then painter falls back to centered, fill-bounding-rect).
+	 * Compared in arena.c via arena__compare_macsurf_gradient_radial;
+	 * lifetime owned by this style's destroy path. Appended at end
+	 * per the same struct-mid-insert gotcha as macsurf_gradient_full. */
+	int32_t *macsurf_gradient_radial;
 };
 
 #endif

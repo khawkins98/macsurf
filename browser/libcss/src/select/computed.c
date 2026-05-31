@@ -213,6 +213,12 @@ css_error css_computed_style_destroy(css_computed_style *style)
 		style->macsurf_gradient_full = NULL;
 	}
 
+	/* fixes345: free heap-allocated radial-position array. */
+	if (style->macsurf_gradient_radial != NULL) {
+		free(style->macsurf_gradient_radial);
+		style->macsurf_gradient_radial = NULL;
+	}
+
 	lwc_string_unref(style->i.list_style_image);
 	lwc_string_unref(style->i.background_image);
 
@@ -524,6 +530,17 @@ const css_color *css_computed_macsurf_gradient_full(
 		const css_computed_style *style)
 {
 	return style->macsurf_gradient_full;
+}
+
+/* fixes345: accessor for the radial-gradient size + position prefix.
+ * Returns NULL when the rule had no explicit size/position (painter
+ * falls back to centered, fill-bounding-rect). When non-NULL, the
+ * 4-int array is [size_x_px, size_y_px, pos_x_pct_x100, pos_y_pct_x100]
+ * with -1 sentinels for any field that wasn't supplied. */
+const int32_t *css_computed_macsurf_gradient_radial(
+		const css_computed_style *style)
+{
+	return style->macsurf_gradient_radial;
 }
 
 uint8_t css_computed_macsurf_grid_col_span(

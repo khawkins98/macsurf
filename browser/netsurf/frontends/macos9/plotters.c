@@ -871,11 +871,37 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 		long height;
 		long rings = 24;
 		long i;
+		Rect grad_rect;
 		macos9_colour_to_rgb(pstyle->fill_colour,  &c1);
 		macos9_colour_to_rgb(pstyle->fill_colour2, &c2);
 		saved_clip = macos9_push_clip();
-		width  = (long)(r.right - r.left);
-		height = (long)(r.bottom - r.top);
+		grad_rect = r;
+		/* fixes345 — when the rule carried a size+position prefix
+		 * (radial_set true), build a smaller grad_rect centered at
+		 * the requested position so the rings draw at the author's
+		 * intended location instead of filling the whole bounding
+		 * rect. The original `r` is still used for the c2 fill so
+		 * the rest of the element gets the edge colour. */
+		if (pstyle->radial_set) {
+			long box_w = (long)(r.right - r.left);
+			long box_h = (long)(r.bottom - r.top);
+			long sx = (pstyle->radial_sx >= 0) ?
+				(long)pstyle->radial_sx : box_w;
+			long sy = (pstyle->radial_sy >= 0) ?
+				(long)pstyle->radial_sy : box_h;
+			long cx_pct = (pstyle->radial_px >= -10000) ?
+				(long)pstyle->radial_px : 5000;
+			long cy_pct = (pstyle->radial_py >= -10000) ?
+				(long)pstyle->radial_py : 5000;
+			long cx = r.left + (box_w * cx_pct) / 10000;
+			long cy = r.top  + (box_h * cy_pct) / 10000;
+			grad_rect.left   = (short)(cx - sx);
+			grad_rect.right  = (short)(cx + sx);
+			grad_rect.top    = (short)(cy - sy);
+			grad_rect.bottom = (short)(cy + sy);
+		}
+		width  = (long)(grad_rect.right - grad_rect.left);
+		height = (long)(grad_rect.bottom - grad_rect.top);
 		if (width < 2 || height < 2) {
 			RGBForeColor(&c2);
 			PaintRect(&r);
@@ -894,10 +920,14 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 				long inset_y = (height * i) / (rings * 2);
 				long t = (i * 256L) / (rings - 1);  /* 0..256 */
 				long inv = 256L - t;
-				ring.left   = (short)(r.left   + inset_x);
-				ring.right  = (short)(r.right  - inset_x);
-				ring.top    = (short)(r.top    + inset_y);
-				ring.bottom = (short)(r.bottom - inset_y);
+				/* fixes345 — when radial_set, rings inset from
+				 * grad_rect (the author-placed ellipse). When
+				 * not set, rings inset from r (existing
+				 * behaviour: fill bounding rect). */
+				ring.left   = (short)(grad_rect.left   + inset_x);
+				ring.right  = (short)(grad_rect.right  - inset_x);
+				ring.top    = (short)(grad_rect.top    + inset_y);
+				ring.bottom = (short)(grad_rect.bottom - inset_y);
 				if (ring.right - ring.left < 1 ||
 				    ring.bottom - ring.top < 1) break;
 				cur.red   = (unsigned short)
