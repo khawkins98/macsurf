@@ -378,6 +378,48 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "location");
 	}
 
+	/* fixes350 (#118) — add the rest of the Location interface
+	 * properties (protocol, host, hostname, port, pathname, search,
+	 * hash, origin) by URL-parsing the href getter. Implemented in JS
+	 * because the existing href C-getter already routes through the
+	 * bw and we want every read to reflect the LIVE current URL. */
+	macsurf_js__safe_eval(ctx,
+		"(function(){"
+		"  if(typeof location==='undefined')return;"
+		"  function parse(){"
+		"    var s=location.href||'';"
+		"    var p={protocol:'',host:'',hostname:'',port:'',"
+		"           pathname:'',search:'',hash:'',origin:''};"
+		"    var hi=s.indexOf('#');"
+		"    if(hi>=0){p.hash=s.substring(hi);s=s.substring(0,hi);}"
+		"    var qi=s.indexOf('?');"
+		"    if(qi>=0){p.search=s.substring(qi);s=s.substring(0,qi);}"
+		"    var ci=s.indexOf('://');"
+		"    var rest=s;"
+		"    if(ci>=0){p.protocol=s.substring(0,ci)+':';rest=s.substring(ci+3);}"
+		"    var pi=rest.indexOf('/');"
+		"    var authority=pi>=0?rest.substring(0,pi):rest;"
+		"    p.pathname=pi>=0?rest.substring(pi):'/';"
+		"    p.host=authority;"
+		"    var coli=authority.indexOf(':');"
+		"    if(coli>=0){p.hostname=authority.substring(0,coli);"
+		"      p.port=authority.substring(coli+1);}"
+		"    else{p.hostname=authority;}"
+		"    p.origin=p.protocol+'//'+p.host;"
+		"    return p;"
+		"  }"
+		"  ['protocol','host','hostname','port','pathname','search',"
+		"   'hash','origin'].forEach(function(k){"
+		"    Object.defineProperty(location,k,{"
+		"      get:function(){return parse()[k];},"
+		"      configurable:true"
+		"    });"
+		"  });"
+		"  location.assign=location.assign||function(u){location.href=u;};"
+		"  location.replace=location.replace||function(u){location.href=u;};"
+		"  location.toString=location.toString||function(){return location.href;};"
+		"})();");
+
 	/* fixes339 — Event + CustomEvent constructors. Common pattern is
 	 * `new Event('click')` or `new CustomEvent('foo', {detail:bar})`.
 	 * Required by many scripts for dispatchEvent. */
@@ -732,7 +774,12 @@ static void register_browser_globals(duk_context *ctx)
 		"}).call(this);");
 
 	/* fixes324 (#118) — window.history. back / forward go through
-	 * the same gui_window list as macos9_window_back / _forward. */
+	 * the same gui_window list as macos9_window_back / _forward.
+	 * fixes350 (#122) — add pushState / replaceState / state stubs so
+	 * SPA libraries that feature-detect them stop bailing. We don't
+	 * yet have a real session-history model to update so they're
+	 * no-ops; if/when a router actually drives navigation through
+	 * them we'll route the URL to location.assign. */
 	{
 		extern duk_ret_t macsurf_js_history_back(duk_context *duk);
 		extern duk_ret_t macsurf_js_history_forward(duk_context *duk);
@@ -749,6 +796,27 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "length");
 		duk_put_prop_string(ctx, -2, "history");
 	}
+	/* fixes350 (#122) — pushState / replaceState / state on history.
+	 * Done in JS so the closure can capture the latest state object
+	 * across calls without C-side storage. */
+	macsurf_js__safe_eval(ctx,
+		"(function(){"
+		"  if(typeof history==='undefined')return;"
+		"  var _state=null;"
+		"  history.pushState=history.pushState||function(s,t,u){"
+		"    _state=s;"
+		"    if(u&&typeof location!=='undefined')location.href=u;"
+		"  };"
+		"  history.replaceState=history.replaceState||function(s,t,u){"
+		"    _state=s;"
+		"    if(u&&typeof location!=='undefined')location.href=u;"
+		"  };"
+		"  Object.defineProperty(history,'state',{"
+		"    get:function(){return _state;},"
+		"    configurable:true"
+		"  });"
+		"  history.scrollRestoration=history.scrollRestoration||'auto';"
+		"})();");
 
 	/* navigator */
 	duk_push_object(ctx);
@@ -1166,23 +1234,55 @@ unsigned char js_fire_event(struct jsthread *thread, const char *type,
 		(void)macsurf_js_dispatch_event(&jc,
 			(struct dom_element *)target, type);
 	} else {
-		/* window-level: look for window.on<type> and call it. */
+		/* window-level: dispatch listeners registered via
+		 * window.addEventListener (stored in window._winListeners by
+		 * fixes338) AND any window.on<type> handler. fixes350 (#31):
+		 * pre-fix this branch only invoked the inline on<type>
+		 * handler, so listeners attached via addEventListener never
+		 * saw 'load' / 'DOMContentLoaded' / etc. and the J8 probe
+		 * stayed red. */
 		char buf[64];
 		size_t tl = strlen(type);
+		duk_context *dctx = thread->ctx;
+		duk_push_global_object(dctx);
+		/* (a) walk _winListeners[type] if present. */
+		if (duk_get_prop_string(dctx, -1, "_winListeners") != 0 &&
+		    duk_is_object(dctx, -1)) {
+			if (duk_get_prop_string(dctx, -1, type) != 0 &&
+			    duk_is_array(dctx, -1)) {
+				duk_size_t n = duk_get_length(dctx, -1);
+				duk_size_t i;
+				for (i = 0; i < n; i++) {
+					duk_get_prop_index(dctx, -1,
+						(duk_uarridx_t)i);
+					if (duk_is_callable(dctx, -1)) {
+						if (duk_pcall(dctx, 0) != 0) {
+							MS_LOG(
+							  duk_safe_to_string(
+							    dctx, -1));
+						}
+					}
+					duk_pop(dctx);
+				}
+			}
+			duk_pop(dctx); /* array (or undef) */
+		}
+		duk_pop(dctx); /* _winListeners (or undef) */
+		/* (b) inline window.on<type>. */
 		if (tl + 2 < sizeof buf) {
 			buf[0] = 'o'; buf[1] = 'n';
 			memcpy(buf + 2, type, tl);
 			buf[2 + tl] = '\0';
-			duk_push_global_object(thread->ctx);
-			if (duk_get_prop_string(thread->ctx, -1, buf) != 0 &&
-			    duk_is_callable(thread->ctx, -1)) {
-				if (duk_pcall(thread->ctx, 0) != 0) {
+			if (duk_get_prop_string(dctx, -1, buf) != 0 &&
+			    duk_is_callable(dctx, -1)) {
+				if (duk_pcall(dctx, 0) != 0) {
 					MS_LOG(duk_safe_to_string(
-						thread->ctx, -1));
+						dctx, -1));
 				}
 			}
-			duk_pop_2(thread->ctx);
+			duk_pop(dctx); /* fn (or undef) */
 		}
+		duk_pop(dctx); /* global */
 	}
 	return 1;
 }
