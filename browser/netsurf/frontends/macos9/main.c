@@ -551,6 +551,20 @@ void macos9_handle_mouse_down(const EventRecord *event) {
 							browser_window_mouse_click(gw->bw,
 								BROWSER_MOUSE_CLICK_1 | mods,
 								rx_ns, ry_ns);
+							/* fixes320 — dispatch inline onclick="..."
+							 * attribute handler to the JS bridge.
+							 * NetSurf core's interaction.c doesn't
+							 * fire DOM click events for generic
+							 * elements; we walk the box tree, find
+							 * the deepest element with an onclick
+							 * attribute, and peval it. */
+							{
+								extern bool macos9_dispatch_click_to_js(
+									struct browser_window *bw,
+									int x_ns, int y_ns);
+								(void)macos9_dispatch_click_to_js(
+									gw->bw, rx_ns, ry_ns);
+							}
 						} else {
 							macos9_window_te_deactivate_url(gw);
 						}
@@ -832,6 +846,11 @@ int main(void) {
 	nsoption_set_bool(background_images, true);
 	/* Enable author CSS so inline <style>/<link> rules apply. */
 	nsoption_set_bool(author_level_css, true);
+	/* fixes319 (#115-#121) — turn on inline <script> execution. Defaults
+	 * to false in NetSurf core; without this, the Duktape bridge that
+	 * fixes316 wired up is dead-code from NetSurf's perspective because
+	 * html_script_exec returns early without ever calling js_exec. */
+	nsoption_set_bool(enable_javascript, true);
 	/* fixes91: raise concurrent-fetch caps. NetSurf defaults are
 	 * max_fetchers=24 / max_fetchers_per_host=5. With our HTTP fetcher's
 	 * MFS_INIT-at-setup state-machine, slots stay non-IDLE past the

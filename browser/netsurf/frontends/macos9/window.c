@@ -166,6 +166,9 @@ static Rect macos9_active_favicon_src_rect;
 
 struct gui_window *macos9_find_window(WindowRef w) { struct gui_window *g; for(g=window_list;g;g=g->next) if(g->window==w) return g; return NULL; }
 struct gui_window *macos9_window_list_head(void) { return window_list; }
+/* fixes320j — accessor so the JS bridge can reach bw to schedule
+ * a reformat after JS DOM mutation. */
+struct browser_window *macos9_gw_bw(struct gui_window *g) { return g ? g->bw : NULL; }
 static void set_status_text(struct gui_window *g, const char *m) { if(!m) g->status[0]=0; else { strncpy(g->status,m,127); g->status[127]=0; } }
 /* fixes294 — shift TE field's left by +20 to leave room for the favicon. */
 /* fixes302 — TextEdit rect inside the url field.
@@ -731,23 +734,55 @@ static nserror macos9_gw_event(struct gui_window *g, enum gui_window_event e) {
 	}
 	return 0;
 }
-static void macos9_gw_set_title(struct gui_window *g, const char *t) {
+/* fixes320h — when JS sets document.title, NetSurf core's reformat
+ * pipeline calls our set_title vtable entry shortly after with the
+ * HTML <title> value, overwriting the JS-set title and producing the
+ * "title flashes for a split second and resets" symptom.
+ *
+ * Lock the title once JS sets it. The vtable entry checks this flag
+ * and skips its SetWTitle when JS has claimed the title. The lock
+ * stays for the rest of the document's lifetime; navigation clears
+ * it (see macos9_gw_set_url below). */
+static int g_title_locked_by_js = 0;
+
+void macos9_gw_set_title_unlock(void) { g_title_locked_by_js = 0; }
+
+static void macos9__set_title_impl(struct gui_window *g, const char *t) {
 	Str255 p;
 	size_t in_l;
 	size_t out_l;
 	char mac_buf[256];
 	if (!g || !g->window || !t) return;
 	in_l = strlen(t);
-	/* fixes219 — NetSurf hands us UTF-8; SetWTitle wants MacRoman.
-	 * Without the conversion en-dashes, smart quotes, etc. land as
-	 * mojibake in the title bar (",A," instead of "–"). */
 	out_l = macos9_utf8_to_macroman(t, in_l, mac_buf, sizeof mac_buf);
 	if (out_l > 255) out_l = 255;
 	p[0] = (unsigned char)out_l;
 	memcpy(p + 1, mac_buf, out_l);
 	SetWTitle(g->window, p);
 }
-static nserror macos9_gw_set_url(struct gui_window *g, struct nsurl *u) { const char *s; if(g&&u&&g->url_te&&(s=nsurl_access(u))) set_url_te_text(g,s); return 0; }
+
+/* fixes319 — non-static so the JS bridge can drive document.title from
+ * scripts. Vtable entry path: respects the JS lock. */
+void macos9_gw_set_title(struct gui_window *g, const char *t) {
+	if (g_title_locked_by_js) return;
+	macos9__set_title_impl(g, t);
+}
+
+/* fixes320h — separate entry for the JS bridge so it can claim the
+ * title without going through the locked vtable path. Sets the lock
+ * before applying so subsequent NetSurf core calls are no-ops. */
+void macos9_gw_set_title_from_js(struct gui_window *g, const char *t) {
+	g_title_locked_by_js = 1;
+	macos9__set_title_impl(g, t);
+}
+static nserror macos9_gw_set_url(struct gui_window *g, struct nsurl *u) {
+	const char *s;
+	/* fixes320h — navigation releases the JS title lock so the new
+	 * page's HTML <title> applies through the normal vtable path. */
+	g_title_locked_by_js = 0;
+	if(g&&u&&g->url_te&&(s=nsurl_access(u))) set_url_te_text(g,s);
+	return 0;
+}
 static void macos9_gw_set_status(struct gui_window *g, const char *t) {
 	/* fixes109 — dedupe. NetSurf core fires set_status on every fetch
 	 * progress callback, every hover, every link-tracking transition.
