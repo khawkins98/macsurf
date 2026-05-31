@@ -125,6 +125,50 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 			advance_bytecode(style, sizeof(css_color));
 			packed = macsurf_gradient_pack(c1, c2, horizontal,
 					false);
+			/* fixes348 — alpha-aware downgrade.
+			 *
+			 * The gradient painter in plotters.c ignores alpha
+			 * (it interpolates RGB only). When the source CSS is
+			 * a pinstripe / overlay like
+			 *   linear-gradient(rgba(255,255,255,.5) 1px,
+			 *                   transparent 1px)
+			 * (mactrove's platinum.css line 39-40), c1's alpha is
+			 * 0x7F-0x80 and c2's alpha is 0x00. Painted opaquely
+			 * this becomes a HARSH BLACK-TO-WHITE gradient because
+			 * transparent's rgb is 0x000000 and the white stop's
+			 * rgb is 0xFFFFFF — exactly the black-to-white box
+			 * artefact users see "where images should be".
+			 *
+			 * Until the painter learns to alpha-composite over the
+			 * page background, the correct visual answer is to
+			 * SKIP these gradients entirely so the underlying
+			 * background-color (Platinum-grey for mactrove) shows
+			 * through. Conditions for skip:
+			 *
+			 *   - either stop has alpha < 0xC0 (less than ~75%
+			 *     opaque). Authors don't write decorative semi-
+			 *     transparent gradients expecting them to render
+			 *     as opaque; if they wanted opaque they'd write
+			 *     opaque colours.
+			 *
+			 *   - OR both stops have alpha < 0xFF and one is fully
+			 *     transparent (alpha = 0) — the classic pinstripe
+			 *     overlay shape.
+			 *
+			 * Fully-opaque gradients are unaffected; this only
+			 * intercepts the alpha-overlay class. */
+			{
+				uint8_t a1 = (uint8_t)((c1 >> 24) & 0xff);
+				uint8_t a2 = (uint8_t)((c2 >> 24) & 0xff);
+				bool drop = false;
+				if (a1 < 0xC0 || a2 < 0xC0) drop = true;
+				if ((a1 < 0xFF && a2 == 0) ||
+				    (a2 < 0xFF && a1 == 0)) drop = true;
+				if (drop) {
+					value = CSS_MACSURF_GRADIENT_NONE;
+					packed = 0;
+				}
+			}
 #ifdef MACSURF_DEBUG
 			/* fixes318 (#147) probe — log raw bytecode values so
 			 * we can see on hardware whether c1 / c2 actually
@@ -135,9 +179,10 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 				extern void macsurf_debug_log_writef(
 					const char *fmt, ...);
 				macsurf_debug_log_writef(
-					"grad cascade: opv=%ld c1=%ld c2=%ld packed=%ld h=%d",
+					"grad cascade: opv=%ld c1=%ld c2=%ld packed=%ld h=%d val=%d",
 					(long)opv, (long)c1, (long)c2,
-					(long)packed, horizontal ? 1 : 0);
+					(long)packed, horizontal ? 1 : 0,
+					(int)value);
 			}
 #endif
 			break;

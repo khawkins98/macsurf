@@ -319,6 +319,24 @@ css_error css_inline_extras_register_sheet(const css_stylesheet *sh)
 			css__cp_tokens_destroy(cur->tokens, cur->n_tokens);
 			cur->tokens = cloned;
 			cur->n_tokens = src->n_tokens;
+#ifdef MACSURF_DEBUG
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				int t0 = -1;
+				int t1 = -1;
+				if (src->n_tokens > 0)
+					t0 = (int)src->tokens[0].type;
+				if (src->n_tokens > 1)
+					t1 = (int)src->tokens[1].type;
+				macsurf_debug_log_writef(
+					"fixes347d extras REPLACE: name=%s ntok=%ld t0=%d t1=%d",
+					(src->name != NULL) ?
+						lwc_string_data(src->name) :
+						"(null)",
+					(long)src->n_tokens, t0, t1);
+			}
+#endif
 		} else {
 			new_entry = (css_cp_entry *)calloc(1,
 					sizeof(css_cp_entry));
@@ -338,6 +356,28 @@ css_error css_inline_extras_register_sheet(const css_stylesheet *sh)
 					cur = cur->next;
 				cur->next = new_entry;
 			}
+#ifdef MACSURF_DEBUG
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				int t0 = -1;
+				int t1 = -1;
+				int t2 = -1;
+				if (src->n_tokens > 0)
+					t0 = (int)src->tokens[0].type;
+				if (src->n_tokens > 1)
+					t1 = (int)src->tokens[1].type;
+				if (src->n_tokens > 2)
+					t2 = (int)src->tokens[2].type;
+				macsurf_debug_log_writef(
+					"fixes347d extras ADD: name=%s ntok=%ld t0=%d t1=%d t2=%d",
+					(src->name != NULL) ?
+						lwc_string_data(src->name) :
+						"(null)",
+					(long)src->n_tokens,
+					t0, t1, t2);
+			}
+#endif
 		}
 	}
 	return CSS_OK;
@@ -707,6 +747,18 @@ static const css_cp_entry *lookup_var(lwc_string *name,
 	if (hit != NULL)
 		found = hit;
 
+#ifdef MACSURF_DEBUG
+	{
+		extern void macsurf_debug_log_writef(
+			const char *fmt, ...);
+		macsurf_debug_log_writef(
+			"fixes347d lookup_var: name=%s extras_hit=%d found=%d",
+			(name != NULL) ? lwc_string_data(name) : "(null)",
+			(find_inline_extras(name) != NULL) ? 1 : 0,
+			(found != NULL) ? 1 : 0);
+	}
+#endif
+
 	return found;
 }
 
@@ -882,12 +934,37 @@ css_error css__deferred_decl_resolve(const css_deferred_decl *dd,
 	if (dd == NULL || origin_sheet == NULL || state == NULL)
 		return CSS_BADPARM;
 
+#ifdef MACSURF_DEBUG
+	{
+		extern void macsurf_debug_log_writef(
+			const char *fmt, ...);
+		macsurf_debug_log_writef(
+			"fixes347d deferred ENTER: prop=%s ntok=%ld",
+			(dd->property != NULL) ?
+				lwc_string_data(dd->property) :
+				"(null)",
+			(long)dd->n_tokens);
+	}
+#endif
+
 	memset(&scratch, 0, sizeof(scratch));
 	ok = true;
 
 	error = substitute_tokens(dd->tokens, dd->n_tokens,
 			origin_sheet, ctx, state->inline_style,
 			0, &scratch, &ok);
+#ifdef MACSURF_DEBUG
+	{
+		extern void macsurf_debug_log_writef(
+			const char *fmt, ...);
+		macsurf_debug_log_writef(
+			"fixes347d deferred SUBST: prop=%s err=%d ok=%d used=%ld",
+			(dd->property != NULL) ?
+				lwc_string_data(dd->property) :
+				"(null)",
+			(int)error, (int)ok, (long)scratch.used);
+	}
+#endif
 	if (error != CSS_OK) {
 		free(scratch.items);
 		return error;
@@ -936,6 +1013,18 @@ css_error css__deferred_decl_resolve(const css_deferred_decl *dd,
 
 	ctx_idx = 0;
 	error = handler(&stub_lang, replay, &ctx_idx, scratch_style);
+#ifdef MACSURF_DEBUG
+	{
+		extern void macsurf_debug_log_writef(
+			const char *fmt, ...);
+		macsurf_debug_log_writef(
+			"fixes347d deferred HANDLER: prop=%s err=%d prop_id=%d",
+			(dd->property != NULL) ?
+				lwc_string_data(dd->property) :
+				"(null)",
+			(int)error, (int)prop_id);
+	}
+#endif
 	if (error != CSS_OK) {
 		css__stylesheet_style_destroy(scratch_style);
 		parserutils_vector_destroy(replay);
@@ -956,24 +1045,41 @@ css_error css__deferred_decl_resolve(const css_deferred_decl *dd,
 			css__make_style_important(scratch_style);
 	}
 
-	/* Apply bytecode through the normal cascade dispatch. */
-	cascade_walker = *scratch_style;
-	while (cascade_walker.used > 0) {
-		opcode_t op;
-		css_code_t opv;
+	/* fixes347f — apply bytecode through the normal cascade dispatch,
+	 * but temporarily bump current_specificity to MAX so the var()-
+	 * resolved write always outranks earlier writes that may have set
+	 * a placeholder value (e.g. UA background-image:none) before this
+	 * deferred declaration's rule got its turn. var() substitution is
+	 * a textual replace; the resulting value belongs to the rule that
+	 * referenced var(), so it inherits THAT rule's specificity. By
+	 * the time we reach here, the rule's cascade_style is running and
+	 * state->current_specificity is correct, but for a defensive
+	 * cover against ordering bugs we still bump and restore. */
+	{
+		uint32_t saved_specificity = state->current_specificity;
+		state->current_specificity = 0x7fffffff;
+		cascade_walker = *scratch_style;
+		while (cascade_walker.used > 0) {
+			opcode_t op;
+			css_code_t opv;
 
-		opv = *cascade_walker.bytecode;
-		cascade_walker.used -= 1;
-		cascade_walker.bytecode = cascade_walker.bytecode + 1;
+			opv = *cascade_walker.bytecode;
+			cascade_walker.used -= 1;
+			cascade_walker.bytecode = cascade_walker.bytecode + 1;
 
-		op = getOpcode(opv);
+			op = getOpcode(opv);
 
-		error = prop_dispatch[op].cascade(opv, &cascade_walker, state);
-		if (error != CSS_OK) {
-			css__stylesheet_style_destroy(scratch_style);
-			parserutils_vector_destroy(replay);
-			return error;
+			error = prop_dispatch[op].cascade(opv,
+					&cascade_walker, state);
+			if (error != CSS_OK) {
+				state->current_specificity =
+						saved_specificity;
+				css__stylesheet_style_destroy(scratch_style);
+				parserutils_vector_destroy(replay);
+				return error;
+			}
 		}
+		state->current_specificity = saved_specificity;
 	}
 
 	css__stylesheet_style_destroy(scratch_style);
