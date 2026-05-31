@@ -75,6 +75,16 @@ static inline bool arena__compare_grid_tracks(
 	return memcmp(a, b, 8 * sizeof(int32_t)) == 0;
 }
 
+/* fixes344b: compare two 2-element css_color gradient-stop arrays
+ * (8 bytes each). */
+static inline bool arena__compare_macsurf_gradient_full(
+		const css_color *a, const css_color *b)
+{
+	if (a == NULL && b == NULL) return true;
+	if (a == NULL || b == NULL) return false;
+	return memcmp(a, b, 2 * sizeof(css_color)) == 0;
+}
+
 static inline bool arena__compare_string_list(
 		lwc_string **a,
 		lwc_string **b)
@@ -147,6 +157,12 @@ static inline bool css__arena_style_is_equal(
 	if (!arena__compare_grid_tracks(
 			a->macsurf_grid_row_tracks,
 			b->macsurf_grid_row_tracks)) {
+		return false;
+	}
+
+	if (!arena__compare_macsurf_gradient_full(
+			a->macsurf_gradient_full,
+			b->macsurf_gradient_full)) {
 		return false;
 	}
 

@@ -207,6 +207,12 @@ css_error css_computed_style_destroy(css_computed_style *style)
 		style->macsurf_grid_row_tracks = NULL;
 	}
 
+	/* fixes344b: free heap-allocated gradient full-stop array. */
+	if (style->macsurf_gradient_full != NULL) {
+		free(style->macsurf_gradient_full);
+		style->macsurf_gradient_full = NULL;
+	}
+
 	lwc_string_unref(style->i.list_style_image);
 	lwc_string_unref(style->i.background_image);
 
@@ -506,6 +512,18 @@ const int32_t *css_computed_macsurf_grid_row_tracks(
 		const css_computed_style *style)
 {
 	return style->macsurf_grid_row_tracks;
+}
+
+/* fixes344b: accessor for the full-ARGB gradient stops. Returns NULL
+ * when the gradient is unset or both stops are fully opaque; in that
+ * case the painter takes the fast RGB565-only path. When non-NULL,
+ * the array is [c1_full_ARGB, c2_full_ARGB]; the painter does per-
+ * pixel alpha blending using these values plus the underlying paint
+ * surface colour. */
+const css_color *css_computed_macsurf_gradient_full(
+		const css_computed_style *style)
+{
+	return style->macsurf_gradient_full;
 }
 
 uint8_t css_computed_macsurf_grid_col_span(

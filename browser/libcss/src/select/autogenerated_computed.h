@@ -412,6 +412,17 @@ struct css_computed_style {
 	 * via arena__compare_grid_row_tracks. */
 	int32_t *macsurf_grid_row_tracks;
 
+	/* fixes344b: heap-allocated 2-element css_color array carrying
+	 * full ARGB for the gradient stops [c1, c2]. The packed int32
+	 * in `_i.macsurf_gradient` stays RGB565+R4G6B4 for the existing
+	 * painter's fast path; this side-channel preserves alpha so the
+	 * plotter can do real per-pixel alpha blending when the rule
+	 * uses rgba(...) or `transparent` stops. NULL when the gradient
+	 * is unset or both stops are fully opaque. Compared via raw
+	 * memcmp of 8 bytes in arena__compare_macsurf_gradient_full;
+	 * lifetime owned by this style's destroy path. */
+	css_color *macsurf_gradient_full;
+
 	struct css_computed_style *next;
 	uint32_t count;
 	uint32_t bin;

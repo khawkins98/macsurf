@@ -222,6 +222,15 @@ const int32_t *css_computed_macsurf_grid_tracks(
 const int32_t *css_computed_macsurf_grid_row_tracks(
 		const css_computed_style *style);
 
+/* fixes344b: returns a pointer to a 2-element css_color array carrying
+ * full ARGB for the gradient's two stops, or NULL when both stops are
+ * fully opaque (the painter falls back to the existing RGB565+R4G6B4
+ * unpack path in that case). When non-NULL, format is [c1, c2] with
+ * alpha in the high byte of each. Used by the gradient plotter to do
+ * per-pixel alpha blending against the underlying surface. */
+const css_color *css_computed_macsurf_gradient_full(
+		const css_computed_style *style);
+
 /* fixes151: -macsurf-grid-col-span as a uint8_t. 0 = unset (caller
  * treats as 1). 1..254 = literal span count. 255 = "fill the
  * remainder of the row" sentinel (from `grid-column: 1 / -1`-style

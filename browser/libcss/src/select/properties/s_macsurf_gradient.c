@@ -5,6 +5,9 @@
  * Copyright 2025 Gemini CLI
  */
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "bytecode/bytecode.h"
 #include "bytecode/opcodes.h"
 #include "select/propset.h"
@@ -112,6 +115,35 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
+		/* fixes344b — capture the full ARGB of both stops into the
+		 * outer struct's macsurf_gradient_full side-channel so the
+		 * painter can do per-pixel alpha blending. Only allocates
+		 * when at least one stop is non-opaque (alpha < 0xFF);
+		 * fully-opaque gradients take the fast existing path with
+		 * full == NULL. */
+		if (value == CSS_MACSURF_GRADIENT_SET) {
+			uint8_t a1 = (uint8_t)((c1 >> 24) & 0xff);
+			uint8_t a2 = (uint8_t)((c2 >> 24) & 0xff);
+			if (a1 != 0xff || a2 != 0xff) {
+				css_color *full = (css_color *)malloc(
+					2 * sizeof(css_color));
+				if (full != NULL) {
+					full[0] = c1;
+					full[1] = c2;
+					if (state->computed->macsurf_gradient_full
+							!= NULL) {
+						free(state->computed->macsurf_gradient_full);
+					}
+					state->computed->macsurf_gradient_full = full;
+				}
+			} else {
+				if (state->computed->macsurf_gradient_full
+						!= NULL) {
+					free(state->computed->macsurf_gradient_full);
+					state->computed->macsurf_gradient_full = NULL;
+				}
+			}
+		}
 		return set_macsurf_gradient(state->computed, value,
 				(int32_t)packed);
 	}
@@ -136,12 +168,30 @@ css_error css__copy_macsurf_gradient(
 {
 	int32_t color = 0;
 	uint8_t type = get_macsurf_gradient(from, &color);
+	css_error err;
 
 	if (from == to) {
 		return CSS_OK;
 	}
 
-	return set_macsurf_gradient(to, type, (css_color)color);
+	err = set_macsurf_gradient(to, type, (css_color)color);
+	if (err != CSS_OK) return err;
+
+	/* fixes344b — also propagate the full-ARGB side-channel. */
+	if (to->macsurf_gradient_full != NULL) {
+		free(to->macsurf_gradient_full);
+		to->macsurf_gradient_full = NULL;
+	}
+	if (from->macsurf_gradient_full != NULL) {
+		css_color *copy = (css_color *)malloc(
+			2 * sizeof(css_color));
+		if (copy != NULL) {
+			memcpy(copy, from->macsurf_gradient_full,
+				2 * sizeof(css_color));
+			to->macsurf_gradient_full = copy;
+		}
+	}
+	return CSS_OK;
 }
 
 css_error css__compose_macsurf_gradient(const css_computed_style *parent,
