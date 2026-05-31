@@ -338,6 +338,60 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "clearInterval");
 	}
 
+	/* fixes322 (#122) — requestAnimationFrame. Falls back to
+	 * setTimeout(fn, 16) ≈ 60fps. cancelAnimationFrame is an alias
+	 * for clearTimeout since both share id space. */
+	{
+		extern duk_ret_t macsurf_js_settimeout(duk_context *duk);
+		extern duk_ret_t macsurf_js_cleartimeout(duk_context *duk);
+		duk_eval_string_noresult(ctx,
+			"function requestAnimationFrame(fn){"
+				"return setTimeout(fn,16);"
+			"}"
+			"function cancelAnimationFrame(id){"
+				"clearTimeout(id);"
+			"}");
+		(void)macsurf_js_settimeout; (void)macsurf_js_cleartimeout;
+	}
+
+	/* fixes323 (#117) — window.location. Read returns the current
+	 * URL via the bw stored in win_priv. Write triggers a navigation.
+	 * Reload via location.reload(). */
+	{
+		extern duk_ret_t macsurf_js_location_get(duk_context *duk);
+		extern duk_ret_t macsurf_js_location_set(duk_context *duk);
+		extern duk_ret_t macsurf_js_location_reload(duk_context *duk);
+		duk_push_object(ctx); /* location */
+		duk_push_string(ctx, "href");
+		duk_push_c_function(ctx, macsurf_js_location_get, 0);
+		duk_push_c_function(ctx, macsurf_js_location_set, 1);
+		duk_def_prop(ctx, -4,
+			DUK_DEFPROP_HAVE_GETTER | DUK_DEFPROP_HAVE_SETTER |
+			DUK_DEFPROP_SET_CONFIGURABLE);
+		duk_push_c_function(ctx, macsurf_js_location_reload, 0);
+		duk_put_prop_string(ctx, -2, "reload");
+		duk_put_prop_string(ctx, -2, "location");
+	}
+
+	/* fixes324 (#118) — window.history. back / forward go through
+	 * the same gui_window list as macos9_window_back / _forward. */
+	{
+		extern duk_ret_t macsurf_js_history_back(duk_context *duk);
+		extern duk_ret_t macsurf_js_history_forward(duk_context *duk);
+		extern duk_ret_t macsurf_js_history_go(duk_context *duk);
+		duk_push_object(ctx); /* history */
+		duk_push_c_function(ctx, macsurf_js_history_back, 0);
+		duk_put_prop_string(ctx, -2, "back");
+		duk_push_c_function(ctx, macsurf_js_history_forward, 0);
+		duk_put_prop_string(ctx, -2, "forward");
+		duk_push_c_function(ctx, macsurf_js_history_go, 1);
+		duk_put_prop_string(ctx, -2, "go");
+		duk_push_int(ctx, 0); /* length — placeholder until we
+		                        plumb history list size */
+		duk_put_prop_string(ctx, -2, "length");
+		duk_put_prop_string(ctx, -2, "history");
+	}
+
 	/* navigator */
 	duk_push_object(ctx);
 	duk_push_string(ctx, MACSURF_JS_UA);
@@ -448,6 +502,102 @@ static const char * const macsurf_js__content_types[] = {
 	"text/javascript",
 	"text/ecmascript"
 };
+
+/* fixes323/324 (#117 #118) — window.location and window.history
+ * native implementations. All route through the active gui_window's
+ * bw pointer via macos9_window_list_head(). */
+#ifdef __MACOS9__
+extern struct gui_window *macos9_window_list_head(void);
+extern struct browser_window *macos9_gw_bw(struct gui_window *g);
+extern void macos9_window_navigate(struct gui_window *g, const char *url);
+extern void macos9_window_back(struct gui_window *g);
+extern void macos9_window_forward(struct gui_window *g);
+extern void macos9_window_reload(struct gui_window *g);
+#endif
+
+duk_ret_t macsurf_js_location_get(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	struct gui_window *win = macos9_window_list_head();
+	struct browser_window *bw = win ? macos9_gw_bw(win) : NULL;
+	const char *href = "about:blank";
+	if (bw != NULL) {
+		extern struct nsurl *browser_window_access_url(
+			const struct browser_window *bw);
+		struct nsurl *u = browser_window_access_url(bw);
+		if (u != NULL) {
+			extern const char *nsurl_access(const struct nsurl *u);
+			const char *s = nsurl_access(u);
+			if (s != NULL) href = s;
+		}
+	}
+	duk_push_string(ctx, href);
+#else
+	duk_push_string(ctx, "about:blank");
+#endif
+	return 1;
+}
+
+duk_ret_t macsurf_js_location_set(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	const char *url = duk_safe_to_string(ctx, 0);
+	struct gui_window *win = macos9_window_list_head();
+	if (win != NULL && url != NULL) {
+		macos9_window_navigate(win, url);
+	}
+#else
+	(void)ctx;
+#endif
+	return 0;
+}
+
+duk_ret_t macsurf_js_location_reload(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	struct gui_window *win = macos9_window_list_head();
+	if (win != NULL) macos9_window_reload(win);
+#else
+	(void)ctx;
+#endif
+	return 0;
+}
+
+duk_ret_t macsurf_js_history_back(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	struct gui_window *win = macos9_window_list_head();
+	if (win != NULL) macos9_window_back(win);
+#else
+	(void)ctx;
+#endif
+	return 0;
+}
+
+duk_ret_t macsurf_js_history_forward(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	struct gui_window *win = macos9_window_list_head();
+	if (win != NULL) macos9_window_forward(win);
+#else
+	(void)ctx;
+#endif
+	return 0;
+}
+
+duk_ret_t macsurf_js_history_go(duk_context *ctx)
+{
+#ifdef __MACOS9__
+	int delta = duk_to_int(ctx, 0);
+	struct gui_window *win = macos9_window_list_head();
+	if (win == NULL) return 0;
+	while (delta < 0) { macos9_window_back(win); delta++; }
+	while (delta > 0) { macos9_window_forward(win); delta--; }
+#else
+	(void)ctx;
+#endif
+	return 0;
+}
 
 /* fixes321 (#103) — pump bridge. macos9_poll calls this every event
  * loop tick. Builds a temporary jscontext from global_heap and fires
