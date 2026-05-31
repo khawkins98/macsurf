@@ -182,6 +182,88 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 			DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE |
 			DUK_DEFPROP_HAVE_CONFIGURABLE | DUK_DEFPROP_CONFIGURABLE);
 
+	/* fixes337 — extra element methods commonly feature-detected:
+	 * getBoundingClientRect, scrollIntoView, focus, blur, click,
+	 * dispatchEvent, dataset. All V1 stubs returning sensible values.
+	 * Real impls queued for future rounds when the visual path
+	 * matters per-method. */
+	duk_eval_string_noresult(duk,
+		"(function(el){"
+		"  el.getBoundingClientRect=function(){"
+		"    return {top:0,left:0,right:0,bottom:0,width:0,height:0,x:0,y:0};"
+		"  };"
+		"  el.scrollIntoView=function(){};"
+		"  el.focus=function(){};"
+		"  el.blur=function(){};"
+		"  el.click=function(){"
+		"    var L=this.__listeners;if(L&&L.click)L.click.forEach(function(f){"
+		"      try{f.call(this);}catch(e){}"
+		"    });"
+		"  };"
+		"  el.dispatchEvent=function(ev){"
+		"    var t=ev&&ev.type||'';"
+		"    var L=this.__listeners;"
+		"    if(L&&L[t])L[t].forEach(function(f){try{f.call(this,ev);}catch(e){}});"
+		"    return true;"
+		"  };"
+		"  el.removeEventListener=function(t,fn){"
+		"    if(!this.__listeners||!this.__listeners[t])return;"
+		"    var arr=this.__listeners[t];"
+		"    for(var i=0;i<arr.length;i++)if(arr[i]===fn){arr.splice(i,1);return;}"
+		"  };"
+		"  el.dataset=el.dataset||{};"
+		"})");
+	duk_dup(duk, -2);
+	duk_call(duk, 1);
+	duk_pop(duk);
+
+	/* fixes336 — common element methods (matches, closest, children,
+	 * firstChild / lastChild / parentNode / nextSibling / cloneNode).
+	 * Currently all stubs except matches (uses getAttribute on the
+	 * wrapper to mock-check id / class / tag patterns). Stubs return
+	 * sensible defaults so feature-detection succeeds. */
+	duk_eval_string_noresult(duk,
+		"(function(el){"
+		"  el.matches=function(sel){"
+		"    if(!sel)return false;"
+		"    sel=String(sel).trim();"
+		"    if(sel.charAt(0)=='#'){"
+		"      return el.getAttribute('id')==sel.substr(1);"
+		"    }else if(sel.charAt(0)=='.'){"
+		"      var c=el.getAttribute('class')||'';"
+		"      var want=sel.substr(1);"
+		"      var ks=c.split(/\\s+/);"
+		"      for(var i=0;i<ks.length;i++)if(ks[i]==want)return true;"
+		"      return false;"
+		"    }else{"
+		"      var tn=el.tagName?el.tagName():'';"
+		"      return tn.toLowerCase()==sel.toLowerCase();"
+		"    }"
+		"  };"
+		"  el.closest=function(sel){"
+		"    var cur=el;"
+		"    while(cur){"
+		"      if(cur.matches&&cur.matches(sel))return cur;"
+		"      cur=cur.parentNode||null;"
+		"    }"
+		"    return null;"
+		"  };"
+		"  el.children=el.children||[];"
+		"  el.parentNode=el.parentNode||null;"
+		"  el.parentElement=el.parentElement||null;"
+		"  el.firstChild=el.firstChild||null;"
+		"  el.lastChild=el.lastChild||null;"
+		"  el.nextSibling=el.nextSibling||null;"
+		"  el.previousSibling=el.previousSibling||null;"
+		"  el.cloneNode=function(deep){return el;};"
+		"  el.contains=function(other){return other===el;};"
+		"  el.hasAttribute=function(name){return el.getAttribute(name)!==null;};"
+		"  el.removeAttribute=function(name){el.setAttribute(name,'');};"
+		"})");
+	duk_dup(duk, -2);
+	duk_call(duk, 1);
+	duk_pop(duk);
+
 	/* fixes326 (#30) — classList helper object. .add / .remove /
 	 * .toggle / .contains operate on the element's `class` attribute
 	 * via getAttribute / setAttribute. Implemented in JS so it's
