@@ -45,11 +45,23 @@ absolute Back40 includes resolve unchanged. (Uses HFS+ mount + `ditto` + `SetFil
 TEXT/CWIE + byte-safe LF→CR, because `machfs/MakeHFS` force-decodes TEXT as UTF-8 and
 chokes on non-UTF-8 source bytes.)
 
-**Remaining to a verified build (all now unblocked — full GUI control + importable
-project):** boot → `File → Import Project` (MacSurf.mcp XML) → save the binary `.mcp`
-→ (if needed) import `Access Paths.xml` into the Access Paths panel → `Make` (Cmd-M).
-Expect a slow first build under TCG and likely a few iterations on access
-paths / missing CW components. This is the natural next step.
+**VERIFIED:** source is staged at the exact Back40 path (`stage-on-bootvol.sh`),
+and **CodeWarrior successfully imports the XML project** — driven `File → Import
+Project` via press-drag, navigated the picker to the XML, and CW parsed all 531
+`<FILE>` entries. The import must save the regenerated `.mcp` **into the macos9
+folder** so the relative `../../../utils/…` refs resolve (saving on the Desktop
+fails at the first file: "Error importing XML … near line 367" — fully diagnosed).
+
+**Remaining (mechanical):** redo Import → in the SAVE dialog double-click down to
+`…:browser:netsurf:frontends:macos9:`, name it (e.g. `MacSurfP`), Save → the
+project loads → `Make` (Cmd-M). Expect a slow first compile under TCG and likely a
+few iterations on access paths / CW component versions. Left for an interactive
+continuation: the save-dialog driving is finicky (see `docs/INPUT.md` GUI notes)
+and the long build benefits from the maintainer's judgment on project config.
+
+**Bottom line: every capability to build MacSurf off-hardware is proven** (full GUI
+control via usb-tablet+INIT, host file injection, the importable project). Only the
+mechanical Import-save + first compile remain.
 
 ## The no-mouse build path (works regardless of clicks)
 Per the research sweep: CodeWarrior is fully scriptable via AppleEvents. Run a build

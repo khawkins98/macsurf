@@ -84,8 +84,46 @@ non-default button. Options, best first:
   coords over a visible QEMU window (reuses the proven Cocoa path). Needs the window
   visible+frontmost (breaks headless) + Accessibility permission + geometry math.
 
+## Driving the GUI: techniques verified on-machine
+
+With usb-tablet+INIT, absolute clicks work — but classic-Mac GUI idioms have
+gotchas that took real trial-and-error:
+
+- **Absolute moves are accurate** (`vm.py move X Y` lands within ~2px). Earlier
+  "offset" symptoms were misread cursor positions, not a mapping error.
+- **Menus need press-drag, not click-then-click.** A click opens a sticky menu,
+  but it times out during the gap before your *separate* item-click call, and the
+  fall-through click hits whatever's behind (often switching to the Finder). Use
+  `vm.py pressdrag Xtitle Ytitle Xitem Yitem` — press the menu title, drag to the
+  item, release, all in one call. This reliably picked File→Import Project and the
+  application menu.
+- **Bring a backgrounded app forward** via the application menu (top-right) with a
+  press-drag to its name.
+- **Nav OPEN dialogs** (e.g. Import's "choose file") **type-select the list** —
+  type a name, Return opens/enters it. They remember the last folder.
+- **Nav SAVE dialogs are different:** typing goes to the **Name field**, not the
+  list. Enter folders by **double-clicking** them (Cmd-Down does NOT work). Scroll
+  with the scrollbar arrows to reach off-screen folders. **Esc CANCELS the whole
+  dialog** — don't use it to dismiss sub-popups.
+- **Dialog default button = Return** (e.g. OK / Open / Save / a dialog's bold button).
+
+## Build verification status (what's proven)
+
+- The repo `MacSurf.mcp` is a **valid, importable CodeWarrior XML project** — CW8
+  parses all 531 `<FILE>` entries and proceeds to the save step. Confirmed by
+  driving **File → Import Project** on it.
+- It MUST be imported/saved into the **macos9 folder** (`Back40:Desktop
+  Folder:patrick:macsurf-source Folder:browser:netsurf:frontends:macos9:`) so the
+  XML's relative `<PATH>../../../utils/…</PATH>` refs resolve. Saving elsewhere
+  fails at the first `<FILE>` ("Error importing XML … near line 367").
+- Source is staged at exactly that location (`stage-on-bootvol.sh`), CR + TEXT/CWIE.
+- **Remaining:** complete Import saving into macos9 → the project loads → `Make`
+  (Cmd-M; slow under TCG, expect access-path/component iteration). Best finished
+  interactively given the slow build loop and project-config judgment calls.
+
 ## Bottom line
 
 The recurring **build loop needs no mouse** — keyboard + AppleScript + host file
-injection covers it. Mouse clicking is only for one-time GUI setup, and the
-usb-tablet+INIT path (or a one-time human/golden-prefs step) covers that.
+injection covers it. Mouse clicking (now solved via usb-tablet+INIT) handles the
+one-time GUI setup. Every capability needed to build MacSurf off-hardware is
+proven; only the mechanical Import-save + the long first compile remain.

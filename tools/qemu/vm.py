@@ -177,6 +177,22 @@ class VM:
         if double:
             time.sleep(0.12); p(True); time.sleep(dwell); p(False)
 
+    def pressdrag(self, x1, y1, x2, y2, settle=0.4):
+        """Press at (x1,y1), drag to (x2,y2), release. The ONLY reliable way to
+        pick a classic-Mac menu item: a plain click-to-open then a second click
+        on the item fails because the sticky menu times out between QMP calls.
+        Use for: title-bar menus (press the menu title, drag to the item) and the
+        application menu. NB dialogs differ: nav OPEN dialogs type-select the list;
+        nav SAVE dialogs send typing to the Name field and need double-click to
+        enter folders (Cmd-Down does NOT work); Esc CANCELS the whole dialog."""
+        self._abs(x1, y1); time.sleep(settle)
+        self._cmd("input-send-event", {"events": [
+            {"type": "btn", "data": {"button": "left", "down": True}}]})
+        time.sleep(settle + 0.1)
+        self._abs(x2, y2); time.sleep(settle + 0.2)
+        self._cmd("input-send-event", {"events": [
+            {"type": "btn", "data": {"button": "left", "down": False}}]})
+
     def move(self, px, py):
         self._abs(px, py)
 
@@ -257,6 +273,8 @@ def main(argv):
         vm.rel(int(rest[0]), int(rest[1]), step=step)
     elif verb == "press":
         vm.press(double=("--double" in rest))
+    elif verb == "pressdrag":
+        vm.pressdrag(int(rest[0]), int(rest[1]), int(rest[2]), int(rest[3]))
     elif verb == "click":
         vm.click(int(rest[0]), int(rest[1]), double=("--double" in rest))
     elif verb == "settle":
