@@ -373,6 +373,65 @@ static void register_browser_globals(duk_context *ctx)
 		duk_put_prop_string(ctx, -2, "location");
 	}
 
+	/* fixes339 — Event + CustomEvent constructors. Common pattern is
+	 * `new Event('click')` or `new CustomEvent('foo', {detail:bar})`.
+	 * Required by many scripts for dispatchEvent. */
+	duk_eval_string_noresult(ctx,
+		"function Event(type,opts){"
+			"opts=opts||{};"
+			"this.type=String(type);"
+			"this.bubbles=!!opts.bubbles;"
+			"this.cancelable=!!opts.cancelable;"
+			"this.composed=!!opts.composed;"
+			"this.defaultPrevented=false;"
+			"this.target=null;this.currentTarget=null;"
+			"this.preventDefault=function(){this.defaultPrevented=true;};"
+			"this.stopPropagation=function(){};"
+			"this.stopImmediatePropagation=function(){};"
+		"}"
+		"this.Event=Event;"
+		"function CustomEvent(type,opts){"
+			"Event.call(this,type,opts);"
+			"this.detail=opts&&opts.detail!==undefined?opts.detail:null;"
+		"}"
+		"CustomEvent.prototype=Object.create(Event.prototype);"
+		"this.CustomEvent=CustomEvent;"
+		"function MouseEvent(type,opts){Event.call(this,type,opts);"
+			"opts=opts||{};"
+			"this.clientX=opts.clientX||0;this.clientY=opts.clientY||0;"
+			"this.screenX=opts.screenX||0;this.screenY=opts.screenY||0;"
+			"this.button=opts.button||0;"
+			"this.shiftKey=!!opts.shiftKey;"
+			"this.ctrlKey=!!opts.ctrlKey;this.altKey=!!opts.altKey;"
+			"this.metaKey=!!opts.metaKey;"
+		"}"
+		"MouseEvent.prototype=Object.create(Event.prototype);"
+		"this.MouseEvent=MouseEvent;"
+		"function KeyboardEvent(type,opts){Event.call(this,type,opts);"
+			"opts=opts||{};"
+			"this.key=opts.key||'';this.code=opts.code||'';"
+			"this.keyCode=opts.keyCode||0;this.which=opts.which||0;"
+			"this.shiftKey=!!opts.shiftKey;this.ctrlKey=!!opts.ctrlKey;"
+			"this.altKey=!!opts.altKey;this.metaKey=!!opts.metaKey;"
+		"}"
+		"KeyboardEvent.prototype=Object.create(Event.prototype);"
+		"this.KeyboardEvent=KeyboardEvent;");
+
+	/* fixes340 — MutationObserver / IntersectionObserver / ResizeObserver
+	 * stubs. Many sites guard their setup with `if(MutationObserver)`.
+	 * The stub satisfies the guard; observe() is a no-op so the page
+	 * doesn't pile up callbacks on a non-firing observer. */
+	duk_eval_string_noresult(ctx,
+		"function _Observer(cb){this._cb=cb;}"
+		"_Observer.prototype.observe=function(){};"
+		"_Observer.prototype.unobserve=function(){};"
+		"_Observer.prototype.disconnect=function(){};"
+		"_Observer.prototype.takeRecords=function(){return [];};"
+		"this.MutationObserver=_Observer;"
+		"this.IntersectionObserver=_Observer;"
+		"this.ResizeObserver=_Observer;"
+		"this.PerformanceObserver=_Observer;");
+
 	/* fixes338 — common window properties + event helpers. Stubs
 	 * for the most-feature-detected window APIs:
 	 *   - scrollTo / scrollBy / scroll
