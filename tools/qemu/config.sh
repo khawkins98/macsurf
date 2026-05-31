@@ -14,7 +14,10 @@ QEMU_TRANSFER="$QEMU_WS/transfer"   # staging dir for host->guest file injection
 QEMU_LOGS="$QEMU_WS/logs"           # serial logs, build logs pulled back from guest
 
 # ---- Disk images -----------------------------------------------------------
-QEMU_SYSDISK="$QEMU_IMAGES/os9-system.qcow2"   # OS 9 boot/system disk
+# Working system disk: os9-cw.qcow2 = UTM OS 9.2.1 + CodeWarrior 8 (host-injected).
+# Fallbacks: os9-utm.qcow2 = clean OS9 (has os9_clean snapshot); os9-system.qcow2 =
+# the abandoned from-ISO install attempt; media/.../disk-0.qcow2 = pristine UTM original.
+QEMU_SYSDISK="${QEMU_SYSDISK:-$QEMU_IMAGES/os9-cw.qcow2}"
 QEMU_XFERDISK="$QEMU_IMAGES/transfer.hfs.img"  # raw HFS image for host<->guest exchange
 
 # ---- VM hardware (locked from 6-dimension research; see SETUP.md) ----------
@@ -32,6 +35,9 @@ QEMU_ACCEL="${QEMU_ACCEL:-tcg,split-wx=on,tb-size=512}"
 # sungem = Apple GMAC, OS 9 has a built-in Open Transport driver (no install).
 # SLIRP NAT: guest=10.0.2.15  gateway/HOST=10.0.2.2  DNS=10.0.2.3
 QEMU_NIC="${QEMU_NIC:-sungem}"
+# Pointer: usb-mouse = RELATIVE (OS 9 native, hard to script-click); usb-tablet =
+# ABSOLUTE (scriptable clicks, but OS 9 HID support unproven — probe before relying).
+QEMU_POINTER="${QEMU_POINTER:-usb-mouse}"
 # host->guest port forwards (for SSH/FTP into the guest later); guest->host needs none.
 QEMU_HOSTFWD="${QEMU_HOSTFWD:-hostfwd=tcp::2222-:22,hostfwd=tcp::2121-:21}"
 # The MacSurf TLS proxy, as the OS 9 guest must address it (host = SLIRP gateway).

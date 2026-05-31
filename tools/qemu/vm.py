@@ -146,6 +146,35 @@ class VM:
             {"type": "abs", "data": {"axis": "y", "value": ay}},
         ]})
 
+    def rel(self, dx, dy, step=0):
+        """Relative pointer motion (for usb-mouse). step>0 splits into N-px
+        increments in one batch to reduce OS 9 acceleration overshoot."""
+        evs = []
+        if step and step > 0:
+            def axis_steps(total, axis):
+                n = abs(total); s = 1 if total >= 0 else -1
+                while n > 0:
+                    d = min(step, n) * s
+                    evs.append({"type": "rel", "data": {"axis": axis, "value": d}})
+                    n -= step
+            axis_steps(dx, "x"); axis_steps(dy, "y")
+        else:
+            if dx:
+                evs.append({"type": "rel", "data": {"axis": "x", "value": dx}})
+            if dy:
+                evs.append({"type": "rel", "data": {"axis": "y", "value": dy}})
+        if evs:
+            self._cmd("input-send-event", {"events": evs})
+
+    def press(self, button="left", double=False):
+        """Click at the CURRENT cursor position (no move)."""
+        def p(d):
+            self._cmd("input-send-event", {"events": [
+                {"type": "btn", "data": {"button": button, "down": d}}]})
+        p(True); time.sleep(0.06); p(False)
+        if double:
+            time.sleep(0.08); p(True); time.sleep(0.06); p(False)
+
     def move(self, px, py):
         self._abs(px, py)
 
@@ -221,6 +250,11 @@ def main(argv):
         vm.type(rest[0])
     elif verb == "move":
         vm.move(int(rest[0]), int(rest[1]))
+    elif verb == "rmove":
+        step = int(rest[2]) if len(rest) > 2 else 0
+        vm.rel(int(rest[0]), int(rest[1]), step=step)
+    elif verb == "press":
+        vm.press(double=("--double" in rest))
     elif verb == "click":
         vm.click(int(rest[0]), int(rest[1]), double=("--double" in rest))
     elif verb == "settle":

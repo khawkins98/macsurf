@@ -48,7 +48,7 @@ ARGS=(
   -smp 1
   -g "$QEMU_VIDEO"
   -drive "file=$QEMU_SYSDISK,format=qcow2,media=disk"
-  -device usb-mouse
+  -device "$QEMU_POINTER"
   -device usb-kbd
   -prom-env "vga-ndrv?=true"
   -qmp "unix:$QEMU_QMP_SOCK,server,nowait"
