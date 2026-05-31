@@ -182,6 +182,110 @@ macsurf_push_element(duk_context *duk, dom_element *el)
 			DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE |
 			DUK_DEFPROP_HAVE_CONFIGURABLE | DUK_DEFPROP_CONFIGURABLE);
 
+	/* fixes326 (#30) — classList helper object. .add / .remove /
+	 * .toggle / .contains operate on the element's `class` attribute
+	 * via getAttribute / setAttribute. Implemented in JS so it's
+	 * simpler and the underlying attribute calls already DOM-write. */
+	duk_eval_string_noresult(duk,
+		"(function(el){"
+		"  Object.defineProperty(el,'classList',{"
+		"    get:function(){"
+		"      var self=this;"
+		"      function _list(){"
+		"        var c=self.getAttribute('class')||'';"
+		"        return c.split(/\\s+/).filter(function(x){return x.length;});"
+		"      }"
+		"      function _write(arr){"
+		"        self.setAttribute('class',arr.join(' '));"
+		"      }"
+		"      return {"
+		"        add:function(){"
+		"          var a=_list();"
+		"          for(var i=0;i<arguments.length;i++){"
+		"            if(a.indexOf(arguments[i])<0)a.push(arguments[i]);"
+		"          }_write(a);"
+		"        },"
+		"        remove:function(){"
+		"          var a=_list();"
+		"          for(var i=0;i<arguments.length;i++){"
+		"            var x=a.indexOf(arguments[i]);"
+		"            if(x>=0)a.splice(x,1);"
+		"          }_write(a);"
+		"        },"
+		"        toggle:function(t,force){"
+		"          var a=_list();var i=a.indexOf(t);"
+		"          if(i>=0&&force!==true){a.splice(i,1);_write(a);return false;}"
+		"          if(i<0&&force!==false){a.push(t);_write(a);return true;}"
+		"          return i>=0;"
+		"        },"
+		"        contains:function(t){return _list().indexOf(t)>=0;},"
+		"        get length(){return _list().length;}"
+		"      };"
+		"    },configurable:true"
+		"  });"
+		"})");
+	duk_dup(duk, -2); /* wrapper */
+	duk_call(duk, 1);
+	duk_pop(duk);
+
+	/* fixes327 (#32) — element.style with setProperty / cssText.
+	 * Duktape is ES5 (no Proxy), so we install Object.defineProperty
+	 * accessors for the most common camelCase property names. Anything
+	 * else can use the standard CSS Object Model methods
+	 * setProperty / getPropertyValue / cssText. */
+	duk_eval_string_noresult(duk,
+		"(function(el){"
+		"  function _kebab(p){return p.replace(/([A-Z])/g,'-$1').toLowerCase();}"
+		"  function _set(p,v){"
+		"    var s=el.getAttribute('style')||'';"
+		"    var k=_kebab(p);"
+		"    var re=new RegExp('(^|;)\\\\s*'+k+'\\\\s*:[^;]*;?');"
+		"    s=s.replace(re,'');"
+		"    if(v!==''&&v!==null&&v!==undefined)s+=k+':'+v+';';"
+		"    el.setAttribute('style',s);"
+		"  }"
+		"  function _get(p){"
+		"    var s=el.getAttribute('style')||'';"
+		"    var k=_kebab(p);"
+		"    var re=new RegExp('(?:^|;)\\\\s*'+k+'\\\\s*:\\\\s*([^;]+)');"
+		"    var m=s.match(re);return m?m[1].trim():'';"
+		"  }"
+		"  var style={"
+		"    setProperty:function(p,v){_set(p,v);},"
+		"    getPropertyValue:function(p){return _get(p);},"
+		"    removeProperty:function(p){var v=_get(p);_set(p,'');return v;}"
+		"  };"
+		"  Object.defineProperty(style,'cssText',{"
+		"    get:function(){return el.getAttribute('style')||'';},"
+		"    set:function(v){el.setAttribute('style',v||'');}"
+		"  });"
+		"  var props=['color','background','backgroundColor','backgroundImage',"
+		"    'backgroundPosition','backgroundRepeat','backgroundSize',"
+		"    'display','visibility','opacity','width','height',"
+		"    'minWidth','minHeight','maxWidth','maxHeight',"
+		"    'margin','marginTop','marginLeft','marginRight','marginBottom',"
+		"    'padding','paddingTop','paddingLeft','paddingRight','paddingBottom',"
+		"    'border','borderTop','borderLeft','borderRight','borderBottom',"
+		"    'borderWidth','borderColor','borderStyle','borderRadius',"
+		"    'fontSize','fontWeight','fontFamily','fontStyle',"
+		"    'lineHeight','letterSpacing','wordSpacing','textAlign',"
+		"    'textDecoration','textTransform','whiteSpace',"
+		"    'top','left','right','bottom','position','zIndex',"
+		"    'cursor','overflow','overflowX','overflowY','float','clear',"
+		"    'transform','transition','animation','boxShadow','outline'];"
+		"  props.forEach(function(p){"
+		"    Object.defineProperty(style,p,{"
+		"      get:function(){return _get(p);},"
+		"      set:function(v){_set(p,v);},"
+		"      enumerable:true,configurable:true"
+		"    });"
+		"  });"
+		"  Object.defineProperty(el,'style',{value:style,configurable:true});"
+		"})");
+	duk_dup(duk, -2);
+	duk_call(duk, 1);
+	duk_pop(duk);
+
 	duk_push_c_function(duk, element_finalizer, 1);
 	duk_set_finalizer(duk, -2);
 
