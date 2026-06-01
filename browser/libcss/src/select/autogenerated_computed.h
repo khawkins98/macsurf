@@ -490,6 +490,10 @@ struct css_computed_style {
 	 * existing field offsets in stale CW8 .o files don't shift, same
 	 * discipline as macsurf_gradient_full / macsurf_gradient_radial. */
 	int32_t box_shadow_2;
+	/* fixes362 — third box-shadow packed value. Common Platinum
+	 * pattern is two inset bevels + one outer drop shadow; this
+	 * holds the drop. Same packing format as the first two slots. */
+	int32_t box_shadow_3;
 };
 
 #endif

@@ -57,6 +57,7 @@ css_error css__cascade_box_shadow(uint32_t opv, css_style *style,
         css_color color = 0;
         int32_t packed = 0;
         int32_t packed2 = 0; /* fixes361b second shadow */
+        int32_t packed3 = 0; /* fixes362 third shadow */
         css_fixed shadow_count = 0;
 
         if (hasFlagValue(opv) == false) {
@@ -101,14 +102,35 @@ css_error css__cascade_box_shadow(uint32_t opv, css_style *style,
                                 (void)b2; (void)s2;
                                 packed2 = box_shadow_pack(h2, v2, i2, c2);
                         }
+                        if (shadow_count >= 3) {
+                                /* fixes362 — third shadow into outer-
+                                 * struct box_shadow_3 side channel. */
+                                css_fixed h3, v3, b3, s3, i3;
+                                css_color c3;
+                                h3 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                v3 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                b3 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                s3 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                i3 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                c3 = *((css_color *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_color));
+                                (void)b3; (void)s3;
+                                packed3 = box_shadow_pack(h3, v3, i3, c3);
+                        }
                         break;
                 }
         }
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
-		/* Store second shadow in outer-struct side channel. 0 =
-		 * unset / no second shadow (won't paint). */
+		/* Store second + third shadows in outer-struct side channels.
+		 * 0 = unset / no shadow at that slot (won't paint). */
 		state->computed->box_shadow_2 = packed2;
+		state->computed->box_shadow_3 = packed3;
 		return set_box_shadow(state->computed, value, packed);
 	}
 
@@ -137,8 +159,10 @@ css_error css__copy_box_shadow(
 		return CSS_OK;
 	}
 
-	/* fixes361b — propagate second shadow alongside the first. */
+	/* fixes361b — propagate second shadow alongside the first.
+	 * fixes362 — propagate third shadow too. */
 	to->box_shadow_2 = from->box_shadow_2;
+	to->box_shadow_3 = from->box_shadow_3;
 	return set_box_shadow(to, type, integer);
 }
 
@@ -152,6 +176,7 @@ css_error css__compose_box_shadow(const css_computed_style *parent,
 		(type == CSS_BOX_SHADOW_INHERIT) ? parent : child;
 
 	result->box_shadow_2 = src->box_shadow_2;
+	result->box_shadow_3 = src->box_shadow_3;
 	return css__copy_box_shadow(src, result);
 }
 

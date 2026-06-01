@@ -191,6 +191,12 @@ uint8_t css_computed_box_shadow(
 int32_t css_computed_box_shadow_2(
 		const css_computed_style *style);
 
+/* fixes362 — third box-shadow packed value. Same format as
+ * css_computed_box_shadow_2; the Platinum convention is two insets
+ * (light + dark bevels) followed by one outer drop shadow. */
+int32_t css_computed_box_shadow_3(
+		const css_computed_style *style);
+
 uint8_t css_computed_macsurf_gradient(
 		const css_computed_style *style,
 		int32_t *color);

@@ -286,9 +286,16 @@ macos9_face_from_style(const plot_font_style_t *fstyle)
  * for the immediately following plot call, so it's robust to those
  * uninitialised locals. */
 static int32_t macos9_box_shadow_2_oneshot = 0;
+static int32_t macos9_box_shadow_3_oneshot = 0;
 void macos9_set_box_shadow_2(int32_t packed)
 {
 	macos9_box_shadow_2_oneshot = packed;
+}
+/* fixes362 — third box-shadow one-shot. Platinum convention is two
+ * inset bevels (light + dark) followed by one outer drop. */
+void macos9_set_box_shadow_3(int32_t packed)
+{
+	macos9_box_shadow_3_oneshot = packed;
 }
 
 extern struct gui_window *macos9_paint_gw;
@@ -604,11 +611,22 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 {
 	Rect r;
 	RGBColor rgb;
+	/* fixes361h/362 — snapshot the extra-shadow one-shot statics and
+	 * clear them up-front. Any subsequent plot_rectangle call without
+	 * a fresh macos9_set_box_shadow_{2,3} from redraw.c starts at 0,
+	 * so the values can't leak across paints. */
+	int32_t bsh2_local;
+	int32_t bsh3_local;
 
 	(void)ctx;
 
 	if (pstyle == NULL || rectangle == NULL)
 		return NSERROR_OK;
+
+	bsh2_local = macos9_box_shadow_2_oneshot;
+	bsh3_local = macos9_box_shadow_3_oneshot;
+	macos9_box_shadow_2_oneshot = 0;
+	macos9_box_shadow_3_oneshot = 0;
 
 	macos9_plot_rect_count++;
 	macos9_rect_from_ns(rectangle, &r);
@@ -815,6 +833,48 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 			saved_clip = macos9_push_clip();
 			PaintRect(&s);
 			macos9_pop_clip(saved_clip);
+		}
+	}
+	/* fixes362 — outer drop shadow from the box_shadow_3 one-shot
+	 * static. Paints BEFORE the box fill (same timing as the first
+	 * outset shadow above). Common Platinum pattern is two inset
+	 * bevels + one outer drop, with the drop providing a subtle
+	 * floating effect on cards / buttons. */
+	if (bsh3_local != 0 && pstyle->fill_type != PLOT_OP_TYPE_NONE) {
+		bool inset3 = (((uint32_t)bsh3_local) & 0x8000) != 0;
+		if (!inset3) {
+			int8_t h3 = (int8_t)((((uint32_t)bsh3_local) >> 24) & 0xff);
+			int8_t v3 = (int8_t)((((uint32_t)bsh3_local) >> 16) & 0xff);
+			uint16_t rgb555_3 = (uint16_t)(((uint32_t)bsh3_local) & 0x7fff);
+			short hoff3 = (short)h3;
+			short voff3 = (short)v3;
+			if (hoff3 < -16) hoff3 = -16;
+			if (hoff3 >  16) hoff3 =  16;
+			if (voff3 < -16) voff3 = -16;
+			if (voff3 >  16) voff3 =  16;
+			if (rgb555_3 != 0 && (hoff3 != 0 || voff3 != 0)) {
+				uint8_t r5b = (uint8_t)((rgb555_3 >> 10) & 0x1f);
+				uint8_t g5b = (uint8_t)((rgb555_3 >>  5) & 0x1f);
+				uint8_t b5b = (uint8_t)((rgb555_3      ) & 0x1f);
+				RGBColor sh3;
+				Rect s3;
+				RgnHandle saved_clip3;
+				sh3.red   = (unsigned short)
+					(((unsigned int)((r5b << 3) | (r5b >> 2))) * 0x0101);
+				sh3.green = (unsigned short)
+					(((unsigned int)((g5b << 3) | (g5b >> 2))) * 0x0101);
+				sh3.blue  = (unsigned short)
+					(((unsigned int)((b5b << 3) | (b5b >> 2))) * 0x0101);
+				s3 = r;
+				s3.left   = (short)(s3.left   + hoff3);
+				s3.right  = (short)(s3.right  + hoff3);
+				s3.top    = (short)(s3.top    + voff3);
+				s3.bottom = (short)(s3.bottom + voff3);
+				RGBForeColor(&sh3);
+				saved_clip3 = macos9_push_clip();
+				PaintRect(&s3);
+				macos9_pop_clip(saved_clip3);
+			}
 		}
 	}
 #endif
@@ -1107,20 +1167,13 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 			macos9_pop_clip(saved_clip);
 		}
 
-		/* fixes361h — second inset box-shadow, sourced from a one-
-		 * shot frontend static rather than a plot_style_t struct
-		 * extension. macos9_set_box_shadow_2 is called from
-		 * redraw.c with the packed bsh2 value (or 0); we read-and-
-		 * clear so the next plot->rectangle starts at 0 unless
-		 * redraw.c set it again.
-		 *
-		 * Avoids the stack-garbage class that fixes361b/g hit when
-		 * netsurf-core paint paths (list-marker ellipsis fill_style,
-		 * column-rule rule_style, image.c/svg.c locals) declared
-		 * plot_style_t without zero-initialising every field. */
+		/* fixes361h / 362 — second + third inset box-shadows from
+		 * the one-shot statics (snapshot at function entry into
+		 * bsh2_local / bsh3_local). The outset path for bsh3 ran
+		 * BEFORE the fill above; here we paint the inset branches
+		 * if either was declared as `inset`. */
 		{
-			int32_t bsh2 = macos9_box_shadow_2_oneshot;
-			macos9_box_shadow_2_oneshot = 0;
+			int32_t bsh2 = bsh2_local;
 			if (bsh2 != 0) {
 				int8_t h2 = (int8_t)((((uint32_t)bsh2) >> 24) & 0xff);
 				int8_t v2 = (int8_t)((((uint32_t)bsh2) >> 16) & 0xff);
@@ -1169,6 +1222,62 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 						PaintRect(&edge2);
 					}
 					macos9_pop_clip(saved_clip2);
+				}
+			}
+
+			/* fixes362 — third inset (when the third shadow is
+			 * declared `inset` rather than the typical outer drop). */
+			{
+				int32_t bsh3 = bsh3_local;
+				if (bsh3 != 0) {
+					int8_t h3 = (int8_t)((((uint32_t)bsh3) >> 24) & 0xff);
+					int8_t v3 = (int8_t)((((uint32_t)bsh3) >> 16) & 0xff);
+					bool inset3 = (((uint32_t)bsh3) & 0x8000) != 0;
+					uint16_t rgb555_3 = (uint16_t)(((uint32_t)bsh3) & 0x7fff);
+					if (inset3 && rgb555_3 != 0 && (h3 != 0 || v3 != 0)) {
+						uint8_t r5b = (uint8_t)((rgb555_3 >> 10) & 0x1f);
+						uint8_t g5b = (uint8_t)((rgb555_3 >>  5) & 0x1f);
+						uint8_t b5b = (uint8_t)((rgb555_3      ) & 0x1f);
+						RGBColor sh3;
+						RgnHandle saved_clip3;
+						Rect edge3;
+						short hoff3 = (short)h3;
+						short voff3 = (short)v3;
+						short bw3 = (short)(r.right - r.left);
+						short bh3 = (short)(r.bottom - r.top);
+						if (hoff3 >  bw3) hoff3 =  bw3;
+						if (hoff3 < -bw3) hoff3 = -bw3;
+						if (voff3 >  bh3) voff3 =  bh3;
+						if (voff3 < -bh3) voff3 = -bh3;
+						sh3.red   = (unsigned short)
+							(((unsigned int)((r5b << 3) | (r5b >> 2))) * 0x0101);
+						sh3.green = (unsigned short)
+							(((unsigned int)((g5b << 3) | (g5b >> 2))) * 0x0101);
+						sh3.blue  = (unsigned short)
+							(((unsigned int)((b5b << 3) | (b5b >> 2))) * 0x0101);
+						RGBForeColor(&sh3);
+						saved_clip3 = macos9_push_clip();
+						ClipRect(&r);
+						if (hoff3 > 0) {
+							edge3 = r;
+							edge3.right = (short)(edge3.left + hoff3);
+							PaintRect(&edge3);
+						} else if (hoff3 < 0) {
+							edge3 = r;
+							edge3.left = (short)(edge3.right + hoff3);
+							PaintRect(&edge3);
+						}
+						if (voff3 > 0) {
+							edge3 = r;
+							edge3.bottom = (short)(edge3.top + voff3);
+							PaintRect(&edge3);
+						} else if (voff3 < 0) {
+							edge3 = r;
+							edge3.top = (short)(edge3.bottom + voff3);
+							PaintRect(&edge3);
+						}
+						macos9_pop_clip(saved_clip3);
+					}
 				}
 			}
 		}

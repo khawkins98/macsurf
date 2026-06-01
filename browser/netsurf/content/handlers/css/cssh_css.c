@@ -623,8 +623,54 @@ macsurf__emit_grid_tracks(const char *p, const char *end,
 				}
 				if (n > 0 && n < 1000) mult = n;
 			} else {
+				/* fixes362 — auto-fill / auto-fit: compute the
+				 * column count by reading the minmax(N<unit>, ...)
+				 * min-track-width and dividing a viewport-estimate
+				 * by it. mactrove's /hardware page uses
+				 *   grid-template-columns:
+				 *     repeat(auto-fill, minmax(200px, 1fr));
+				 * on a 949px viewport — that should resolve to 4
+				 * columns, not the legacy mult=3 fallback. */
 				mult = 3;
 				while (p < end && *p != ',' && *p != ')') p++;
+				/* p is now at ',' (or end/')' if malformed).
+				 * Look for "minmax(<digits>" in the inner half. */
+				if (p < end && *p == ',') {
+					const char *scan = p + 1;
+					const char *scan_end = end;
+					while (scan < scan_end &&
+							(*scan == ' ' || *scan == '\t')) scan++;
+					/* Match "minmax(" case-insensitive. */
+					if ((scan_end - scan) >= 7 &&
+							(scan[0] == 'm' || scan[0] == 'M') &&
+							(scan[1] == 'i' || scan[1] == 'I') &&
+							(scan[2] == 'n' || scan[2] == 'N') &&
+							(scan[3] == 'm' || scan[3] == 'M') &&
+							(scan[4] == 'a' || scan[4] == 'A') &&
+							(scan[5] == 'x' || scan[5] == 'X') &&
+							scan[6] == '(') {
+						const char *mm = scan + 7;
+						int min_n = 0;
+						while (mm < scan_end && (*mm == ' ' ||
+								*mm == '\t')) mm++;
+						while (mm < scan_end && *mm >= '0' &&
+								*mm <= '9') {
+							min_n = min_n * 10 + (*mm - '0');
+							mm++;
+						}
+						/* mm should point at unit ("px", "em", ...)
+						 * or comma. Treat any non-zero N as a px
+						 * estimate — fine for the common
+						 * minmax(NNNpx, 1fr) idiom. */
+						if (min_n > 16 && min_n < 1000) {
+							/* Viewport estimate ~900px. */
+							int cols = 900 / min_n;
+							if (cols < 1) cols = 1;
+							if (cols > 8) cols = 8;
+							mult = cols;
+						}
+					}
+				}
 			}
 			while (p < end && (*p == ' ' || *p == '\t')) p++;
 			if (p < end && *p == ',') p++;

@@ -118,14 +118,16 @@ static css_error parse_one_shadow(css_language *c,
  *
  * fixes361b — multi-shadow support. Up to 2 shadows are stored: the
  * first goes into the existing inner-struct slot via the standard
- * SET=0x0080 path; the second is appended after the first and read by
- * s_box_shadow.c into the outer-struct box_shadow_2 side channel.
+ * SET=0x0080 path; the second goes into the outer-struct
+ * box_shadow_2 side channel; the third (fixes362) goes into
+ * box_shadow_3. Common Platinum shadow pattern is two inset bevels
+ * (light top-left + dark bottom-right) plus one outer drop shadow.
  *
  * Bytecode layout (count == 1 case stays compatible with the old
  * single-shadow format):
  *
  *   OPV(BOX_SHADOW, flags=0, value=0x0080 SET)
- *   css_fixed count       (1 or 2)
+ *   css_fixed count       (1, 2, or 3)
  *   for i in 0..count-1:
  *     css_fixed h, v, blur, spread, inset, color    (6 entries)
  */
@@ -137,9 +139,9 @@ css_error css__parse_box_shadow(css_language *c,
 	css_error error;
 	const css_token *token;
 	enum flag_value flag_value;
-	css_fixed h[2], v[2], blur[2], spread[2];
-	bool inset[2];
-	css_color color[2];
+	css_fixed h[3], v[3], blur[3], spread[3];
+	bool inset[3];
+	css_color color[3];
 	int n = 0;
 
 	token = parserutils_vector_peek(vector, *ctx);
@@ -171,8 +173,8 @@ css_error css__parse_box_shadow(css_language *c,
 	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
 	n = 1;
 
-	/* Parse additional shadows up to N=2. Each separated by a comma. */
-	while (n < 2) {
+	/* Parse additional shadows up to N=3. Each separated by a comma. */
+	while (n < 3) {
 		int32_t comma_ctx = *ctx;
 		consumeWhitespace(vector, ctx);
 		token = parserutils_vector_peek(vector, *ctx);
@@ -195,8 +197,8 @@ css_error css__parse_box_shadow(css_language *c,
 		n++;
 	}
 
-	/* Skip any further comma-separated shadows beyond N=2 so the
-	 * declaration parses as a whole even if author CSS has 3+. */
+	/* Skip any further comma-separated shadows beyond N=3 so the
+	 * declaration parses as a whole even if author CSS has 4+. */
 	while (1) {
 		int32_t comma_ctx = *ctx;
 		css_fixed dh, dv, dblur, dspread, dcolor_fix;
@@ -232,11 +234,19 @@ css_error css__parse_box_shadow(css_language *c,
 			(css_fixed)inset[0], (css_fixed)color[0]);
 	if (error != CSS_OK) return error;
 
-	/* Emit second shadow's 6 fields when n==2. */
-	if (n == 2) {
+	/* Emit second shadow's 6 fields when n>=2. */
+	if (n >= 2) {
 		error = css__stylesheet_style_vappend(result, 6,
 				h[1], v[1], blur[1], spread[1],
 				(css_fixed)inset[1], (css_fixed)color[1]);
+		if (error != CSS_OK) return error;
+	}
+
+	/* fixes362 — emit third shadow's 6 fields when n==3. */
+	if (n == 3) {
+		error = css__stylesheet_style_vappend(result, 6,
+				h[2], v[2], blur[2], spread[2],
+				(css_fixed)inset[2], (css_fixed)color[2]);
 		if (error != CSS_OK) return error;
 	}
 

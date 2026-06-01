@@ -185,6 +185,10 @@ static inline bool css__arena_style_is_equal(
 	if (a->box_shadow_2 != b->box_shadow_2) {
 		return false;
 	}
+	/* fixes362 — third box-shadow scalar. */
+	if (a->box_shadow_3 != b->box_shadow_3) {
+		return false;
+	}
 
 	if (!arena__compare_string_list(
 			a->cursor,

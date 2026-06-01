@@ -1188,8 +1188,12 @@ extern int macos9_get_bg_fixed_origin(int *out_x, int *out_y,
  * — leaving the new fields as stack garbage and triggering phantom
  * second-shadow paints. With the value living in a macos9-side
  * static, the plotter reads-then-clears: only the immediately
- * preceding macos9_set_box_shadow_2 call can produce a paint. */
+ * preceding macos9_set_box_shadow_2 call can produce a paint.
+ *
+ * fixes362 — same pattern for the third shadow (the outer drop in the
+ * Platinum two-inset + drop convention). */
 extern void macos9_set_box_shadow_2(int32_t packed);
+extern void macos9_set_box_shadow_3(int32_t packed);
 #endif
 
 static bool html_redraw_background(int x, int y, struct box *box, float scale,
@@ -1350,12 +1354,15 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
 	                }
-	                /* fixes361h — second shadow goes through the
-	                 * macos9_set_box_shadow_2 one-shot static; plotter
-	                 * reads-then-clears. Avoids the stack-garbage class
-	                 * that fixes361b/g hit when extending plot_style_t. */
+	                /* fixes361h / 362 — extra shadows go through the
+	                 * macos9_set_box_shadow_{2,3} one-shot statics;
+	                 * plotter reads-then-clears. Avoids the stack-
+	                 * garbage class that fixes361b/g hit when
+	                 * extending plot_style_t. */
 #ifdef __MACOS9__
 	                macos9_set_box_shadow_2(css_computed_box_shadow_2(
+	                                background->style));
+	                macos9_set_box_shadow_3(css_computed_box_shadow_3(
 	                                background->style));
 #endif
 	                (void)scale;  /* scale baked into offset->fixed shift */
@@ -2021,10 +2028,12 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
 	                }
-	                /* fixes361h — second shadow goes through the
-	                 * macos9_set_box_shadow_2 one-shot static. */
+	                /* fixes361h / 362 — extra shadows via one-shot
+	                 * statics. */
 #ifdef __MACOS9__
 	                macos9_set_box_shadow_2(css_computed_box_shadow_2(
+	                                box->style));
+	                macos9_set_box_shadow_3(css_computed_box_shadow_3(
 	                                box->style));
 #endif
 	                (void)scale;
