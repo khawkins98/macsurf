@@ -1181,6 +1181,15 @@ static bool html_redraw_file(int x, int y, int width, int height,
 #ifdef __MACOS9__
 extern int macos9_get_bg_fixed_origin(int *out_x, int *out_y,
 		int *out_w, int *out_h);
+/* fixes361h — second-shadow plumbing via a frontend-side one-shot
+ * static instead of a plot_style_t struct extension. fixes361b/g put
+ * box_shadow_2_* on plot_style_t, but several NetSurf-core sites
+ * declare plot_style_t locals without zero-initialising every field
+ * — leaving the new fields as stack garbage and triggering phantom
+ * second-shadow paints. With the value living in a macos9-side
+ * static, the plotter reads-then-clears: only the immediately
+ * preceding macos9_set_box_shadow_2 call can produce a paint. */
+extern void macos9_set_box_shadow_2(int32_t packed);
 #endif
 
 static bool html_redraw_background(int x, int y, struct box *box, float scale,
@@ -1341,6 +1350,14 @@ static bool html_redraw_background(int x, int y, struct box *box, float scale,
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
 	                }
+	                /* fixes361h — second shadow goes through the
+	                 * macos9_set_box_shadow_2 one-shot static; plotter
+	                 * reads-then-clears. Avoids the stack-garbage class
+	                 * that fixes361b/g hit when extending plot_style_t. */
+#ifdef __MACOS9__
+	                macos9_set_box_shadow_2(css_computed_box_shadow_2(
+	                                background->style));
+#endif
 	                (void)scale;  /* scale baked into offset->fixed shift */
 	        }
 	        /* MacSurf fixes47/48 -- the gradient slot stores BOTH
@@ -2004,6 +2021,12 @@ static bool html_redraw_inline_background(int x, int y, struct box *box,
 	                } else {
 	                        pstyle_fill_bg.box_shadow_color = 0;
 	                }
+	                /* fixes361h — second shadow goes through the
+	                 * macos9_set_box_shadow_2 one-shot static. */
+#ifdef __MACOS9__
+	                macos9_set_box_shadow_2(css_computed_box_shadow_2(
+	                                box->style));
+#endif
 	                (void)scale;
 	        }
 	        /* MacSurf: mirror the html_redraw_background gradient override
@@ -2443,7 +2466,10 @@ static bool html_redraw_text_box(const html_content *html, struct box *box,
 				&marker_w);
 		if (res == NSERROR_OK && marker_w > 0 &&
 				marker_w < (clip->x1 - x)) {
-			plot_style_t fill_style;
+			plot_style_t fill_style = {
+				PLOT_OP_TYPE_NONE
+			}; /* fixes361g — zero-init ALL fields so plotters.c
+			    * doesn't read garbage in box_shadow_2_* etc. */
 			struct rect r;
 			int ell_x = clip->x1 - marker_w;
 
@@ -2644,7 +2670,11 @@ static bool html_redraw_multicol_rules(
 	css_fixed rule_len;
 	css_unit rule_unit;
 	css_color rule_color;
-	plot_style_t rule_style;
+	plot_style_t rule_style = {
+		PLOT_OP_TYPE_NONE
+	}; /* fixes361g — zero-init all fields to keep box_shadow_2_*
+	    * (plot_style.h extension) from leaking stack garbage into
+	    * the plotter's second-inset paint path. */
 	struct box *child;
 	int count;
 	int gap;

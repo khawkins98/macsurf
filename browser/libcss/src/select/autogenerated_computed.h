@@ -483,6 +483,13 @@ struct css_computed_style {
 	 * lifetime owned by this style's destroy path. Appended at end
 	 * per the same struct-mid-insert gotcha as macsurf_gradient_full. */
 	int32_t *macsurf_gradient_radial;
+
+	/* fixes361b — second box-shadow packed value. Same format as
+	 * the inner `box_shadow` slot: h<<24 | v<<16 | inset<<15 | rgb555.
+	 * 0 = unset (no second shadow). Appended at outer-struct end so
+	 * existing field offsets in stale CW8 .o files don't shift, same
+	 * discipline as macsurf_gradient_full / macsurf_gradient_radial. */
+	int32_t box_shadow_2;
 };
 
 #endif

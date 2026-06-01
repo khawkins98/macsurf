@@ -2,7 +2,7 @@
  * This file is part of LibCSS.
  * Licensed under the MIT License,
  *                http://www.opensource.org/licenses/mit-license.php
- * Copyright 2025 Gemini CLI
+ * Copyright 2025 Gemini CLI / 2026 MacSurf (fixes361b)
  */
 
 #include <assert.h>
@@ -14,7 +14,120 @@
 #include "parse/properties/utils.h"
 
 /**
- * Parse box-shadow: [inset]? h v [blur] [spread] [color]?
+ * Parse a single shadow record: [inset]? h v [blur] [spread] [color]?
+ *
+ * Returns CSS_OK on success and populates the out params. On invalid
+ * shadow returns CSS_INVALID and leaves ctx unchanged from the caller's
+ * perspective (caller checks ctx).
+ */
+static css_error parse_one_shadow(css_language *c,
+		const parserutils_vector *vector, int32_t *ctx,
+		css_fixed *h_out, css_fixed *v_out,
+		css_fixed *blur_out, css_fixed *spread_out,
+		bool *inset_out, css_color *color_out)
+{
+	int32_t saved_ctx = *ctx;
+	css_error error;
+	const css_token *token;
+	css_fixed h = 0, v = 0, blur = 0, spread = 0;
+	uint32_t h_u = 0, v_u = 0, b_u = 0, s_u = 0;
+	css_color color = 0;
+	uint16_t color_type = 0;
+	bool inset = false;
+
+	consumeWhitespace(vector, ctx);
+
+	/* Optional inset keyword. */
+	token = parserutils_vector_peek(vector, *ctx);
+	if (token != NULL && token->type == CSS_TOKEN_IDENT) {
+		bool inset_match = false;
+		if (lwc_string_caseless_isequal(token->idata,
+				c->strings[INSET], &inset_match)
+				== lwc_error_ok && inset_match) {
+			inset = true;
+			parserutils_vector_iterate(vector, ctx);
+			consumeWhitespace(vector, ctx);
+		}
+	}
+
+	/* h-offset v-offset (required) */
+	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &h, &h_u);
+	if (error != CSS_OK) { *ctx = saved_ctx; return error; }
+
+	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &v, &v_u);
+	if (error != CSS_OK) { *ctx = saved_ctx; return error; }
+
+	consumeWhitespace(vector, ctx);
+
+	/* Optional blur */
+	token = parserutils_vector_peek(vector, *ctx);
+	if (token != NULL && (token->type == CSS_TOKEN_DIMENSION ||
+			token->type == CSS_TOKEN_NUMBER)) {
+		error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX,
+				&blur, &b_u);
+		if (error == CSS_OK) {
+			consumeWhitespace(vector, ctx);
+			/* Optional spread */
+			token = parserutils_vector_peek(vector, *ctx);
+			if (token != NULL && (token->type == CSS_TOKEN_DIMENSION ||
+					token->type == CSS_TOKEN_NUMBER)) {
+				error = css__parse_unit_specifier(c, vector, ctx,
+						UNIT_PX, &spread, &s_u);
+				if (error != CSS_OK) {
+					*ctx = saved_ctx; return error;
+				}
+				consumeWhitespace(vector, ctx);
+			}
+		}
+	}
+
+	/* Optional inset keyword AFTER offsets (CSS allows either position). */
+	token = parserutils_vector_peek(vector, *ctx);
+	if (token != NULL && token->type == CSS_TOKEN_IDENT && !inset) {
+		bool inset_match = false;
+		if (lwc_string_caseless_isequal(token->idata,
+				c->strings[INSET], &inset_match)
+				== lwc_error_ok && inset_match) {
+			inset = true;
+			parserutils_vector_iterate(vector, ctx);
+			consumeWhitespace(vector, ctx);
+		}
+	}
+
+	/* Optional color */
+	token = parserutils_vector_peek(vector, *ctx);
+	if (token != NULL && token->type != CSS_TOKEN_CHAR) {
+		error = css__parse_colour_specifier(c, vector, ctx,
+				&color_type, &color);
+		if (error == CSS_OK) {
+			/* color parsed */
+		}
+	}
+
+	*h_out = h;
+	*v_out = v;
+	*blur_out = blur;
+	*spread_out = spread;
+	*inset_out = inset;
+	*color_out = color;
+	return CSS_OK;
+}
+
+/**
+ * Parse box-shadow: <shadow> [, <shadow>]*
+ *
+ * fixes361b — multi-shadow support. Up to 2 shadows are stored: the
+ * first goes into the existing inner-struct slot via the standard
+ * SET=0x0080 path; the second is appended after the first and read by
+ * s_box_shadow.c into the outer-struct box_shadow_2 side channel.
+ *
+ * Bytecode layout (count == 1 case stays compatible with the old
+ * single-shadow format):
+ *
+ *   OPV(BOX_SHADOW, flags=0, value=0x0080 SET)
+ *   css_fixed count       (1 or 2)
+ *   for i in 0..count-1:
+ *     css_fixed h, v, blur, spread, inset, color    (6 entries)
  */
 css_error css__parse_box_shadow(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
@@ -23,12 +136,11 @@ css_error css__parse_box_shadow(css_language *c,
 	int32_t orig_ctx = *ctx;
 	css_error error;
 	const css_token *token;
-	css_fixed h = 0, v = 0, blur = 0, spread = 0;
-	uint32_t h_u = 0, v_u = 0, b_u = 0, s_u = 0;
-	css_color color = 0;
-	uint16_t color_type = 0;
-	bool inset = false;
 	enum flag_value flag_value;
+	css_fixed h[2], v[2], blur[2], spread[2];
+	bool inset[2];
+	css_color color[2];
+	int n = 0;
 
 	token = parserutils_vector_peek(vector, *ctx);
 	if (token == NULL) return CSS_INVALID;
@@ -36,57 +148,97 @@ css_error css__parse_box_shadow(css_language *c,
 	flag_value = get_css_flag_value(c, token);
 	if (flag_value != FLAG_VALUE__NONE) {
 		parserutils_vector_iterate(vector, ctx);
-		return css_stylesheet_style_flag_value(result, flag_value, CSS_PROP_BOX_SHADOW);
+		return css_stylesheet_style_flag_value(result, flag_value,
+				CSS_PROP_BOX_SHADOW);
 	}
 
-	/* Optional inset. fixes48 -- same class of bug as fixes44's
-	 * macsurf-gradient: lwc_string_caseless_isequal returns lwc_error
-	 * (0 = OK) and writes match into its third arg. Passing NULL
-	 * dereferenced a null pointer and the bool-return interpretation
-	 * was inverted. */
+	/* "none" keyword. */
 	if (token->type == CSS_TOKEN_IDENT) {
-		bool inset_match = false;
+		bool none_match = false;
 		if (lwc_string_caseless_isequal(token->idata,
-				c->strings[INSET], &inset_match)
-				== lwc_error_ok && inset_match) {
-			inset = true;
+				c->strings[NONE], &none_match)
+				== lwc_error_ok && none_match) {
 			parserutils_vector_iterate(vector, ctx);
+			return css__stylesheet_style_appendOPV(result,
+					CSS_PROP_BOX_SHADOW, 0, 0x0000 /* NONE */);
 		}
 	}
 
-	/* h-offset v-offset */
-	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &h, &h_u);
+	/* Parse first shadow (required). */
+	error = parse_one_shadow(c, vector, ctx,
+			&h[0], &v[0], &blur[0], &spread[0],
+			&inset[0], &color[0]);
 	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
+	n = 1;
 
-	error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &v, &v_u);
-	if (error != CSS_OK) { *ctx = orig_ctx; return error; }
-
-	/* Optional blur */
-	token = parserutils_vector_peek(vector, *ctx);
-	if (token != NULL && (token->type == CSS_TOKEN_DIMENSION || token->type == CSS_TOKEN_NUMBER)) {
-		error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &blur, &b_u);
-		if (error == CSS_OK) {
-			/* Optional spread */
-			token = parserutils_vector_peek(vector, *ctx);
-			if (token != NULL && (token->type == CSS_TOKEN_DIMENSION || token->type == CSS_TOKEN_NUMBER)) {
-				error = css__parse_unit_specifier(c, vector, ctx, UNIT_PX, &spread, &s_u);
-				if (error != CSS_OK) { *ctx = orig_ctx; return error; }
-			}
+	/* Parse additional shadows up to N=2. Each separated by a comma. */
+	while (n < 2) {
+		int32_t comma_ctx = *ctx;
+		consumeWhitespace(vector, ctx);
+		token = parserutils_vector_peek(vector, *ctx);
+		if (token == NULL || token->type != CSS_TOKEN_CHAR ||
+				lwc_string_length(token->idata) != 1 ||
+				lwc_string_data(token->idata)[0] != ',') {
+			*ctx = comma_ctx;
+			break;
 		}
+		parserutils_vector_iterate(vector, ctx);
+		error = parse_one_shadow(c, vector, ctx,
+				&h[n], &v[n], &blur[n], &spread[n],
+				&inset[n], &color[n]);
+		if (error != CSS_OK) {
+			/* Bail without rolling back the first shadow — the
+			 * comma was bad but the first parse is good. */
+			*ctx = comma_ctx;
+			break;
+		}
+		n++;
 	}
 
-	/* Optional color */
-	token = parserutils_vector_peek(vector, *ctx);
-	if (token != NULL) {
-		error = css__parse_colour_specifier(c, vector, ctx, &color_type, &color);
-		if (error == CSS_OK) {
-			/* color parsed */
+	/* Skip any further comma-separated shadows beyond N=2 so the
+	 * declaration parses as a whole even if author CSS has 3+. */
+	while (1) {
+		int32_t comma_ctx = *ctx;
+		css_fixed dh, dv, dblur, dspread, dcolor_fix;
+		bool dinset;
+		css_color dcolor;
+		consumeWhitespace(vector, ctx);
+		token = parserutils_vector_peek(vector, *ctx);
+		if (token == NULL || token->type != CSS_TOKEN_CHAR ||
+				lwc_string_length(token->idata) != 1 ||
+				lwc_string_data(token->idata)[0] != ',') {
+			*ctx = comma_ctx;
+			break;
 		}
+		parserutils_vector_iterate(vector, ctx);
+		error = parse_one_shadow(c, vector, ctx,
+				&dh, &dv, &dblur, &dspread, &dinset, &dcolor);
+		(void)dcolor_fix;
+		if (error != CSS_OK) {
+			*ctx = comma_ctx;
+			break;
+		}
+		/* Discard. */
 	}
 
-	error = css__stylesheet_style_appendOPV(result, CSS_PROP_BOX_SHADOW, 0, 0x0080 /* SET */);
+	error = css__stylesheet_style_appendOPV(result,
+			CSS_PROP_BOX_SHADOW, 0, 0x0080 /* SET */);
 	if (error != CSS_OK) return error;
 
-	/* Append 4 lengths + inset flag + color info */
-	return css__stylesheet_style_vappend(result, 6, h, v, blur, spread, (css_fixed)inset, (css_fixed)color);
+	/* Emit count + first shadow's 6 fields (always). */
+	error = css__stylesheet_style_vappend(result, 7,
+			(css_fixed)n,
+			h[0], v[0], blur[0], spread[0],
+			(css_fixed)inset[0], (css_fixed)color[0]);
+	if (error != CSS_OK) return error;
+
+	/* Emit second shadow's 6 fields when n==2. */
+	if (n == 2) {
+		error = css__stylesheet_style_vappend(result, 6,
+				h[1], v[1], blur[1], spread[1],
+				(css_fixed)inset[1], (css_fixed)color[1]);
+		if (error != CSS_OK) return error;
+	}
+
+	return CSS_OK;
 }

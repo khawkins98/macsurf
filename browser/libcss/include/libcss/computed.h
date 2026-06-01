@@ -184,6 +184,13 @@ uint8_t css_computed_box_shadow(
 		const css_computed_style *style,
 		int32_t *integer);
 
+/* fixes361b — second box-shadow packed value. Returns 0 if no second
+ * shadow set, otherwise the packed bsh int32 in the same format as
+ * css_computed_box_shadow's *integer (h<<24 | v<<16 | inset<<15 |
+ * rgb555). Used to paint a second inset bevel for Platinum 3D effect. */
+int32_t css_computed_box_shadow_2(
+		const css_computed_style *style);
+
 uint8_t css_computed_macsurf_gradient(
 		const css_computed_style *style,
 		int32_t *color);

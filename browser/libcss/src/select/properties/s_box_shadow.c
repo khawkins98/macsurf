@@ -56,6 +56,8 @@ css_error css__cascade_box_shadow(uint32_t opv, css_style *style,
         css_fixed h = 0, v = 0, blur = 0, spread = 0, inset = 0;
         css_color color = 0;
         int32_t packed = 0;
+        int32_t packed2 = 0; /* fixes361b second shadow */
+        css_fixed shadow_count = 0;
 
         if (hasFlagValue(opv) == false) {
                 switch (getValue(opv)) {
@@ -64,6 +66,10 @@ css_error css__cascade_box_shadow(uint32_t opv, css_style *style,
                         break;
                 case 0x0080: /* SET */
                         value = CSS_BOX_SHADOW_SET;
+                        /* fixes361b — bytecode now starts with a count
+                         * (1 or 2), followed by 6 fields per shadow. */
+                        shadow_count = *((css_fixed *) style->bytecode);
+                        advance_bytecode(style, sizeof(css_fixed));
                         h = *((css_fixed *) style->bytecode);
                         advance_bytecode(style, sizeof(css_fixed));
                         v = *((css_fixed *) style->bytecode);
@@ -77,11 +83,32 @@ css_error css__cascade_box_shadow(uint32_t opv, css_style *style,
                         color = *((css_color *) style->bytecode);
                         advance_bytecode(style, sizeof(css_color));
                         packed = box_shadow_pack(h, v, inset, color);
+                        if (shadow_count >= 2) {
+                                css_fixed h2, v2, b2, s2, i2;
+                                css_color c2;
+                                h2 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                v2 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                b2 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                s2 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                i2 = *((css_fixed *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_fixed));
+                                c2 = *((css_color *) style->bytecode);
+                                advance_bytecode(style, sizeof(css_color));
+                                (void)b2; (void)s2;
+                                packed2 = box_shadow_pack(h2, v2, i2, c2);
+                        }
                         break;
                 }
         }
 	if (css__outranks_existing(getOpcode(opv), isImportant(opv), state,
 			getFlagValue(opv))) {
+		/* Store second shadow in outer-struct side channel. 0 =
+		 * unset / no second shadow (won't paint). */
+		state->computed->box_shadow_2 = packed2;
 		return set_box_shadow(state->computed, value, packed);
 	}
 
@@ -110,6 +137,8 @@ css_error css__copy_box_shadow(
 		return CSS_OK;
 	}
 
+	/* fixes361b — propagate second shadow alongside the first. */
+	to->box_shadow_2 = from->box_shadow_2;
 	return set_box_shadow(to, type, integer);
 }
 
@@ -119,10 +148,11 @@ css_error css__compose_box_shadow(const css_computed_style *parent,
 {
 	int32_t integer = 0;
 	uint8_t type = get_box_shadow(child, &integer);
+	const css_computed_style *src =
+		(type == CSS_BOX_SHADOW_INHERIT) ? parent : child;
 
-	return css__copy_box_shadow(
-			type == CSS_BOX_SHADOW_INHERIT ? parent : child,
-			result);
+	result->box_shadow_2 = src->box_shadow_2;
+	return css__copy_box_shadow(src, result);
 }
 
 uint32_t destroy_box_shadow(void *bytecode)

@@ -479,6 +479,11 @@ uint8_t css_computed_box_shadow(const css_computed_style *style,
 	return get_box_shadow(style, integer);
 }
 
+int32_t css_computed_box_shadow_2(const css_computed_style *style)
+{
+	return style->box_shadow_2;
+}
+
 uint8_t css_computed_macsurf_gradient(const css_computed_style *style,
 		int32_t *color)
 {

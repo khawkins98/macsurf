@@ -273,6 +273,24 @@ macos9_face_from_style(const plot_font_style_t *fstyle)
 /* ---- plotters ---- */
 
 #ifdef __MACOS9__
+/* fixes361h — one-shot static for the second box-shadow's packed
+ * value. redraw.c calls macos9_set_box_shadow_2(packed) right before
+ * a plot->rectangle that should paint a second-inset bevel; the
+ * plotter reads-and-clears so the value can't leak into subsequent
+ * paints that didn't explicitly set it.
+ *
+ * Replaces the fixes361b/g attempt to extend plot_style_t with new
+ * fields, which leaked stack garbage from uninitialised plot_style_t
+ * locals in netsurf-core paint paths and produced phantom red bevels
+ * on cards / inputs. The static is process-global but only meaningful
+ * for the immediately following plot call, so it's robust to those
+ * uninitialised locals. */
+static int32_t macos9_box_shadow_2_oneshot = 0;
+void macos9_set_box_shadow_2(int32_t packed)
+{
+	macos9_box_shadow_2_oneshot = packed;
+}
+
 extern struct gui_window *macos9_paint_gw;
 /* fixes77g -- prefer macos9_paint_gw over GetPort+GetWRefCon. The old
  * pattern assumed the current port was the window and read gw from the
@@ -1020,40 +1038,139 @@ macos9_plot_rectangle(const struct redraw_context *ctx,
 			macos9_pop_clip(saved_clip);
 		}
 #ifdef __MACOS9__
-		/* fixes200: inset box-shadow. Paint the offset grey rect
-		 * INSIDE the main rect r, clipped to r.
+		/* fixes361 — proper inset box-shadow: paint thin edge lines
+		 * along the inside of the box, NOT a full offset rectangle.
 		 *
-		 * fixes225 BISECT: gate behind MACSURF_INSET_BOX_SHADOW so
-		 * we can prove/disprove that this is what's painting the
-		 * dark wash on mactrove. Default 0 = disabled. Flip to 1
-		 * to re-enable if mactrove looks the same with this off
-		 * (meaning the bug is elsewhere). */
-#ifndef MACSURF_INSET_BOX_SHADOW
-#define MACSURF_INSET_BOX_SHADOW 0
-#endif
-		if (MACSURF_INSET_BOX_SHADOW &&
-		    pstyle->box_shadow_inset &&
+		 * CSS spec inverts the offset direction for inset shadows.
+		 * For `box-shadow: inset h v 0 color`:
+		 *   - h > 0: paint |h|-px line on the LEFT inside edge
+		 *   - h < 0: paint |h|-px line on the RIGHT inside edge
+		 *   - v > 0: paint |v|-px line on the TOP inside edge
+		 *   - v < 0: paint |v|-px line on the BOTTOM inside edge
+		 *
+		 * Mactrove's Platinum windows declare a pair of inset
+		 * shadows for 3D bevels:
+		 *   inset -1px -1px 0 dark    -> 1px dark line on right+bottom
+		 *   inset  1px  1px 0 light   -> 1px light line on top+left
+		 * Only the FIRST shadow is currently parsed (single-shadow
+		 * limitation), so this round paints the first inset's edges
+		 * faithfully. A multi-shadow round can layer the second.
+		 *
+		 * Re-enabled after fixes225's blanket disable. The dark-wash
+		 * regression was the `box_shadow_color == 0` fallback paint-
+		 * dark-grey-everywhere path; now we SKIP the paint when the
+		 * colour didn't round-trip from var() resolution. */
+		if (pstyle->box_shadow_inset &&
+		    pstyle->box_shadow_color != 0 &&
 		    (pstyle->box_shadow != 0 || pstyle->box_shadow_y != 0)) {
 			short hoff = (short)(pstyle->box_shadow   >> PLOT_STYLE_RADIX);
 			short voff = (short)(pstyle->box_shadow_y >> PLOT_STYLE_RADIX);
 			RGBColor sh;
-			Rect s;
 			RgnHandle saved_clip;
-			if (pstyle->box_shadow_color != 0) {
-				macos9_colour_to_rgb(pstyle->box_shadow_color, &sh);
-			} else {
-				sh.red = sh.green = sh.blue = 0x6666;
-			}
-			s = r;
-			s.left  = (short)(s.left  + hoff);
-			s.right = (short)(s.right + hoff);
-			s.top    = (short)(s.top    + voff);
-			s.bottom = (short)(s.bottom + voff);
+			Rect edge;
+			/* Clamp |offset| to box width/height so we never paint a
+			 * line wider than the box itself. */
+			short bw = (short)(r.right - r.left);
+			short bh = (short)(r.bottom - r.top);
+			if (hoff >  bw) hoff =  bw;
+			if (hoff < -bw) hoff = -bw;
+			if (voff >  bh) voff =  bh;
+			if (voff < -bh) voff = -bh;
+
+			macos9_colour_to_rgb(pstyle->box_shadow_color, &sh);
 			RGBForeColor(&sh);
 			saved_clip = macos9_push_clip();
 			ClipRect(&r);
-			PaintRect(&s);
+
+			/* Horizontal edge (left/right inside line). */
+			if (hoff > 0) {
+				edge = r;
+				edge.right = (short)(edge.left + hoff);
+				PaintRect(&edge);
+			} else if (hoff < 0) {
+				edge = r;
+				edge.left = (short)(edge.right + hoff);
+				PaintRect(&edge);
+			}
+
+			/* Vertical edge (top/bottom inside line). */
+			if (voff > 0) {
+				edge = r;
+				edge.bottom = (short)(edge.top + voff);
+				PaintRect(&edge);
+			} else if (voff < 0) {
+				edge = r;
+				edge.top = (short)(edge.bottom + voff);
+				PaintRect(&edge);
+			}
+
 			macos9_pop_clip(saved_clip);
+		}
+
+		/* fixes361h — second inset box-shadow, sourced from a one-
+		 * shot frontend static rather than a plot_style_t struct
+		 * extension. macos9_set_box_shadow_2 is called from
+		 * redraw.c with the packed bsh2 value (or 0); we read-and-
+		 * clear so the next plot->rectangle starts at 0 unless
+		 * redraw.c set it again.
+		 *
+		 * Avoids the stack-garbage class that fixes361b/g hit when
+		 * netsurf-core paint paths (list-marker ellipsis fill_style,
+		 * column-rule rule_style, image.c/svg.c locals) declared
+		 * plot_style_t without zero-initialising every field. */
+		{
+			int32_t bsh2 = macos9_box_shadow_2_oneshot;
+			macos9_box_shadow_2_oneshot = 0;
+			if (bsh2 != 0) {
+				int8_t h2 = (int8_t)((((uint32_t)bsh2) >> 24) & 0xff);
+				int8_t v2 = (int8_t)((((uint32_t)bsh2) >> 16) & 0xff);
+				bool inset2 = (((uint32_t)bsh2) & 0x8000) != 0;
+				uint16_t rgb555_2 = (uint16_t)(((uint32_t)bsh2) & 0x7fff);
+				if (inset2 && rgb555_2 != 0 && (h2 != 0 || v2 != 0)) {
+					uint8_t r5b = (uint8_t)((rgb555_2 >> 10) & 0x1f);
+					uint8_t g5b = (uint8_t)((rgb555_2 >>  5) & 0x1f);
+					uint8_t b5b = (uint8_t)((rgb555_2      ) & 0x1f);
+					RGBColor sh2;
+					RgnHandle saved_clip2;
+					Rect edge2;
+					short hoff2 = (short)h2;
+					short voff2 = (short)v2;
+					short bw2 = (short)(r.right - r.left);
+					short bh2 = (short)(r.bottom - r.top);
+					if (hoff2 >  bw2) hoff2 =  bw2;
+					if (hoff2 < -bw2) hoff2 = -bw2;
+					if (voff2 >  bh2) voff2 =  bh2;
+					if (voff2 < -bh2) voff2 = -bh2;
+					sh2.red   = (unsigned short)
+						(((unsigned int)((r5b << 3) | (r5b >> 2))) * 0x0101);
+					sh2.green = (unsigned short)
+						(((unsigned int)((g5b << 3) | (g5b >> 2))) * 0x0101);
+					sh2.blue  = (unsigned short)
+						(((unsigned int)((b5b << 3) | (b5b >> 2))) * 0x0101);
+					RGBForeColor(&sh2);
+					saved_clip2 = macos9_push_clip();
+					ClipRect(&r);
+					if (hoff2 > 0) {
+						edge2 = r;
+						edge2.right = (short)(edge2.left + hoff2);
+						PaintRect(&edge2);
+					} else if (hoff2 < 0) {
+						edge2 = r;
+						edge2.left = (short)(edge2.right + hoff2);
+						PaintRect(&edge2);
+					}
+					if (voff2 > 0) {
+						edge2 = r;
+						edge2.bottom = (short)(edge2.top + voff2);
+						PaintRect(&edge2);
+					} else if (voff2 < 0) {
+						edge2 = r;
+						edge2.top = (short)(edge2.bottom + voff2);
+						PaintRect(&edge2);
+					}
+					macos9_pop_clip(saved_clip2);
+				}
+			}
 		}
 #endif
 #else
