@@ -177,6 +177,39 @@ def fileref_entry(pathtype, path, pathformat="MacOS", targetname=None):
     ) % (pathtype, escape(path), pathformat)
 
 
+def parse_access_paths_xml(path):
+    """Read the genuine CW access-paths export ('Access Paths.xml' at repo root)
+    and return (user_paths, system_paths) as lists of (mac_path, format, root,
+    recursive). This is patrick's actual working set — complete and correct,
+    unlike the stale manifest UserSearchPath/SystemSearchPath entries."""
+    root = ET.parse(path).getroot()
+    out = {"UserSearchPaths": [], "SystemSearchPaths": []}
+    for sl in root.iter("SETTINGLIST"):
+        for s in sl.findall("SETTING"):
+            nm = s.findtext("NAME")
+            if nm not in out:
+                continue
+            for wrap in s.findall("SETTING"):
+                sp = None
+                recursive = "false"
+                for inner in wrap.findall("SETTING"):
+                    if inner.findtext("NAME") == "SearchPath":
+                        sp = inner
+                    elif inner.findtext("NAME") == "Recursive":
+                        recursive = inner.findtext("VALUE") or "false"
+                if sp is None:
+                    continue
+                p = f = r = None
+                for kv in sp.findall("SETTING"):
+                    n, v = kv.findtext("NAME"), kv.findtext("VALUE")
+                    if n == "Path": p = v
+                    elif n == "PathFormat": f = v
+                    elif n == "PathRoot": r = v
+                if p is not None:
+                    out[nm].append((p, f or "MacOS", r or "Absolute", recursive == "true"))
+    return out["UserSearchPaths"], out["SystemSearchPaths"]
+
+
 def convert_file_path(raw_path, prefix):
     """Return (pathtype, converted_path, is_library, repo_relative_path_or_None),
     or None if the file was deleted from the repo (drop from project)."""
@@ -206,6 +239,9 @@ def main():
     ap.add_argument("--reference", default=os.path.normpath(DEFAULT_REFERENCE))
     ap.add_argument("--out", default=None)
     ap.add_argument("--prefix", default=DEFAULT_PREFIX)
+    ap.add_argument("--access-paths", default=os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "Access Paths.xml")),
+        help="genuine CW access-paths export to source search paths from")
     ap.add_argument("--ideversion", default="5.0")
     ap.add_argument("--lf", action="store_true", help="LF endings (default CR)")
     args = ap.parse_args()
@@ -225,22 +261,15 @@ def main():
     target = root.find(".//TARGET")
     target_name = target.findtext("NAME", "MacSurf")
 
-    # scalar settings pass-through; access paths rebuilt
-    user_paths, system_paths, scalars = [], [], []
+    # scalar settings pass through; access paths come from the genuine export
+    # (Access Paths.xml), NOT the stale manifest UserSearchPath/SystemSearchPath.
+    scalars = []
     for s in target.find("SETTINGLIST").findall("SETTING"):
         name = s.findtext("NAME")
-        value = s.findtext("VALUE")
-        if name == "UserSearchPath":
-            user_paths.append(convert_access_path(value, args.prefix))
-        elif name == "SystemSearchPath":
-            system_paths.append(convert_access_path(value, args.prefix))
-        else:
-            scalars.append((name, value))
-
-    # Add access paths for every directory that contains a listed source file
-    # (needed so #include "..." of in-tree headers next to sources also resolves,
-    # and harmless otherwise). Rooted absolute, non-recursive.
-    file_dirs = []
+        if name in ("UserSearchPath", "SystemSearchPath"):
+            continue  # stale; replaced below
+        scalars.append((name, s.findtext("VALUE")))
+    user_paths, system_paths = parse_access_paths_xml(args.access_paths)
 
     # files
     files_xml, linkorder_xml = [], []
@@ -262,9 +291,6 @@ def main():
             if repo_rel and not os.path.exists(os.path.join(repo_root, repo_rel)):
                 missing.append((raw, repo_rel))
             files_xml.append(file_entry("Absolute", conv, kind))
-            d = conv.rsplit(":", 1)[0] + ":"
-            if d not in file_dirs:
-                file_dirs.append(d)
 
     for fr in target.find("LINKORDER").findall("FILEREF"):
         raw = fr.findtext("PATH")
@@ -309,11 +335,9 @@ def main():
     settings = []
     for name, value in scalars:
         settings.append(settings_scalar(name, value))
-    # genuine nested access-path structures
-    up_blocks = [search_path_block(p, "MacOS", r) for (p, r) in user_paths]
-    # also add the per-directory absolute paths (for in-tree header resolution)
-    up_blocks += [search_path_block(d, "MacOS", "Absolute") for d in file_dirs]
-    sp_blocks = [search_path_block(p, "MacOS", r) for (p, r) in system_paths]
+    # genuine nested access-path structures, straight from the real export
+    up_blocks = [search_path_block(p, f, r, rec) for (p, f, r, rec) in user_paths]
+    sp_blocks = [search_path_block(p, f, r, rec) for (p, f, r, rec) in system_paths]
     settings.append("<SETTING><NAME>UserSearchPaths</NAME>%s</SETTING>" % "".join(up_blocks))
     settings.append("<SETTING><NAME>SystemSearchPaths</NAME>%s</SETTING>" % "".join(sp_blocks))
 
@@ -354,9 +378,9 @@ def main():
             print("    ... and %d more" % (len(missing) - 15))
     print("wrote %s" % out_path)
     print("  target: %s | files: %d (libraries: %d) | linkorder: %d | groups: %d | "
-          "user paths: %d (+%d per-dir) | system paths: %d"
+          "user paths: %d | system paths: %d (from %s)"
           % (target_name, n_files, n_lib, len(linkorder_xml), len(groups_xml),
-             len(user_paths), len(file_dirs), len(system_paths)))
+             len(user_paths), len(system_paths), os.path.basename(args.access_paths)))
 
 
 if __name__ == "__main__":

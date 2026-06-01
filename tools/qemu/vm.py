@@ -221,6 +221,34 @@ class VM:
             time.sleep(interval)
         return False
 
+    def shutdown(self, wait=90):
+        """Clean in-guest power-off via Finder's Special -> Shut Down (press-drag).
+        Avoids the Disk First Aid repair that a hard `quit` forces on next boot.
+        Assumes Finder is reachable and there are no modal dialogs / unsaved-work
+        prompts (quit any app with unsaved work yourself first). Menu-title x and
+        item y are resolution-independent (menus are top-left anchored, items are
+        fixed pixel offsets). Returns True if the VM process exits within `wait` s."""
+        import os
+        # bring Finder frontmost by clicking an empty desktop spot (left-center is safe)
+        self._abs(self.w // 3, self.h - 90); time.sleep(0.4)
+        self._cmd("input-send-event", {"events": [
+            {"type": "btn", "data": {"button": "left", "down": True}}]})
+        time.sleep(0.08)
+        self._cmd("input-send-event", {"events": [
+            {"type": "btn", "data": {"button": "left", "down": False}}]})
+        time.sleep(0.6)
+        # Special menu title ~x=247, "Shut Down" item ~y=136 (640x480-calibrated,
+        # resolution-independent because the menu bar is left-anchored).
+        self.pressdrag(247, 7, 270, 136)
+        # wait for the QEMU process to exit (clean poweroff quits qemu since we
+        # don't pass -no-shutdown)
+        deadline = time.time() + wait
+        while time.time() < deadline:
+            if os.system("pgrep -x qemu-system-ppc >/dev/null 2>&1") != 0:
+                return True
+            time.sleep(3)
+        return False
+
     def snapshot(self, tag):
         return self.hmp("savevm %s" % tag)
 
@@ -287,6 +315,8 @@ def main(argv):
         print(vm.snapshots())
     elif verb == "powerdown":
         vm.powerdown()
+    elif verb == "shutdown":
+        print("clean shutdown:", "OK" if vm.shutdown() else "TIMEOUT")
     elif verb == "quit":
         vm.quit()
     elif verb == "probe-tablet":
