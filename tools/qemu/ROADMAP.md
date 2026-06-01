@@ -34,7 +34,7 @@ see [docs/PERFORMANCE.md](docs/PERFORMANCE.md) (levers + measurements) and
 
 ## The critical path
 
-### M1 — Import the project into CodeWarrior (NOW)
+### M1 — Import the project into CodeWarrior (NOW) — [#1](https://github.com/khawkins98/macsurf/issues/1)
 
 The repo's `MacSurf.mcp` is a hand-maintained XML manifest that CW8 cannot
 open or import (schema mismatch — see GOTCHAS.md). The converter generates a
@@ -61,7 +61,7 @@ Import behaviors verified in earlier sessions: CW8 parses all entries; menus
 need press-drag; SAVE dialogs type into the Name field; Esc cancels the dialog.
 Full GUI-driving reference: [docs/INPUT.md](docs/INPUT.md).
 
-### M2 — First green build
+### M2 — First green build — [#1](https://github.com/khawkins98/macsurf/issues/1)
 
 In CW8: **Make** (⌘M). Expect 30–60+ min under TCG for the cold 530-file build;
 poll by screen motion (`vm.py settle` / screenshots), not elapsed time.
@@ -76,7 +76,7 @@ poll by screen motion (`vm.py settle` / screenshots), not elapsed time.
   qcow2 is the durable object cache (incremental builds from here are 5–50x
   cheaper than cold builds).
 
-### M3 — Build-loop hardening (after first green build)
+### M3 — Build-loop hardening (after first green build) — [#4](https://github.com/khawkins98/macsurf/issues/4)
 
 In payoff order; details in [docs/PERFORMANCE.md](docs/PERFORMANCE.md):
 
@@ -89,13 +89,13 @@ In payoff order; details in [docs/PERFORMANCE.md](docs/PERFORMANCE.md):
 
 ### M4 — Bigger performance levers (when the loop is stable)
 
-1. **Sharded compilation**: split into 4 CW8 Library targets, one cloned VM per
+1. **Sharded compilation** ([#5](https://github.com/khawkins98/macsurf/issues/5)): split into 4 CW8 Library targets, one cloned VM per
    shard, link once. ~3–3.5x on cold builds. (EMULATION-FRONTIER.md §4)
-2. **SheepShaver arm64-JIT spike**: build `kanjitalk755/macemu` with the JIT
+2. **SheepShaver arm64-JIT spike** ([#6](https://github.com/khawkins98/macsurf/issues/6)): build `kanjitalk755/macemu` with the JIT
    enabled, install CW8, attempt a compile. ~5x if it works; nobody has tried
    (the maintainer only ever used SheepShaver for runtime smoke tests).
 
-### M5 — The toolchain question (Ken's long-term interest)
+### M5 — The toolchain question (Ken's long-term interest) — [#7](https://github.com/khawkins98/macsurf/issues/7)
 
 Evaluate replacing CodeWarrior with **Retro68** (GCC-based PPC cross-compiler,
 runs natively on macOS/Linux). This would eliminate the emulated build loop
@@ -110,17 +110,19 @@ known-good CW8 baseline to compare against.
 
 ## Open questions for the maintainer
 
+Tracked as issues [#2](https://github.com/khawkins98/macsurf/issues/2) and [#3](https://github.com/khawkins98/macsurf/issues/3) on the fork.
+
 Surfaced by the tooling on this branch; need Mac-side answers. None block M1
 (the generated project uses the manifest's choices, with warnings).
 
-1. **Designated initializers in 7 manifest files** (found by `tools/precheck.sh`):
+1. **Designated initializers in 7 manifest files** ([#2](https://github.com/khawkins98/macsurf/issues/2), found by `tools/precheck.sh`):
    `layout.c` (3 sites), `scrollbar.c` (3), `textarea.c` (3), `plot_style.h:310`,
    libcss `properties.c:188`, `unit.c:430`. Per CLAUDE.md these break CW8 —
    so either the Mac copies of these files differ from the repo (drift), or
    CW8's "C99 mode" setting accepts them and CLAUDE.md's C89 rules are
    over-strict. Whichever way it resolves, something needs updating.
 
-2. **Four manifest entries whose renamed twin differs in content** (found by
+2. **Four manifest entries whose renamed twin differs in content** ([#3](https://github.com/khawkins98/macsurf/issues/3), found by
    `manifest-to-mcpxml.py`): the manifest builds the left file, but the right
    file also exists with different content — which is the real one?
    - `content.c` vs `ns_content.c` (netsurf/content)
