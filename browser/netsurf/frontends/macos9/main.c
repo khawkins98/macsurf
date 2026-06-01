@@ -152,6 +152,17 @@ static void macos9_init_menus(void) {
 		InsertMenu(view_menu, 0);
 	}
 
+	/* fixes351 (#48) — Bookmarks menu. Items dispatch to the existing
+	 * macos9_bookmark_add / macos9_bookmark_list_show in
+	 * macos9_chrome_extras.c (which already store in a session-scope
+	 * array; disk persistence deferred). */
+	{
+		MenuHandle bookmark_menu = NewMenu(MENU_BOOKMARK, "\pBookmarks");
+		AppendMenu(bookmark_menu, "\pAdd Bookmark/D");
+		AppendMenu(bookmark_menu, "\pShow Bookmarks/B");
+		InsertMenu(bookmark_menu, 0);
+	}
+
 	DrawMenuBar();
 #endif
 }
@@ -232,6 +243,22 @@ static void macos9_handle_menu(short menu_id, short item) {
 			 * Future: real Carbon dialog with search controls. */
 			extern void macos9_find_in_page(struct gui_window *g);
 			macos9_find_in_page(gw);
+		} break;
+		default: break;
+		}
+		break;
+	case MENU_BOOKMARK:
+		/* fixes351 (#48) — Bookmarks menu dispatcher. The add/show
+		 * functions live in macos9_chrome_extras.c and were landed in
+		 * fixes331 with no menu wiring at the time; this hooks them up. */
+		switch (item) {
+		case ITEM_BMK_ADD: {
+			extern void macos9_bookmark_add(struct gui_window *g);
+			macos9_bookmark_add(gw);
+		} break;
+		case ITEM_BMK_SHOW: {
+			extern void macos9_bookmark_list_show(struct gui_window *g);
+			macos9_bookmark_list_show(gw);
 		} break;
 		default: break;
 		}

@@ -92,7 +92,14 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 	if (c == NULL) return false;
 	htmlc = (html_content *)c;
 	if (htmlc->layout == NULL) return false;
-	if (htmlc->js_thread == NULL) return false;
+	/* fixes351 (#110) — the JS-thread guard moved BELOW the
+	 * summary-toggle block. <summary> click → <details>[open] toggle is
+	 * a native widget behaviour with zero Duktape dependency (libdom
+	 * attribute mutate + schedule_reformat), so a page that contains
+	 * only HTML must still be able to toggle. Pre-fix, the guard
+	 * short-circuited any page that didn't spin up a JS thread,
+	 * silently killing #110 even though the toggle code was right
+	 * below. */
 
 	box = htmlc->layout;
 	while (box != NULL) {
@@ -107,13 +114,25 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 	 * `open` attribute. Walk up from the clicked box to find a
 	 * summary, then mutate its parent details. Skip the onclick
 	 * dispatch for this case since the toggle is a native widget
-	 * behaviour. */
+	 * behaviour.
+	 *
+	 * fixes351a (#110) — keep walking past boxes whose ->node is NULL.
+	 * The box tree contains anonymous inline containers between a
+	 * text box and the styled inline-level element it belongs to;
+	 * those anonymous boxes have node==NULL. The pre-fix loop
+	 * condition `while (cand != NULL && cand->node != NULL)` exited as
+	 * soon as it hit one of those, so the walk never reached the
+	 * actual <summary> box and the toggle silently never fired even
+	 * though click dispatch was reaching this function. The fix is to
+	 * walk while cand is non-NULL and just skip the body when node is
+	 * NULL. */
 	{
 		struct box *cand = box;
-		while (cand != NULL && cand->node != NULL) {
+		while (cand != NULL) {
 			dom_string *tname = NULL;
 			dom_node_type ntype;
-			if (dom_node_get_node_type(cand->node, &ntype) ==
+			if (cand->node != NULL &&
+			    dom_node_get_node_type(cand->node, &ntype) ==
 					DOM_NO_ERR &&
 			    ntype == DOM_ELEMENT_NODE &&
 			    dom_node_get_node_name(cand->node, &tname) ==
@@ -134,6 +153,10 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 				if (is_summary && cand->parent != NULL &&
 				    cand->parent->node != NULL) {
 					dom_string *open_name = NULL;
+#ifdef __MACOS9__
+					macsurf_debug_log_writef(
+						"fixes351a: summary toggle firing");
+#endif
 					if (dom_string_create(
 						(const unsigned char *)"open", 4,
 						&open_name) == DOM_NO_ERR &&
@@ -165,9 +188,22 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 							}
 						}
 						dom_string_unref(open_name);
+						/* fixes351b (#110) — schedule_reformat
+						 * alone re-runs layout but uses the STALE
+						 * cascade results, so the new `open`
+						 * attribute never matches
+						 * `details[open] > *` and the inner
+						 * content stays hidden (or vice versa
+						 * stays visible after remove). Force a
+						 * full recascade first — same call the
+						 * hover/active handler uses for the same
+						 * reason (pseudo-class state change). */
 						{
+							extern nserror html_recascade_tree(
+								html_content *c);
 							extern int browser_window_schedule_reformat(
 								struct browser_window *bw);
+							(void)html_recascade_tree(htmlc);
 							(void)browser_window_schedule_reformat(bw);
 						}
 						return true;
@@ -177,6 +213,10 @@ bool macos9_dispatch_click_to_js(struct browser_window *bw, int x_ns, int y_ns)
 			cand = cand->parent;
 		}
 	}
+
+	/* fixes351 (#110) — only NOW do we need the JS thread, because
+	 * everything below dispatches onclick to Duktape. */
+	if (htmlc->js_thread == NULL) return false;
 
 	target = box;
 	while (target != NULL) {

@@ -460,11 +460,45 @@ void macos9_window_address_bar_submit(struct gui_window *g) {
 	 * because fixes317 now ALWAYS attempts the other scheme on failure
 	 * (regardless of what the user typed), one shot per scheme per host
 	 * per navigation, bounce-loop-safe. */
-	if (!strstr(r, "://")) {
-		/* Mark with explicit https scheme. */
-		sprintf(f, "https://%s", r);
-	} else {
-		strcpy(f, r);
+	/* fixes351 (#99) — proper scheme detection that handles opaque
+	 * schemes (about:, data:, javascript:, mailto:, file:, resource:,
+	 * about:blank, etc.) too, not just hierarchical ones. The previous
+	 * strstr(r,"://") heuristic only saw the `//` after http/https/file/
+	 * ftp etc. and forced an https:// prepend onto everything else —
+	 * `about:cache` got mangled to `https://about:cache`, nsurl parsed
+	 * that as host=about, path=cache, fetcher 404'd, page went blank.
+	 *
+	 * RFC 3986 scheme grammar: ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+	 * followed by ":". Walk the URL looking for that shape; if the colon
+	 * lands before any "/", "?", "#", "@", or whitespace, the leading
+	 * token is a scheme and the URL is already scheme-prefixed. Otherwise
+	 * it's a bare hostname/path and gets the https:// default.
+	 */
+	{
+		long i;
+		int has_scheme = 0;
+		if (r[0] != 0 &&
+		    ((r[0] >= 'a' && r[0] <= 'z') ||
+		     (r[0] >= 'A' && r[0] <= 'Z'))) {
+			for (i = 1; r[i] != 0; i++) {
+				char c = r[i];
+				if (c == ':') {
+					has_scheme = 1;
+					break;
+				}
+				if ((c >= 'a' && c <= 'z') ||
+				    (c >= 'A' && c <= 'Z') ||
+				    (c >= '0' && c <= '9') ||
+				    c == '+' || c == '-' || c == '.')
+					continue;
+				break;
+			}
+		}
+		if (!has_scheme) {
+			sprintf(f, "https://%s", r);
+		} else {
+			strcpy(f, r);
+		}
 	}
 	/* fixes304 — URL-bar Enter bypasses the disk cache for the first
 	 * fetch of the new navigation (one-shot, cleared by macos9_cache_store

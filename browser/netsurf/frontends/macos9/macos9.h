@@ -155,6 +155,7 @@ extern bool macos9_quitting;
 #define MENU_EDIT   130
 #define MENU_GO     131
 #define MENU_VIEW   132
+#define MENU_BOOKMARK 133  /* fixes351 (#48) */
 
 #define ITEM_FILE_NEW       1
 #define ITEM_FILE_LOCATION  2
@@ -169,6 +170,10 @@ extern bool macos9_quitting;
 
 #define ITEM_VIEW_SOURCE    1
 #define ITEM_VIEW_FIND      3
+
+/* fixes351 (#48) — Bookmarks menu items. */
+#define ITEM_BMK_ADD        1
+#define ITEM_BMK_SHOW       2
 
 struct gui_window *macos9_find_window(WindowRef w);
 void macos9_window_layout(struct gui_window *g);
