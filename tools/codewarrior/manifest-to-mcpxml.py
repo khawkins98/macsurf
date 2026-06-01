@@ -6,7 +6,7 @@ Why: the repo's MacSurf.mcp mimics CW's export style but doesn't conform to the
 real schema (wrong FILEFLAGS vocabulary, missing PATHFORMAT/<?codewarrior?> PI,
 invented flat access-path form), so CW8's File->Import Project rejects it. This
 converter restructures it against the schema captured from genuine CW exports
-(see tools/qemu/reference/python-cw7-reference.xml and docs/CW-XML-SCHEMA notes).
+(see tools/codewarrior/reference/python-cw7-reference.xml and docs/CW-XML-SCHEMA notes).
 
 Key choices:
 - FILE/FILEREF entries use PATHTYPE Absolute + MacOS colon paths rooted at the

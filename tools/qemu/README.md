@@ -87,6 +87,7 @@ Step 2's save-dialog navigation + step 3 are the remaining un-executed steps; se
 | `read-results.sh <img> [dest]` | extract files from an HFS image back to the host |
 | `create-disks.sh` | create a blank system qcow2 (for from-ISO installs) |
 | `stage-project.sh` | (superseded by stage-on-bootvol.sh; kept for the machfs approach) |
+| `guest-cp.sh <file> <guest-path> [TYPE CREATOR]` | copy a single host file into the guest disk (type/creator + optional CR) |
 | `build-robot.applescript` | in-guest CodeWarrior build driver (AppleEvents; reference) |
 
 ## Disk images (~/macsurf-qemu/images/ — never committed)

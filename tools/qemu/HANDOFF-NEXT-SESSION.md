@@ -49,9 +49,9 @@ older commits of this file.
 
 ## The plan (converter is BUILT — this is now a short job)
 
-**`tools/qemu/manifest-to-mcpxml.py` already exists and works.** It converts the
+**`tools/codewarrior/manifest-to-mcpxml.py` already exists and works.** It converts the
 manifest into a genuine CW8-importable project XML using the schema captured from
-real CW exports (`tools/qemu/reference/python-cw7-reference.xml` + a research
+real CW exports (`tools/codewarrior/reference/python-cw7-reference.xml` + a research
 sweep). Key properties of its output (`MacSurf-import.xml`, gitignored/regenerable):
 - correct prologue (`<?codewarrior exportversion="1.0.1" ideversion="5.0" ?>`) + real DOCTYPE
 - 530 files as **PATHTYPE Absolute** MacOS colon paths under the staged
@@ -63,7 +63,7 @@ sweep). Key properties of its output (`MacSurf-import.xml`, gitignored/regenerab
 - validates every reference against the repo tree (build fails loudly if stale)
 
 **Steps:**
-1. `python3 tools/qemu/manifest-to-mcpxml.py` → regenerates
+1. `python3 tools/codewarrior/manifest-to-mcpxml.py` → regenerates
    `browser/netsurf/frontends/macos9/MacSurf-import.xml`
 2. Stage it into the guest: mount the disk (see `stage-on-bootvol.sh` for the
    hdiutil pattern), `ditto` the XML somewhere easy (e.g. the volume root or
