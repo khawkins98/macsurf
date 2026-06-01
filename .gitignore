@@ -19,6 +19,7 @@ COPILOT.md
 # Exceptions: the public build pack + ready-to-run binary live in builds/
 !builds/MacSurf-BuildPack.sit
 !builds/MacSurf.sit
+!builds/Complete-Project-060126.sit
 
 # Build artifacts
 MacSurf
