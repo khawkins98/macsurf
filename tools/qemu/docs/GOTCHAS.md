@@ -80,14 +80,17 @@ compiler; these cover the emulation harness).
 
 ## CodeWarrior
 
-- **The repo `MacSurf.mcp` is an XML project export, not a binary project.** Use
-  **File → Import Project** on it. **File → Open fails** with "Resource File Error
-  207008 — not a resource file" because CW binary projects live in the resource
-  fork, which git strips.
-- **The Import must save the regenerated `.mcp` into the macos9 source folder**
-  (`…:browser:netsurf:frontends:macos9:`) so the XML's relative
-  `<PATH>../../../utils/…</PATH>` refs resolve. Saving anywhere else fails at the
-  first `<FILE>` ("Error importing XML … near line 367").
+- **The repo `MacSurf.mcp` is a hand-maintained XML manifest, NOT a CodeWarrior
+  export.** It mimics CW's export style but doesn't conform to the real schema
+  (no `<?codewarrior exportversion?>` PI, `FILEFLAGS` values `compile`/`link`
+  aren't CW vocabulary, no `PATHFORMAT`, made-up flat access-path form). **File →
+  Open fails** ("Resource File Error 207008" — CW binary projects live in the
+  resource fork, which git strips) and **File → Import Project also fails**
+  ("Error importing XML … near line 367" = the first `<FILE>` entry) because of
+  the schema mismatch — NOT because of file paths or save location. Classic CW
+  tolerates missing files (shows them red); a hard import error means bad format.
+  Fix: capture a genuine CW8 export (make a tiny project in the guest, File →
+  Export Project) and convert the manifest to that schema. See HANDOFF-NEXT-SESSION.md.
 - **CodeWarrior 8 is drag-installable** (officially, per its Installation Notes):
   copy the "Metrowerks CodeWarrior" folder + System Folder Items (CarbonLib 1.5,
   MetroNub, MRO) — no installer, no serial (`license.dat` is bundled). This is how
