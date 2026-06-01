@@ -75,6 +75,13 @@ MANIFEST_RENAMES = {
     "../../../../libcss/src/parse/properties/voice_family.c": "browser/libcss/src/parse/properties/p_voice_family.c",
     "../../../../libcss/src/select/properties/voice_family.c": "browser/libcss/src/select/properties/s_voice_family.c",
     "../../../../libcss/src/select/select.c": "browser/libcss/src/select/css_select.c",
+    # --- stale-TWIN correction (NOT a missing file: BOTH copies exist in the repo) ---
+    # CLAUDE.md "Known Gotchas" documents that the Mac compiles s_dispatch.c (renamed
+    # in a2f5656d) and that dispatch.c is a stale snapshot re-added later by 02da50f5.
+    # Building dispatch.c instead of s_dispatch.c reproduces the prop_dispatch table
+    # desync crash (unmapped-memory PC, e.g. 0x68F168F0, in set_initial). The libdom
+    # events/dispatch.c entry is a DIFFERENT file and is correct as-is.
+    "../../../../libcss/src/select/dispatch.c": "browser/libcss/src/select/s_dispatch.c",
 }
 
 
@@ -270,6 +277,8 @@ def main():
         help="genuine CW access-paths export to source search paths from")
     ap.add_argument("--ideversion", default="5.0")
     ap.add_argument("--lf", action="store_true", help="LF endings (default CR)")
+    ap.add_argument("-v", "--verbose", action="store_true",
+                    help="list byte-identical twins too (not just differing ones)")
     args = ap.parse_args()
 
     out_path = args.out or os.path.join(os.path.dirname(args.manifest), "MacSurf-import.xml")
@@ -309,6 +318,7 @@ def main():
     files_xml, linkorder_xml = [], []
     n_lib = 0
     missing = []
+    source_files = []  # (raw_manifest_path, repo_rel) for every non-library entry
     repo_root = os.path.normpath(os.path.join(os.path.dirname(args.manifest), "..", "..", "..", ".."))
     for f in target.find("FILELIST").findall("FILE"):
         raw = f.findtext("PATH")
@@ -324,7 +334,47 @@ def main():
             # validate the resolved path actually exists in the repo tree
             if repo_rel and not os.path.exists(os.path.join(repo_root, repo_rel)):
                 missing.append((raw, repo_rel))
+            source_files.append((raw, repo_rel))
             files_xml.append(file_entry("Absolute", conv, kind))
+
+    # ---- stale-twin detection -------------------------------------------------
+    # A "twin" = the manifest references dir/base.c but dir/<prefix>_base.c ALSO
+    # exists in the repo, where <prefix> is one of the CW8 flat-namespace rename
+    # prefixes (sweeps a2f5656d, dc62be41, fixes57, fixes61...). The manifest may
+    # be pointing at the stale copy -- which still compiles cleanly, so nothing
+    # errors; it just builds old code. This is the dispatch.c/s_dispatch.c bug
+    # class documented in CLAUDE.md "Known Gotchas". These need a MAINTAINER
+    # decision (which copy is the real build file?) -- do NOT auto-fix; entries
+    # already resolved by MANIFEST_RENAMES above are exempt (mapping documented).
+    #
+    # Twins whose content is byte-identical to the manifest's choice are reported
+    # separately: building either produces the same code TODAY, but they will
+    # drift the moment one is edited.
+    RENAME_PREFIXES = ("p_", "s_", "ag_", "css_", "ns_", "hub_", "pu_", "dom_",
+                       "libcss_", "libhubbub_", "html_", "macos9_")
+    twins_differ, twins_identical = [], []
+    for raw, repo_rel in source_files:
+        if not repo_rel:
+            continue
+        if raw in MANIFEST_RENAMES:
+            continue  # already mapped with documented evidence
+        d, base = os.path.split(repo_rel)
+        full_dir = os.path.join(repo_root, d)
+        if not os.path.isdir(full_dir):
+            continue
+        for pfx in RENAME_PREFIXES:
+            cand = pfx + base
+            cand_path = os.path.join(full_dir, cand)
+            if not os.path.exists(cand_path):
+                continue
+            ref_path = os.path.join(repo_root, repo_rel)
+            try:
+                same = (os.path.exists(ref_path) and
+                        open(ref_path, "rb").read() == open(cand_path, "rb").read())
+            except OSError:
+                same = False
+            entry = (repo_rel, posixpath.join(d, cand))
+            (twins_identical if same else twins_differ).append(entry)
 
     for fr in target.find("LINKORDER").findall("FILEREF"):
         raw = fr.findtext("PATH")
@@ -414,6 +464,21 @@ def main():
             print("    %s  ->  %s" % (raw, rel))
         if len(missing) > 15:
             print("    ... and %d more" % (len(missing) - 15))
+    if twins_differ:
+        print("WARNING: %d manifest entries have a renamed TWIN on disk WITH DIFFERENT" % len(twins_differ))
+        print("  CONTENT -- the manifest may be building the stale copy (the")
+        print("  dispatch.c/s_dispatch.c bug class, see CLAUDE.md Known Gotchas).")
+        print("  Maintainer decision needed; project was generated with the manifest's")
+        print("  choice as-is:")
+        for ref, twin in twins_differ:
+            print("    manifest builds: %s   DIFFERING twin: %s" % (ref, twin))
+    if twins_identical:
+        print("note: %d manifest entries have a byte-identical renamed twin on disk" % len(twins_identical))
+        print("  (harmless today; will become the warning above the moment either copy")
+        print("  is edited). Run with -v to list them." if not args.verbose else "  :")
+        if args.verbose:
+            for ref, twin in twins_identical:
+                print("    manifest builds: %s   identical twin: %s" % (ref, twin))
     print("wrote %s" % out_path)
     print("  target: %s | files: %d (libraries: %d) | linkorder: %d | groups: %d | "
           "user paths: %d | system paths: %d (from %s)"
