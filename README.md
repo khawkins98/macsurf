@@ -18,10 +18,9 @@
 <p align="center">
   <em>MacSurf is a nights-and-weekends project. If it brought your old Mac back to the web, a coffee helps keep development going.</em>
 </p>
+<p align="center"><a href="https://ko-fi.com/macsurf" target="_blank"><img src="https://github.com/mplsllc/macsurf/blob/master/support_me_on_kofi_badge_blue.png" /></a></p>
 
 <p align="center">
-  <a href="https://github.com/mplsllc/macsurf/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/mplsllc/macsurf?include_prereleases&label=release&color=ff8800"></a>
-  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/mplsllc/macsurf?color=blue"></a>
   <a href="https://github.com/mplsllc/macsurf/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/mplsllc/macsurf"></a>
   <a href="https://github.com/mplsllc/macsurf/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/mplsllc/macsurf?style=flat"></a>
   <a href="https://en.wikipedia.org/wiki/Mac_OS_9"><img alt="Mac OS 9" src="https://img.shields.io/badge/Mac%20OS-9.1%E2%80%939.2.2-silver?logo=apple&logoColor=white"></a>
@@ -30,7 +29,6 @@
   <a href="https://en.wikipedia.org/wiki/Carbon_(API)"><img alt="Carbon API" src="https://img.shields.io/badge/API-Carbon-lightgrey"></a>
   <a href="docs/css-status.md"><img alt="CSS coverage" src="https://img.shields.io/badge/CSS-150%2B%20properties-9cf"></a>
   <img alt="JavaScript engine" src="https://img.shields.io/badge/JavaScript-Duktape%20ES5-lightgrey">
-  <a href="https://github.com/mplsllc/macsurf/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/mplsllc/macsurf?color=purple"></a>
 </p>
 
 ---
