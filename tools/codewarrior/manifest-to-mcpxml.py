@@ -105,6 +105,25 @@ def unix_rel_to_mac_abs(rel_path, prefix):
     return ":".join(source_root + joined.split("/")), joined
 
 
+# The hand-maintained manifest uses some setting NAMEs that are not the genuine
+# CodeWarrior panel keys, so CW silently ignores them on import. Map them to the
+# real names (verified against the reference CW export). The prefix-file rename is
+# load-bearing: without MWFrontEnd_C_prefixname, macsurf_prefix.h is never applied
+# to any compile, and every "inline", bool/true/false, NSLOG, Carbon.h suppression
+# guard, and __MACOS9__ define is missing -> a 100+ error cascade (the first being
+# the bare "inline" keyword in the ported libparserutils sources).
+SETTING_NAME_RENAMES = {
+    "MWFrontEnd_C_prefix_file": "MWFrontEnd_C_prefixname",
+}
+
+# Settings the import MUST carry for a clean C89/Carbon build, emitted if the
+# manifest didn't supply them under any (renamed) name. Value is the bare filename;
+# CW resolves it through the user access paths (the macos9 folder is on them).
+REQUIRED_SCALARS = {
+    "MWFrontEnd_C_prefixname": "macsurf_prefix.h",
+}
+
+
 def settings_scalar(name, value):
     return '<SETTING><NAME>%s</NAME><VALUE>%s</VALUE></SETTING>' % (escape(name), escape(value or ""))
 
@@ -271,11 +290,19 @@ def main():
     # scalar settings pass through; access paths come from the genuine export
     # (Access Paths.xml), NOT the stale manifest UserSearchPath/SystemSearchPath.
     scalars = []
+    seen_names = set()
     for s in target.find("SETTINGLIST").findall("SETTING"):
         name = s.findtext("NAME")
         if name in ("UserSearchPath", "SystemSearchPath"):
             continue  # stale; replaced below
+        name = SETTING_NAME_RENAMES.get(name, name)  # fix wrong CW panel keys
         scalars.append((name, s.findtext("VALUE")))
+        seen_names.add(name)
+    # backfill settings the build can't omit (e.g. the prefix file) if absent
+    for name, value in REQUIRED_SCALARS.items():
+        if name not in seen_names:
+            scalars.append((name, value))
+            seen_names.add(name)
     user_paths, system_paths, ap_flags = parse_access_paths_xml(args.access_paths)
 
     # files
