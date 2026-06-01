@@ -130,6 +130,17 @@ REQUIRED_SCALARS = {
     "MWFrontEnd_C_prefixname": "macsurf_prefix.h",
 }
 
+# Settings whose manifest VALUE we deliberately override on conversion (the manifest
+# stays the maintainer's source of truth; we only flip these at import-build time).
+# MWWarning_C_warn_implicitconv: the manifest has it 1 (on), which floods a clean
+# build with ~27K benign "implicit arithmetic conversion" warnings from the ported
+# libraries (libcss/libdom/duktape do tons of intentional int-width conversions),
+# burying the handful of warnings that matter. 0 = off. The genuine CW reference
+# export also ships this off.
+SETTING_VALUE_OVERRIDES = {
+    "MWWarning_C_warn_implicitconv": "0",
+}
+
 
 def settings_scalar(name, value):
     return '<SETTING><NAME>%s</NAME><VALUE>%s</VALUE></SETTING>' % (escape(name), escape(value or ""))
@@ -305,7 +316,8 @@ def main():
         if name in ("UserSearchPath", "SystemSearchPath"):
             continue  # stale; replaced below
         name = SETTING_NAME_RENAMES.get(name, name)  # fix wrong CW panel keys
-        scalars.append((name, s.findtext("VALUE")))
+        value = SETTING_VALUE_OVERRIDES.get(name, s.findtext("VALUE"))  # flip chosen values
+        scalars.append((name, value))
         seen_names.add(name)
     # backfill settings the build can't omit (e.g. the prefix file) if absent
     for name, value in REQUIRED_SCALARS.items():
