@@ -162,9 +162,14 @@ def file_entry(pathtype, path, filekind, pathformat="MacOS"):
     ) % (pathtype, escape(path), pathformat, filekind)
 
 
-def fileref_entry(pathtype, path, pathformat="MacOS"):
+def fileref_entry(pathtype, path, pathformat="MacOS", targetname=None):
+    """FILEREFs inside LINKORDER inherit the TARGET context; FILEREFs inside
+    GROUPLIST live at PROJECT level and REQUIRE <TARGETNAME> (verified against
+    the reference export — omitting it gives "A target needs to be specified
+    in this context" at import)."""
+    tn = "<TARGETNAME>%s</TARGETNAME>" % escape(targetname) if targetname else ""
     return (
-        "<FILEREF>"
+        "<FILEREF>" + tn +
         "<PATHTYPE>%s</PATHTYPE>"
         "<PATH>%s</PATH>"
         "<PATHFORMAT>%s</PATHFORMAT>"
@@ -284,7 +289,7 @@ def main():
                 if result is None:
                     continue
                 ptype, conv, is_lib, _ = result
-                refs.append(fileref_entry("Name" if is_lib else "Absolute", conv))
+                refs.append(fileref_entry("Name" if is_lib else "Absolute", conv, targetname=target_name))
             groups_xml.append("<GROUP><NAME>%s</NAME>%s</GROUP>" % (escape(gname), "".join(refs)))
     # catch-all group for files not in any manifest group (CW shows the project tree from GROUPLIST)
     leftovers = []
@@ -296,7 +301,7 @@ def main():
         if result is None:
             continue
         ptype, conv, is_lib, _ = result
-        leftovers.append(fileref_entry("Name" if is_lib else "Absolute", conv))
+        leftovers.append(fileref_entry("Name" if is_lib else "Absolute", conv, targetname=target_name))
     if leftovers:
         groups_xml.append("<GROUP><NAME>Other Sources</NAME>%s</GROUP>" % "".join(leftovers))
 
