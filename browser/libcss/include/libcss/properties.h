@@ -162,6 +162,7 @@ enum css_properties_e {
 	CSS_PROP_ACCENT_COLOR                   = 0x091,
 	CSS_PROP_CARET_COLOR                    = 0x092,
 	CSS_PROP_BOX_DECORATION_BREAK           = 0x093,
+	CSS_PROP_TAB_SIZE                       = 0x094,
 	CSS_N_PROPERTIES
 };
 

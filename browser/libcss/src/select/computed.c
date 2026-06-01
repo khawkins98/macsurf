@@ -626,6 +626,13 @@ uint8_t css_computed_box_decoration_break(
 	return CSS_BOX_DECORATION_BREAK_CLONE;
 }
 
+int32_t css_computed_tab_size(const css_computed_style *style)
+{
+	int32_t v = style->i.tab_size;
+	if (v <= 0) return 8; /* CSS default */
+	return v;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

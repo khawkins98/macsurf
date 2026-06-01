@@ -257,6 +257,8 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("-macsurf-grid-flow"),
 	SMAP("accent-color"),
 	SMAP("caret-color"),
+	SMAP("box-decoration-break"),
+	SMAP("tab-size"),
 	SMAP("inherit"),
 	SMAP("unset"),
 	SMAP("important"),

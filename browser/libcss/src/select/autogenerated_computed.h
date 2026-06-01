@@ -402,6 +402,11 @@ struct css_computed_style_i {
 	 * Not inherited; initial = SLICE. int32_t for self-alignment per
 	 * the fixes151b discipline. */
 	int32_t box_decoration_break;
+	/* fixes355 (#58): tab-size (integer form).
+	 *   0 = unset (consumer uses 8 = CSS default)
+	 *   N>0 = explicit integer number of space widths
+	 * Inherits. Length-form (px / em) deferred to V2. */
+	int32_t tab_size;
 };
 
 struct css_computed_style {

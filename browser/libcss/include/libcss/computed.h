@@ -296,6 +296,10 @@ uint8_t css_computed_caret_color(const css_computed_style *style,
 uint8_t css_computed_box_decoration_break(
 		const css_computed_style *style);
 
+/* fixes355 (#58): tab-size. Returns the integer number of space
+ * widths; 0 stored = unset, returned as the CSS default of 8. */
+int32_t css_computed_tab_size(const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

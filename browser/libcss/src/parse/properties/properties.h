@@ -160,6 +160,9 @@ css_error css__parse_caret_color(css_language *c,
 css_error css__parse_box_decoration_break(css_language *c,
 		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result);
+css_error css__parse_tab_size(css_language *c,
+		const parserutils_vector *vector, int32_t *ctx,
+		css_style *result);
 
 css_error css__parse_border_right(css_language *c,		const parserutils_vector *vector, int32_t *ctx,
 		css_style *result);

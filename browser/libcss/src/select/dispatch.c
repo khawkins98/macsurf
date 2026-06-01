@@ -610,5 +610,9 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 		PROPERTY_FUNCS(box_decoration_break),
 		0,
+	},
+	{
+		PROPERTY_FUNCS(tab_size),
+		1,
 	}
 	};
