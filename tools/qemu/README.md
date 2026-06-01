@@ -58,20 +58,19 @@ and `config.sh` defaults to this combination. Full story: [docs/INPUT.md](docs/I
 
 ## Building MacSurf in the guest (current status)
 
-The repo's `MacSurf.mcp` is a CodeWarrior **XML project export** (531 files,
-relative paths). Verified working flow:
+The repo's `MacSurf.mcp` is a hand-maintained manifest that CW8 cannot open or
+import directly (see `docs/GOTCHAS.md`). The working flow:
 
 1. Source is staged on the boot volume at
    `Back40:Desktop Folder:patrick:macsurf-source Folder:browser:…`
-   (done by `stage-on-bootvol.sh`; the boot volume is renamed "Back40" so the
-   project's absolute access paths also resolve).
-2. In CodeWarrior: **File → Import Project** → select the staged `MacSurf.mcp` XML
-   → **save the regenerated `.mcp` into the same macos9 folder** (so the XML's
-   relative `../../../` file refs resolve — saving elsewhere fails at line 367).
-3. **Make** (Cmd-M). First build under TCG is slow (expect 30–60 min).
+   (`stage-on-bootvol.sh`; boot volume renamed "Back40").
+2. **Generate an importable project**: `python3 tools/codewarrior/manifest-to-mcpxml.py`
+   → `MacSurf-import.xml` (genuine CW8 schema, absolute paths — location-independent).
+3. Stage it into the guest (`guest-cp.sh`), then in CodeWarrior:
+   **File → Import Project** → select it → type a name + Return (save anywhere).
+4. **Make** (Cmd-M). First build under TCG is slow (expect 30–60 min).
 
-Step 2's save-dialog navigation + step 3 are the remaining un-executed steps; see
-[MORNING-STATUS.md](MORNING-STATUS.md) for exactly where this stands.
+See [MORNING-STATUS.md](MORNING-STATUS.md) for exactly where this stands.
 
 ## Scripts reference
 
@@ -88,7 +87,9 @@ Step 2's save-dialog navigation + step 3 are the remaining un-executed steps; se
 | `create-disks.sh` | create a blank system qcow2 (for from-ISO installs) |
 | `stage-project.sh` | (superseded by stage-on-bootvol.sh; kept for the machfs approach) |
 | `guest-cp.sh <file> <guest-path> [TYPE CREATOR]` | copy a single host file into the guest disk (type/creator + optional CR) |
-| `build-robot.applescript` | in-guest CodeWarrior build driver (AppleEvents; reference) |
+
+CodeWarrior project tooling (the manifest converter, build-robot AppleScript) lives
+in **[`tools/codewarrior/`](../codewarrior/)** — it works on any Mac, not just QEMU.
 
 ## Disk images (~/macsurf-qemu/images/ — never committed)
 
