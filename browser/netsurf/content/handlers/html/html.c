@@ -1420,6 +1420,16 @@ static void html_reformat(struct content *c, int width, int height)
 	/* calculate next reflow time at three times what it took to reflow */
 	nsu_getmonotonic_ms(&ms_after);
 
+	/* fixes352 (#107) — stash the last reformat duration so about:perf
+	 * can render real numbers instead of a placeholder. Single-threaded
+	 * cooperative app; no overlap between pages. */
+#ifdef __MACOS9__
+	{
+		extern long macsurf__site_reformat_ms;
+		macsurf__site_reformat_ms = (long)(ms_after - ms_before);
+	}
+#endif
+
 	ms_interval = (ms_after - ms_before) * 3;
 	if (ms_interval < (nsoption_uint(min_reflow_period) * 10)) {
 		ms_interval = nsoption_uint(min_reflow_period) * 10;

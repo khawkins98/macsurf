@@ -278,6 +278,11 @@ struct stub_fetch_ctx {
 	 * actually populated; 0 means use the static fallback in stub_body_for. */
 	char body_buf[2048];
 	size_t body_used;
+	/* fixes352a (#96) — heap-allocated body for data: URLs whose
+	 * decoded content can be much larger than body_buf. Owned by ctx
+	 * and freed in stub_free. Only used by SCH_DATA. */
+	unsigned char *dyn_body;
+	size_t dyn_body_len;
 };
 
 static struct stub_fetch_ctx *stub_ring = NULL;
@@ -399,6 +404,31 @@ stub_body_for(const struct stub_fetch_ctx *ctx,
 		return;
 
 	case SCH_DATA:
+		/* fixes352a (#96) — serve the decoded body the setup path
+		 * stashed in ctx->dyn_body. MIME comes out of ctx->path's
+		 * before-comma section (e.g. "text/plain;charset=utf-8" →
+		 * "text/plain"; default text/plain when none specified or
+		 * decode failed). */
+		if (ctx->dyn_body != NULL) {
+			*body_out = (const char *)ctx->dyn_body;
+			*len_out = ctx->dyn_body_len;
+			if (strncmp(ctx->path, "text/html", 9) == 0) {
+				*mime_out = "text/html";
+			} else if (strncmp(ctx->path, "text/css", 8) == 0) {
+				*mime_out = "text/css";
+			} else if (strncmp(ctx->path, "text/", 5) == 0) {
+				*mime_out = "text/plain";
+			} else if (strncmp(ctx->path, "image/png", 9) == 0) {
+				*mime_out = "image/png";
+			} else if (strncmp(ctx->path, "image/jpeg", 10) == 0) {
+				*mime_out = "image/jpeg";
+			} else if (strncmp(ctx->path, "image/gif", 9) == 0) {
+				*mime_out = "image/gif";
+			} else {
+				*mime_out = "text/plain";
+			}
+			return;
+		}
 		*body_out = "";
 		*len_out = 0;
 		*mime_out = "application/octet-stream";
@@ -596,17 +626,63 @@ stub_setup_scheme(struct fetch *parent_fetch, struct nsurl *url,
 				"</body></html>");
 		} else if (strncmp(ctx->path, "perf", 4) == 0 &&
 			   (ctx->path[4] == '\0' || ctx->path[4] == '/')) {
+			extern long macsurf__site_reformat_ms;
+			extern long macsurf__site_box_total;
+			extern long macsurf__site_box_blk;
+			extern long macsurf__site_box_inlinec;
+			extern long macsurf__site_box_inline;
+			extern long macsurf__site_box_text;
+			extern long macsurf__site_box_other;
+			extern long macsurf__site_img_ok;
+			extern long macsurf__site_img_fail;
+			extern long macsurf__site_css_ok;
+			extern long macsurf__site_css_skip;
+			extern unsigned long macsurf__site_css_total_bytes;
 			rn = sprintf(ctx->body_buf,
 				"<html><head><title>about:perf</title>"
 				"<style>body{font-family:Geneva,sans-serif;"
 				"background:#FFF4D0;color:#002030;padding:24px;}"
-				"h1{color:#002030;}</style></head>"
+				"h1{color:#002030;}"
+				"table{border-collapse:collapse;margin:12px 0;}"
+				"th,td{border:1px solid #002030;padding:4px 10px;"
+				"text-align:left;font-family:Monaco,monospace;"
+				"font-size:11px;}"
+				"th{background:#E07010;color:#fff;}"
+				"</style></head>"
 				"<body><h1>about:perf</h1>"
-				"<p>Per-page layout / fetch / paint timing is "
-				"logged to MacSurf Debug.log on the Desktop "
-				"(SITE log lines after every reformat).</p>"
-				"<p>Future round will surface timing here.</p>"
-				"</body></html>");
+				"<p>Live counters from the most recently loaded "
+				"page. Reformat_ms = wall-clock duration of the "
+				"layout pass.</p>"
+				"<table>"
+				"<tr><th>Metric</th><th>Value</th></tr>"
+				"<tr><td>reformat_ms</td><td>%ld</td></tr>"
+				"<tr><td>box_total</td><td>%ld</td></tr>"
+				"<tr><td>box_block</td><td>%ld</td></tr>"
+				"<tr><td>box_inline_container</td><td>%ld</td></tr>"
+				"<tr><td>box_inline</td><td>%ld</td></tr>"
+				"<tr><td>box_text</td><td>%ld</td></tr>"
+				"<tr><td>box_other</td><td>%ld</td></tr>"
+				"<tr><td>img_ok</td><td>%ld</td></tr>"
+				"<tr><td>img_fail</td><td>%ld</td></tr>"
+				"<tr><td>css_ok</td><td>%ld</td></tr>"
+				"<tr><td>css_skip</td><td>%ld</td></tr>"
+				"<tr><td>css_total_bytes</td><td>%lu</td></tr>"
+				"</table>"
+				"<p>SITE log lines in MacSurf Debug.log (Desktop) "
+				"carry the full per-fetch timing.</p>"
+				"</body></html>",
+				macsurf__site_reformat_ms,
+				macsurf__site_box_total,
+				macsurf__site_box_blk,
+				macsurf__site_box_inlinec,
+				macsurf__site_box_inline,
+				macsurf__site_box_text,
+				macsurf__site_box_other,
+				macsurf__site_img_ok,
+				macsurf__site_img_fail,
+				macsurf__site_css_ok,
+				macsurf__site_css_skip,
+				macsurf__site_css_total_bytes);
 		}
 		if (rn > 0 && (size_t)rn < sizeof(ctx->body_buf)) {
 			ctx->body_used = (size_t)rn;
@@ -654,6 +730,26 @@ stub_setup_file(struct fetch *parent_fetch, struct nsurl *url,
 	return stub_setup_scheme(parent_fetch, url, SCH_FILE);
 }
 
+/* fixes352a (#96) — data: URL fetcher. Pre-fix this returned an empty
+ * body, so any data: navigation (including View Source) silently went
+ * nowhere. Now parses the URL per RFC 2397 (subset):
+ *
+ *   data:[<mediatype>][;base64],<data>
+ *
+ * V1 supports percent-decoding of the data segment only (no base64).
+ * The MIME type is read out of the before-comma section and stored in
+ * ctx->path's prefix; stub_body_for case SCH_DATA dispatches on it.
+ * The decoded body is heap-allocated into ctx->dyn_body so very large
+ * data: URLs (e.g. a 32 KB View Source dump) survive without inflating
+ * the inline body_buf. */
+static int hex_digit(char c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	return -1;
+}
+
 static void *
 stub_setup_data(struct fetch *parent_fetch, struct nsurl *url,
 		bool only_2xx, bool downgrade_tls,
@@ -661,9 +757,77 @@ stub_setup_data(struct fetch *parent_fetch, struct nsurl *url,
 		const struct fetch_multipart_data *post_multipart,
 		const char **headers)
 {
+	struct stub_fetch_ctx *ctx;
+	const char *url_str;
+	const char *after_scheme;
+	const char *comma;
+	const char *encoded;
+	size_t enc_len;
+	size_t i, j;
+	size_t mime_n;
+	unsigned char *body;
+
 	(void)only_2xx; (void)downgrade_tls;
 	(void)post_urlenc; (void)post_multipart; (void)headers;
-	return stub_setup_scheme(parent_fetch, url, SCH_DATA);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (ctx == NULL) return NULL;
+	ctx->parent = parent_fetch;
+	ctx->scheme = SCH_DATA;
+
+	url_str = nsurl_access(url);
+	if (url_str == NULL) goto bail_min;
+
+	/* Skip "data:" */
+	after_scheme = strchr(url_str, ':');
+	if (after_scheme == NULL) goto bail_min;
+	after_scheme++;
+
+	/* Find the comma separating mediatype from data. Do this on the
+	 * RAW url_str (could be far past ctx->path's 1024-byte truncation). */
+	comma = strchr(after_scheme, ',');
+	if (comma == NULL) goto bail_min;
+
+	/* Store the mediatype portion (before the comma) in ctx->path so
+	 * stub_body_for can sniff it. Path is bounded at 1024 bytes; MIME
+	 * types are well under that. */
+	mime_n = (size_t)(comma - after_scheme);
+	if (mime_n >= sizeof(ctx->path)) mime_n = sizeof(ctx->path) - 1;
+	memcpy(ctx->path, after_scheme, mime_n);
+	ctx->path[mime_n] = '\0';
+
+	encoded = comma + 1;
+	enc_len = strlen(encoded);
+
+	body = (unsigned char *)malloc(enc_len + 1);
+	if (body == NULL) goto bail_min;
+
+	j = 0;
+	for (i = 0; i < enc_len; i++) {
+		if (encoded[i] == '%' && i + 2 < enc_len) {
+			int hi = hex_digit(encoded[i+1]);
+			int lo = hex_digit(encoded[i+2]);
+			if (hi >= 0 && lo >= 0) {
+				body[j++] = (unsigned char)((hi << 4) | lo);
+				i += 2;
+				continue;
+			}
+			body[j++] = (unsigned char)encoded[i];
+		} else if (encoded[i] == '+') {
+			body[j++] = ' ';
+		} else {
+			body[j++] = (unsigned char)encoded[i];
+		}
+	}
+	body[j] = '\0';
+
+	ctx->dyn_body = body;
+	ctx->dyn_body_len = j;
+
+bail_min:
+	stub_ring_insert(ctx);
+	MS_LOG("stub setup");
+	return ctx;
 }
 
 static void *
@@ -702,6 +866,12 @@ stub_free(void *fetch)
 	struct stub_fetch_ctx *ctx = fetch;
 	if (ctx == NULL) return;
 	stub_ring_remove(ctx);
+	/* fixes352a (#96) — free the heap-allocated data: body if any. */
+	if (ctx->dyn_body != NULL) {
+		free(ctx->dyn_body);
+		ctx->dyn_body = NULL;
+		ctx->dyn_body_len = 0;
+	}
 	free(ctx);
 }
 

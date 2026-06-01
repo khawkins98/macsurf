@@ -171,6 +171,9 @@ static void macos9_handle_menu(short menu_id, short item) {
 #ifdef __MACOS9__
 	WindowRef front;
 	struct gui_window *gw;
+	macsurf_debug_log_writef(
+		"fixes352c handle_menu: menu_id=%d item=%d",
+		(int)menu_id, (int)item);
 	switch (menu_id) {
 	case MENU_APPLE:
 		break;
@@ -242,6 +245,8 @@ static void macos9_handle_menu(short menu_id, short item) {
 			/* fixes330 (#45) — find-in-page via prompt for now.
 			 * Future: real Carbon dialog with search controls. */
 			extern void macos9_find_in_page(struct gui_window *g);
+			macsurf_debug_log_writef(
+				"fixes352c ITEM_VIEW_FIND: gw=%p", (void *)gw);
 			macos9_find_in_page(gw);
 		} break;
 		default: break;

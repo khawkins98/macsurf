@@ -43,6 +43,9 @@ long macsurf__site_box_inlinec = 0;
 long macsurf__site_box_inline = 0;
 long macsurf__site_box_text = 0;
 long macsurf__site_box_other = 0;
+/* fixes352 (#107) — last reformat duration in ms (captured in
+ * html_reformat after nsu_getmonotonic_ms). Surfaced by about:perf. */
+long macsurf__site_reformat_ms = 0;
 long macsurf__site_img_ok = 0;
 long macsurf__site_img_fail = 0;
 /* fixes160d — CSS oversize-gate counters. ok = sheet small enough,
