@@ -135,3 +135,51 @@ compiler; these cover the emulation harness).
   matches ours (mac99/512 MB/sungem) and its qcow2 boots under raw QEMU directly.
 - **Keep the pristine UTM disk untouched** as the recovery root; every derived
   image (CW install, source staging) is reproducible from it via scripts.
+
+## Performance / CPU utilization (single-vCPU TCG ceiling)
+
+- **A uniprocessor PPC guest is bounded to ONE host core.** TCG runs one
+  translation thread per guest vCPU; OS 9 is uniprocessor (`-smp 1` is forced,
+  PPC isn't MTTCG-enabled anyway), so QEMU pegs exactly one core. On a 10-core
+  machine that reads as ~10% of total in Activity Monitor. That is the ceiling,
+  not idle capacity. `-smp >1`, bigger `tb-size`, iothreads, HVF/KVM are all
+  dead ends here. (Verified: `info jit` showed TB flush count 0 with only 294 MB
+  of the 512 MB cache used, so the translation cache is not thrashing -- leave
+  `tb-size` alone.)
+- **THE big lever: keep that one core on a PERFORMANCE core, not an efficiency
+  core.** macOS demotes a *niced* thread to E-cores under P-core contention, and
+  E-cores run this TCG load ~1.5-2.5x slower. The trap: **commands launched by an
+  AI-agent / background harness inherit nice +5**, so an agent-launched QEMU runs
+  niced and gets shoved onto E-cores. A QEMU launched from a normal foreground
+  Terminal is nice 0 and gets the P-cores.
+  - **Diagnose P vs E (needs sudo):** `sudo powermetrics --samplers cpu_power -i 1000 -n 3`
+    -- the ~100% core shows up under the P-Cluster (good) or E-Cluster (bad).
+    Non-sudo: Activity Monitor -> Window -> CPU History, watch which graph pegs.
+  - **Check nice (no sudo):** `ps -o pid,nice,stat -p $(pgrep -f qemu-system-ppc)`
+    -- `NI 5` / `STAT RN` means niced.
+  - **Live fix on a running niced VM (sudo; non-disruptive, no restart):**
+    `sudo renice -n 0 -p <pid>` then `sudo taskpolicy -B -p <pid>`. Only root can
+    LOWER niceness, so a non-root `nice -n 0` cannot undo an inherited +5.
+  - **Permanent fix: launch the build VM from a plain Terminal, not via the
+    agent.** That alone gets nice 0 + P-cores. For full-speed builds, drive
+    interactively or have the user launch `launch.sh run` themselves.
+  - Ruled out as factors on this host: AC vs battery (was on AC), Low Power Mode
+    (off), thermal throttling (a single pegged core never throttles an M5; minor
+    caveat for the fanless Air on 10+ min runs -- check `pmset -g therm`).
+- **Stackable secondary levers (measure with identical cold-build wall-clock):**
+  - `-cpu g3`/`750` instead of `g4` may cut AltiVec-emulation overhead (a C
+    compiler emits no vector ops). 5-20%, SPECULATIVE. RISK: config notes flag g4
+    for 9.2.x -- test on a CLONED disk, confirm it still boots + CarbonLib loads.
+  - QEMU source build with `-O3 -flto` (+optional PGO): reliable 3-8% on the TCG
+    thread. Keep the Homebrew binary as fallback.
+  - `-display none` (headless) for unattended builds: small free gain; QMP
+    `screendump` still drives the GUI.
+  - `cache=unsafe,aio=threads` on the `-drive` (DISPOSABLE disk only -- a crash
+    can corrupt it): 0-25% IF the build is hitting HFS flush stalls. Keep the
+    pristine/clean qcow2 untouched; run unsafe on a working copy.
+- **Biggest iteration win (not raw speed): incremental builds.** Use plain Make
+  (Cmd-M), NOT "Remove Object Code -> full rebuild", when you've only edited
+  source. CW8's per-file dependency tracking recompiles just the changed TUs --
+  5-50x less work per round on a 530-file project. Reserve the full clean rebuild
+  for project-structure / prefix / access-path changes. Keep a durable
+  post-clean-build qcow2 so you never pay the cold 530-file cost twice.
