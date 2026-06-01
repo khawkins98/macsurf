@@ -7,7 +7,7 @@
 </p>
 
 <p>
-  MacSurf is a web browser for Classic Mac OS 9 PowerPC. CSS3, ES5 JavaScript, PNGs with alpha, running on a G3 iMac.
+  MacSurf is a web browser for Classic Mac OS 9 PowerPC. CSS3, ES5 JavaScript, and PNGs with alpha — running on a G3 iMac.
 </p>
 
 <div align="center">
