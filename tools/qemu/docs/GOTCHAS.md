@@ -114,6 +114,26 @@ compiler; these cover the emulation harness).
   user paths and you get thousands of "file cannot be opened" cascade errors. The
   converter now emits it (from Access Paths.xml); if hand-building, check the box.
 
+## Build-config gaps found via the harness (fresh-clone blockers)
+
+These block a clean build from a fresh clone (the DEVELOPING.md path). Found while
+driving the CW 8.3 build in QEMU:
+
+- **`ostls_cw8_prefix.h` not in the repo** — `macsurf_prefix.h` includes it
+  unconditionally, but it lives in the un-checked-in `macTLS/` tree. Vendored a copy
+  into `frontends/macos9/`. Upstream issue mplsllc/macsurf#162.
+- **`<hubbub/hubbub_errors.h>` cannot be opened (access-path granularity)** —
+  `libdom/bindings/hubbub/parser.c` includes `<hubbub/hubbub_errors.h>`; the file
+  exists only at `browser/libdom/bindings/hubbub/hubbub_errors.h` (the public
+  `libhubbub/include/hubbub/` has `errors.h`, NOT `hubbub_errors.h`). For the
+  `<hubbub/...>` prefix to resolve to a sibling, the access paths need the PARENT
+  dir `browser:libdom:bindings:`, but the export only has
+  `browser:libdom:bindings:hubbub:` (one level too deep), so it resolves to a
+  doubled `bindings/hubbub/hubbub/...` that doesn't exist. Fix: add the
+  `browser:libdom:bindings:` access path. Affects `parser.c` (and likely
+  `dom_parser.c` in the same dir). Blocks the final link (missing object), not the
+  compile of other files.
+
 ## Snapshots and disk backups
 
 - **`guest-cp.sh` / `stage-on-bootvol.sh` FLATTEN qcow2 internal snapshots.** They
