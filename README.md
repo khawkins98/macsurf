@@ -42,7 +42,7 @@
 > [!NOTE]
 > Early alpha — it runs, renders, and speaks TLS 1.3 natively on a 233 MHz G3, but most of the modern web won't work in it yet. Expect hand-built pages, retro-style sites, and the strange thrill of ES5 JavaScript on PowerPC. Don't expect smooth browsing on arbitrary modern sites, video, or anything React-heavy.
 >
-> If you've got a Power Mac G3 or G4 sitting around, load it up and see what breaks — bug reports and real-hardware screenshots are exactly what this project needs. See [docs/status.md](docs/status.md) for the current punch list.
+> If you've got a Power Mac G3 or G4 sitting around, load it up and see what breaks — bug reports and real-hardware screenshots are exactly what this project needs. See [docs/status.md](docs/status.md) for the current punch list. To build it yourself, start with **[docs/DEVELOPING.md](docs/DEVELOPING.md)**.
 
 ---
 

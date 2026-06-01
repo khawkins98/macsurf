@@ -119,6 +119,19 @@ class VM:
         self._cmd("screendump", {"filename": path, "format": "png"})
         return path
 
+    def detect_resolution(self):
+        """Set self.w/self.h from the live framebuffer. OS 9 boots at 640x480 or
+        1024x768 unpredictably; click coords are wrong if w/h don't match, so all
+        absolute positioning depends on this. Reads the PNG IHDR (no PIL needed)."""
+        tmp = "/tmp/_vm_res.png"
+        self.screenshot(tmp)
+        with open(tmp, "rb") as fh:
+            data = fh.read(26)
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            self.w = int.from_bytes(data[16:20], "big")
+            self.h = int.from_bytes(data[20:24], "big")
+        return self.w, self.h
+
     def status(self):
         return self._cmd("query-status")
 
@@ -269,7 +282,7 @@ class VM:
 
 
 def main(argv):
-    sock = DEFAULT_SOCK; w = 1024; h = 768
+    sock = DEFAULT_SOCK; w = None; h = None
     args = []
     i = 1
     while i < len(argv):
@@ -285,7 +298,15 @@ def main(argv):
     if not args:
         print(__doc__); return 2
     verb, rest = args[0], args[1:]
-    vm = VM(sock, w, h).connect()
+    vm = VM(sock, w or 1024, h or 768).connect()
+    # Auto-detect the real framebuffer size unless explicitly overridden — OS 9
+    # boots at 640x480 or 1024x768 unpredictably and wrong w/h breaks all clicks.
+    if (w is None or h is None) and verb not in ("status", "quit", "snapshots"):
+        try:
+            vm.detect_resolution()
+        except Exception:
+            pass
+    w, h = vm.w, vm.h
     if verb == "screenshot":
         print(vm.screenshot(rest[0] if rest else "/tmp/shot.png"))
     elif verb == "status":

@@ -410,6 +410,8 @@ attach MacsBug to.
 
 ## Docs
 
+- [docs/DEVELOPING.md](docs/DEVELOPING.md), **start here to set up a build** — environments (real Power Mac / QEMU / SheepShaver), the required CodeWarrior 8.3, the MacSurf.mcp manifest situation, and the fix/ship workflow.
+
 - [docs/macsurf-architecture.md](docs/macsurf-architecture.md), Full platform architecture: rendering modes, proxy services, template system, milestone plan
 - [docs/research/architecture-inventory.md](docs/research/architecture-inventory.md), Snapshot of what currently exists in the repo and on the proxy host (no decisions, just facts)
 - [docs/research/window-architecture-2026-04-22.md](docs/research/window-architecture-2026-04-22.md), Window-framework architecture research (fixes161). Full state/event/redraw/scroll inventory of the Mac OS 9 frontend; architectural problem list; proposed unified window-state model; 6-round refactor plan (fixes162-fixes166). **fixes162+ follow this plan.**
