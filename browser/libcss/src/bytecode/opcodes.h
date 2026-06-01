@@ -930,4 +930,25 @@ enum op_image_rendering {
 	IMAGE_RENDERING_PIXELATED	= 0x0002
 };
 
+/* fixes357 (#44): text-decoration-color OPV values. */
+enum op_text_decoration_color {
+	TEXT_DECORATION_COLOR_CURRENT_COLOR	= 0x0000,
+	TEXT_DECORATION_COLOR_SET		= 0x0080
+};
+
+/* fixes357 (#44): text-decoration-style OPV values. */
+enum op_text_decoration_style {
+	TEXT_DECORATION_STYLE_SOLID	= 0x0000,
+	TEXT_DECORATION_STYLE_DOUBLE	= 0x0001,
+	TEXT_DECORATION_STYLE_DOTTED	= 0x0002,
+	TEXT_DECORATION_STYLE_DASHED	= 0x0003,
+	TEXT_DECORATION_STYLE_WAVY	= 0x0004
+};
+
+/* fixes357 (#44): text-decoration-thickness OPV values. */
+enum op_text_decoration_thickness {
+	TEXT_DECORATION_THICKNESS_AUTO	= 0x0000,
+	TEXT_DECORATION_THICKNESS_SET	= 0x0080
+};
+
 #endif

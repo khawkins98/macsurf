@@ -305,6 +305,21 @@ int32_t css_computed_tab_size(const css_computed_style *style);
  * decide whether to skip box-filter pre-downscale. */
 uint8_t css_computed_image_rendering(const css_computed_style *style);
 
+/* fixes357 (#44): text-decoration extended.
+ * text-decoration-color: returns CSS_TEXT_DECORATION_COLOR_* (default
+ * CURRENT_COLOR); *color receives css_color when return == COLOR. */
+uint8_t css_computed_text_decoration_color(
+		const css_computed_style *style, css_color *color);
+
+/* text-decoration-style: returns CSS_TEXT_DECORATION_STYLE_* (default
+ * SOLID). */
+uint8_t css_computed_text_decoration_style(
+		const css_computed_style *style);
+
+/* text-decoration-thickness: returns 0 = auto/from-font, N>0 = px. */
+int32_t css_computed_text_decoration_thickness(
+		const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

@@ -618,5 +618,17 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 		PROPERTY_FUNCS(image_rendering),
 		1,
+	},
+	{
+		PROPERTY_FUNCS(text_decoration_color),
+		0,
+	},
+	{
+		PROPERTY_FUNCS(text_decoration_style),
+		0,
+	},
+	{
+		PROPERTY_FUNCS(text_decoration_thickness),
+		0,
 	}
 	};

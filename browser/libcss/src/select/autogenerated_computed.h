@@ -413,6 +413,18 @@ struct css_computed_style_i {
 	 * pixel-art and crisp-edge content renders with pure
 	 * nearest-neighbor (plotter wiring queued separately). */
 	int32_t image_rendering;
+	/* fixes357 (#44): text-decoration extended sub-properties.
+	 *   text_decoration_color_status: CSS_TEXT_DECORATION_COLOR_*
+	 *   text_decoration_color: resolved css_color (valid when
+	 *      status == COLOR; for CURRENT_COLOR consumer uses the
+	 *      element's computed `color`).
+	 *   text_decoration_style: CSS_TEXT_DECORATION_STYLE_*
+	 *   text_decoration_thickness: 0 = auto/from-font, N>0 = px.
+	 * All four self-aligned int32_t per fixes151b discipline. */
+	int32_t text_decoration_color_status;
+	css_color text_decoration_color;
+	int32_t text_decoration_style;
+	int32_t text_decoration_thickness;
 };
 
 struct css_computed_style {

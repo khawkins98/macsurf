@@ -260,6 +260,9 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("box-decoration-break"),
 	SMAP("tab-size"),
 	SMAP("image-rendering"),
+	SMAP("text-decoration-color"),
+	SMAP("text-decoration-style"),
+	SMAP("text-decoration-thickness"),
 	SMAP("inherit"),
 	SMAP("unset"),
 	SMAP("important"),
@@ -539,6 +542,8 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("high-quality"),
 	SMAP("crisp-edges"),
 	SMAP("pixelated"),
+	SMAP("wavy"),
+	SMAP("from-font"),
 
 	/* Named colours */
 	SMAP("aliceblue"),

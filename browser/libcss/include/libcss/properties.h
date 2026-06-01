@@ -164,6 +164,9 @@ enum css_properties_e {
 	CSS_PROP_BOX_DECORATION_BREAK           = 0x093,
 	CSS_PROP_TAB_SIZE                       = 0x094,
 	CSS_PROP_IMAGE_RENDERING                = 0x095,
+	CSS_PROP_TEXT_DECORATION_COLOR          = 0x096,
+	CSS_PROP_TEXT_DECORATION_STYLE          = 0x097,
+	CSS_PROP_TEXT_DECORATION_THICKNESS      = 0x098,
 	CSS_N_PROPERTIES
 };
 
@@ -214,6 +217,28 @@ enum css_image_rendering_e {
 	CSS_IMAGE_RENDERING_CRISP_EDGES         = 0x2,
 	CSS_IMAGE_RENDERING_PIXELATED           = 0x3
 };
+
+/* fixes357 (#44): text-decoration-color. Not inherited; initial = currentcolor. */
+enum css_text_decoration_color_e {
+	CSS_TEXT_DECORATION_COLOR_INHERIT       = 0x0,
+	CSS_TEXT_DECORATION_COLOR_CURRENT_COLOR = 0x1,
+	CSS_TEXT_DECORATION_COLOR_COLOR         = 0x2
+};
+
+/* fixes357 (#44): text-decoration-style. Not inherited; initial = solid. */
+enum css_text_decoration_style_e {
+	CSS_TEXT_DECORATION_STYLE_INHERIT       = 0x0,
+	CSS_TEXT_DECORATION_STYLE_SOLID         = 0x1,
+	CSS_TEXT_DECORATION_STYLE_DOUBLE        = 0x2,
+	CSS_TEXT_DECORATION_STYLE_DOTTED        = 0x3,
+	CSS_TEXT_DECORATION_STYLE_DASHED        = 0x4,
+	CSS_TEXT_DECORATION_STYLE_WAVY          = 0x5
+};
+
+/* fixes357 (#44): text-decoration-thickness packed int32.
+ *   0 = auto / from-font (consumer picks platform default)
+ *   N>0 = explicit integer pixels (1..1000)
+ * V2 will reserve negative sentinels for percent / length-with-unit. */
 
 /* fixes275 (#65) — -macsurf-grid-flow: encodes grid-auto-flow.
  * row = default sparse row-major auto-placement

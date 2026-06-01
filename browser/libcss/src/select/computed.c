@@ -643,6 +643,40 @@ uint8_t css_computed_image_rendering(const css_computed_style *style)
 	return (uint8_t)v;
 }
 
+uint8_t css_computed_text_decoration_color(
+		const css_computed_style *style, css_color *color)
+{
+	int32_t s = style->i.text_decoration_color_status;
+	css_color c = style->i.text_decoration_color;
+	if (color != NULL) {
+		*color = (s == CSS_TEXT_DECORATION_COLOR_COLOR) ? c : 0;
+	}
+	if (s < CSS_TEXT_DECORATION_COLOR_CURRENT_COLOR ||
+			s > CSS_TEXT_DECORATION_COLOR_COLOR) {
+		return CSS_TEXT_DECORATION_COLOR_CURRENT_COLOR;
+	}
+	return (uint8_t)s;
+}
+
+uint8_t css_computed_text_decoration_style(
+		const css_computed_style *style)
+{
+	int32_t v = style->i.text_decoration_style;
+	if (v < CSS_TEXT_DECORATION_STYLE_SOLID ||
+			v > CSS_TEXT_DECORATION_STYLE_WAVY) {
+		return CSS_TEXT_DECORATION_STYLE_SOLID;
+	}
+	return (uint8_t)v;
+}
+
+int32_t css_computed_text_decoration_thickness(
+		const css_computed_style *style)
+{
+	int32_t v = style->i.text_decoration_thickness;
+	if (v < 0) return 0;
+	return v;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {
