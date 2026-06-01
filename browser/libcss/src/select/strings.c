@@ -177,6 +177,26 @@ css_error css_select_strings_intern(css_select_strings *str)
 	if (error != lwc_error_ok)
 		return css_error_from_lwc_error(error);
 
+	/* fixes358 (#70) — ::marker. */
+	error = lwc_intern_string(
+			"marker", SLEN("marker"),
+			&str->marker);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+
+	/* fixes359 (#71) — ::placeholder and ::file-selector-button. */
+	error = lwc_intern_string(
+			"placeholder", SLEN("placeholder"),
+			&str->placeholder);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+
+	error = lwc_intern_string(
+			"file-selector-button", SLEN("file-selector-button"),
+			&str->file_selector_button);
+	if (error != lwc_error_ok)
+		return css_error_from_lwc_error(error);
+
 	error = lwc_intern_string(
 			"width", SLEN("width"),
 			&str->width);
@@ -241,6 +261,9 @@ void css_select_strings_unref(css_select_strings *str)
 	lwc_string_unref(str->first_letter);
 	lwc_string_unref(str->before);
 	lwc_string_unref(str->after);
+	lwc_string_unref(str->marker);              /* fixes358 (#70) */
+	lwc_string_unref(str->placeholder);         /* fixes359 (#71) */
+	lwc_string_unref(str->file_selector_button); /* fixes359 (#71) */
 
 	lwc_string_unref(str->width);
 	lwc_string_unref(str->height);

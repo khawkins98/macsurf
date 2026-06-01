@@ -2700,6 +2700,30 @@ css_error match_detail(css_select_ctx *ctx, void *node,
 			*pseudo_element = CSS_PSEUDO_ELEMENT_BEFORE;
 		} else if (detail->qname.name == ctx->str.after) {
 			*pseudo_element = CSS_PSEUDO_ELEMENT_AFTER;
+		} else if (detail->qname.name == ctx->str.marker) {
+			/* fixes358 (#70) — ::marker V1: hoist styles to the
+			 * base element. CSS_PSEUDO_ELEMENT_MARKER doesn't
+			 * exist in the pseudo-element storage (would require
+			 * bumping CSS_PSEUDO_ELEMENT_COUNT and structural
+			 * changes to css_select_results.styles[]). Mapping
+			 * marker rules to the LI itself means
+			 * `li::marker { color: red }` colors the LI's text
+			 * (and therefore its bullet, which inherits LI's
+			 * color). V2 will isolate marker styles into a
+			 * dedicated slot once the storage is rearranged. */
+			*pseudo_element = CSS_PSEUDO_ELEMENT_NONE;
+		} else if (detail->qname.name == ctx->str.placeholder ||
+				detail->qname.name ==
+				ctx->str.file_selector_button) {
+			/* fixes359 (#71) — ::placeholder and
+			 * ::file-selector-button V1: accept as known pseudo
+			 * elements so author CSS does not error; mark as
+			 * non-matching so the rules are silently dropped (no
+			 * form-control gadget rendering exists yet). When
+			 * gadget rendering lands (#80 appearance round) this
+			 * mapping changes to hoist styles into the gadget
+			 * paint context. */
+			*match = false;
 		} else
 			*match = false;
 		break;

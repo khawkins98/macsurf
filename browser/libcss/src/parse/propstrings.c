@@ -544,6 +544,9 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("pixelated"),
 	SMAP("wavy"),
 	SMAP("from-font"),
+	SMAP("marker"),
+	SMAP("placeholder"),
+	SMAP("file-selector-button"),
 
 	/* Named colours */
 	SMAP("aliceblue"),

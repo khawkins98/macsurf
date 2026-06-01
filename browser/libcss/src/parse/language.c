@@ -1359,7 +1359,10 @@ css_error parsePseudo(css_language *c, const parserutils_vector *vector,
 		{ FIRST_LINE, CSS_SELECTOR_PSEUDO_ELEMENT },
 		{ FIRST_LETTER, CSS_SELECTOR_PSEUDO_ELEMENT },
 		{ BEFORE, CSS_SELECTOR_PSEUDO_ELEMENT },
-		{ AFTER, CSS_SELECTOR_PSEUDO_ELEMENT }
+		{ AFTER, CSS_SELECTOR_PSEUDO_ELEMENT },
+		{ MARKER, CSS_SELECTOR_PSEUDO_ELEMENT },              /* fixes358 (#70) */
+		{ PLACEHOLDER, CSS_SELECTOR_PSEUDO_ELEMENT },         /* fixes359 (#71) */
+		{ FILE_SELECTOR_BUTTON, CSS_SELECTOR_PSEUDO_ELEMENT } /* fixes359 (#71) */
 	};
 	css_selector_detail_value detail_value;
 	css_selector_detail_value_type value_type =

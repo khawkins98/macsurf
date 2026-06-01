@@ -40,6 +40,9 @@ typedef struct {
 	lwc_string *first_letter;
 	lwc_string *before;
 	lwc_string *after;
+	lwc_string *marker;   /* fixes358 (#70) */
+	lwc_string *placeholder; /* fixes359 (#71) */
+	lwc_string *file_selector_button; /* fixes359 (#71) */
 
 	lwc_string *width;
 	lwc_string *height;
