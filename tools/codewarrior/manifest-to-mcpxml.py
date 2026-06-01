@@ -141,6 +141,17 @@ SETTING_VALUE_OVERRIDES = {
     "MWWarning_C_warn_implicitconv": "0",
 }
 
+# Library basenames the manifest references under their old (CW Pro 7-era) names,
+# which don't exist in CW Pro 8. CW8 renamed the MSL libraries (combined C+C++ into
+# "All", underscore-separated). The linker resolves these by Name on the system
+# search paths; the CW7 name "MSL C.Carbon.Lib" isn't shipped, so the link fails
+# with "could not find or load". Map to the CW8 name that actually ships in
+# {Compiler}:MacOS Support:Libraries:Runtime:Libs:. (Same stale-manifest class as
+# the MANIFEST_RENAMES .c entries.)
+LIBRARY_NAME_RENAMES = {
+    "MSL C.Carbon.Lib": "MSL_All_Carbon.Lib",
+}
+
 
 def settings_scalar(name, value):
     return '<SETTING><NAME>%s</NAME><VALUE>%s</VALUE></SETTING>' % (escape(name), escape(value or ""))
@@ -268,6 +279,7 @@ def convert_file_path(raw_path, prefix):
         mac_path = ":".join(source_root + target.split("/"))
         return ("Absolute", mac_path, False, target)
     base = posixpath.basename(raw_path)
+    base = LIBRARY_NAME_RENAMES.get(base, base)  # fix CW7->CW8 library names
     # Library entries (no directory, .Lib/CarbonLib) -> Name refs via SystemSearchPaths
     if base.endswith(".Lib") or base == "CarbonLib" or "/" not in raw_path and not base.endswith(".c"):
         return ("Name", base, True, None)
