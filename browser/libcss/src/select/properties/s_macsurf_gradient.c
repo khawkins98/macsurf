@@ -113,6 +113,41 @@ css_error css__cascade_macsurf_gradient(uint32_t opv, css_style *style,
 				advance_bytecode(style, sizeof(uint32_t));
 				rad_set = (rad_flag != 0);
 			}
+			/* fixes360 — extend fixes348's alpha-aware downgrade
+			 * to the radial-gradient case. The same painter
+			 * limitation applies to radial as to linear: alpha is
+			 * ignored, so a radial like
+			 *   radial-gradient(rgba(220,184,94,.20),
+			 *                   transparent 62%)
+			 * (macsurf.org's body::before glow) paints as opaque
+			 * gold blending to opaque BLACK — exactly the gold-to-
+			 * black bands visible in the regression screenshots
+			 * (june2.jpg, june5.jpg). Same drop conditions as the
+			 * linear case: either stop alpha < 0xC0, OR both <
+			 * 0xFF with one fully transparent. */
+			{
+				uint8_t a1 = (uint8_t)((c1 >> 24) & 0xff);
+				uint8_t a2 = (uint8_t)((c2 >> 24) & 0xff);
+				bool drop = false;
+				if (a1 < 0xC0 || a2 < 0xC0) drop = true;
+				if ((a1 < 0xFF && a2 == 0) ||
+				    (a2 < 0xFF && a1 == 0)) drop = true;
+				if (drop) {
+					value = CSS_MACSURF_GRADIENT_NONE;
+					packed = 0;
+					radial = false;
+					rad_set = false;
+				}
+			}
+#ifdef MACSURF_DEBUG
+			{
+				extern void macsurf_debug_log_writef(
+					const char *fmt, ...);
+				macsurf_debug_log_writef(
+					"fixes360 RADIAL alpha-check c1=%ld c2=%ld val=%d",
+					(long)c1, (long)c2, (int)value);
+			}
+#endif
 			break;
 		case 0x00C0: /* SET horizontal (fixes48) */
 			horizontal = true;
