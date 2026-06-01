@@ -327,6 +327,9 @@ def main():
         name = s.findtext("NAME")
         if name in ("UserSearchPath", "SystemSearchPath"):
             continue  # stale; replaced below
+        if name == "OutputDirectory":
+            continue  # manifest stores it flat (just a VALUE); CW needs the nested
+                      # Path/PathFormat/PathRoot form -> emitted below, not passed through
         name = SETTING_NAME_RENAMES.get(name, name)  # fix wrong CW panel keys
         value = SETTING_VALUE_OVERRIDES.get(name, s.findtext("VALUE"))  # flip chosen values
         scalars.append((name, value))
@@ -452,6 +455,16 @@ def main():
     sp_blocks = [search_path_block(p, f, r, rec) for (p, f, r, rec) in system_paths]
     settings.append("<SETTING><NAME>UserSearchPaths</NAME>%s</SETTING>" % "".join(up_blocks))
     settings.append("<SETTING><NAME>SystemSearchPaths</NAME>%s</SETTING>" % "".join(sp_blocks))
+    # OutputDirectory must be the nested Path/PathFormat/PathRoot form (the manifest
+    # stores it as a flat VALUE, which CW reads as an invalid output dir and then
+    # won't write the linked binary). Path ":" + PathRoot "Project" = the project
+    # folder, matching the genuine CW reference export.
+    settings.append(
+        "<SETTING><NAME>OutputDirectory</NAME>"
+        "<SETTING><NAME>Path</NAME><VALUE>:</VALUE></SETTING>"
+        "<SETTING><NAME>PathFormat</NAME><VALUE>MacOS</VALUE></SETTING>"
+        "<SETTING><NAME>PathRoot</NAME><VALUE>Project</VALUE></SETTING>"
+        "</SETTING>")
 
     # ---- assemble -------------------------------------------------------------
     out = []
