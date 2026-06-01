@@ -204,8 +204,8 @@ payoff-per-effort order:
 ## Recommended order of operations
 
 1. ~~Native precheck gate~~ — **done** (`tools/precheck.sh`).
-2. Land the first single-target CW8 build in the guest (the existing
-   HANDOFF-NEXT-SESSION.md work). Everything else is gated on this.
+2. Land the first single-target CW8 build in the guest (ROADMAP.md M1/M2).
+   Everything else is gated on this.
 3. Warm-snapshot the post-build state; move injection to the network path.
 4. Run `howvec` during one build to settle the FP question.
 5. 2-VM build/test pipeline.

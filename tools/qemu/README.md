@@ -73,7 +73,7 @@ import directly (see `docs/GOTCHAS.md`). The working flow:
    **File → Import Project** → select it → type a name + Return (save anywhere).
 4. **Make** (Cmd-M). First build under TCG is slow (expect 30–60 min).
 
-See [MORNING-STATUS.md](MORNING-STATUS.md) for exactly where this stands.
+See [ROADMAP.md](ROADMAP.md) for exactly where this stands and what's next.
 
 ## Scripts reference
 
@@ -112,4 +112,4 @@ CodeWarrior injection + `stage-on-bootvol.sh` (both are scripted/documented).
 - **[docs/INPUT.md](docs/INPUT.md)** — input/automation deep-dive: why clicks fail without
   the INIT, GUI-driving techniques, the no-mouse AppleEvents build path
 - **[docs/GOTCHAS.md](docs/GOTCHAS.md)** — every trap we hit, so you don't hit it twice
-- **[MORNING-STATUS.md](MORNING-STATUS.md)** — live status / handoff
+- **[ROADMAP.md](ROADMAP.md)** — the driving document: status, what's next, open questions

@@ -197,5 +197,5 @@ Validated on this host (macOS 26.x, Apple Silicon, QEMU 11.0.1):
 - ⏳ MacSurf project wired (XML import / matching access paths) → first green build → `os9_cw_ready` snapshot
 - ⏳ end-to-end automated build loop (keyboard + AppleScript; see docs/INPUT.md)
 
-See **docs/INPUT.md** for the full input/automation strategy and **MORNING-STATUS.md** for the live handoff.
+See **docs/INPUT.md** for the full input/automation strategy and **ROADMAP.md** for the live status / driving document.
 ```

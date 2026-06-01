@@ -90,7 +90,8 @@ compiler; these cover the emulation harness).
   the schema mismatch — NOT because of file paths or save location. Classic CW
   tolerates missing files (shows them red); a hard import error means bad format.
   Fix: capture a genuine CW8 export (make a tiny project in the guest, File →
-  Export Project) and convert the manifest to that schema. See HANDOFF-NEXT-SESSION.md.
+  Export Project) and convert the manifest to that schema — done: see
+  tools/codewarrior/manifest-to-mcpxml.py and ../ROADMAP.md.
 - **CodeWarrior 8 is drag-installable** (officially, per its Installation Notes):
   copy the "Metrowerks CodeWarrior" folder + System Folder Items (CarbonLib 1.5,
   MetroNub, MRO) — no installer, no serial (`license.dat` is bundled). This is how
