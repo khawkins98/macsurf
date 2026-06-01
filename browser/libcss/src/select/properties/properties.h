@@ -81,6 +81,7 @@ PROPERTY_FUNCS(accent_color);
 PROPERTY_FUNCS(caret_color);
 PROPERTY_FUNCS(box_decoration_break);
 PROPERTY_FUNCS(tab_size);
+PROPERTY_FUNCS(image_rendering);
 
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);

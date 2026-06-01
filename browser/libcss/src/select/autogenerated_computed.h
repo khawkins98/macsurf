@@ -407,6 +407,12 @@ struct css_computed_style_i {
 	 *   N>0 = explicit integer number of space widths
 	 * Inherits. Length-form (px / em) deferred to V2. */
 	int32_t tab_size;
+	/* fixes356 (#78): image-rendering (CSS_IMAGE_RENDERING_*).
+	 * Inherits. Initial = AUTO. When CRISP_EDGES or PIXELATED, the
+	 * plotter should skip the fixes203 box-filter pre-downscale so
+	 * pixel-art and crisp-edge content renders with pure
+	 * nearest-neighbor (plotter wiring queued separately). */
+	int32_t image_rendering;
 };
 
 struct css_computed_style {

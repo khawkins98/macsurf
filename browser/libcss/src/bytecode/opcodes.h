@@ -923,4 +923,11 @@ enum op_box_decoration_break {
 	BOX_DECORATION_BREAK_CLONE	= 0x0001
 };
 
+/* fixes356 (#78): image-rendering OPV values. */
+enum op_image_rendering {
+	IMAGE_RENDERING_AUTO		= 0x0000,
+	IMAGE_RENDERING_CRISP_EDGES	= 0x0001,
+	IMAGE_RENDERING_PIXELATED	= 0x0002
+};
+
 #endif

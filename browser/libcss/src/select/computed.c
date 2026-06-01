@@ -633,6 +633,16 @@ int32_t css_computed_tab_size(const css_computed_style *style)
 	return v;
 }
 
+uint8_t css_computed_image_rendering(const css_computed_style *style)
+{
+	int32_t v = style->i.image_rendering;
+	if (v < CSS_IMAGE_RENDERING_AUTO ||
+			v > CSS_IMAGE_RENDERING_PIXELATED) {
+		return CSS_IMAGE_RENDERING_AUTO;
+	}
+	return (uint8_t)v;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

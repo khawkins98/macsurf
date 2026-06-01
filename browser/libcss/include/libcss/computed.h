@@ -300,6 +300,11 @@ uint8_t css_computed_box_decoration_break(
  * widths; 0 stored = unset, returned as the CSS default of 8. */
 int32_t css_computed_tab_size(const css_computed_style *style);
 
+/* fixes356 (#78): image-rendering. Returns CSS_IMAGE_RENDERING_AUTO
+ * (default) / CRISP_EDGES / PIXELATED. The plotter consults this to
+ * decide whether to skip box-filter pre-downscale. */
+uint8_t css_computed_image_rendering(const css_computed_style *style);
+
 /* fixes76: -macsurf-animation-opacity: <from> <to> <duration_ms>.
  * from, to: opacity 0..255 (255 = opaque).
  * duration_ms: full cycle in ms (1..65535). Cycle is from -> to -> from.

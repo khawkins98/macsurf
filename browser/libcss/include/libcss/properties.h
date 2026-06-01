@@ -163,6 +163,7 @@ enum css_properties_e {
 	CSS_PROP_CARET_COLOR                    = 0x092,
 	CSS_PROP_BOX_DECORATION_BREAK           = 0x093,
 	CSS_PROP_TAB_SIZE                       = 0x094,
+	CSS_PROP_IMAGE_RENDERING                = 0x095,
 	CSS_N_PROPERTIES
 };
 
@@ -204,6 +205,14 @@ enum css_box_decoration_break_e {
 	CSS_BOX_DECORATION_BREAK_INHERIT        = 0x0,
 	CSS_BOX_DECORATION_BREAK_SLICE          = 0x1,
 	CSS_BOX_DECORATION_BREAK_CLONE          = 0x2
+};
+
+/* fixes356 (#78): image-rendering. Inherits; initial = auto. */
+enum css_image_rendering_e {
+	CSS_IMAGE_RENDERING_INHERIT             = 0x0,
+	CSS_IMAGE_RENDERING_AUTO                = 0x1,
+	CSS_IMAGE_RENDERING_CRISP_EDGES         = 0x2,
+	CSS_IMAGE_RENDERING_PIXELATED           = 0x3
 };
 
 /* fixes275 (#65) — -macsurf-grid-flow: encodes grid-auto-flow.
