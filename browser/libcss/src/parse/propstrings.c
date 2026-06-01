@@ -547,6 +547,9 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("marker"),
 	SMAP("placeholder"),
 	SMAP("file-selector-button"),
+	SMAP("is"),
+	SMAP("where"),
+	SMAP("has"),
 
 	/* Named colours */
 	SMAP("aliceblue"),

@@ -1355,6 +1355,9 @@ css_error parsePseudo(css_language *c, const parserutils_vector *vector,
 		{ DISABLED, CSS_SELECTOR_PSEUDO_CLASS },
 		{ CHECKED, CSS_SELECTOR_PSEUDO_CLASS },
 		{ NOT, CSS_SELECTOR_PSEUDO_CLASS },
+		{ IS_FN, CSS_SELECTOR_PSEUDO_CLASS },     /* fixes359 (#68) */
+		{ WHERE_FN, CSS_SELECTOR_PSEUDO_CLASS },  /* fixes359 (#68) */
+		{ HAS_FN, CSS_SELECTOR_PSEUDO_CLASS },    /* fixes361 (#67) */
 
 		{ FIRST_LINE, CSS_SELECTOR_PSEUDO_ELEMENT },
 		{ FIRST_LETTER, CSS_SELECTOR_PSEUDO_ELEMENT },
@@ -1448,6 +1451,35 @@ css_error parsePseudo(css_language *c, const parserutils_vector *vector,
 				return error;
 
 			value_type = CSS_SELECTOR_DETAIL_VALUE_NTH;
+		} else if (fun_type == IS_FN || fun_type == WHERE_FN ||
+				fun_type == HAS_FN) {
+			/* fixes359 (#68) / fixes361 (#67) V1: consume tokens
+			 * up to the closing `)` and discard them. The
+			 * selector itself parses as a known pseudo-class so
+			 * author CSS does not error; at match time the
+			 * matcher silently returns no-match (until V2 lands
+			 * a comma-separated selector-list with proper match
+			 * semantics). :where() gets zero specificity per
+			 * spec; :is() / :has() take the highest specificity
+			 * of their arguments (deferred). For V1, specificity
+			 * is simply 0 (treated as :where) for all three. */
+			int depth = 1;
+			while (depth > 0) {
+				token = parserutils_vector_iterate(vector, ctx);
+				if (token == NULL) return CSS_INVALID;
+				if (tokenIsChar(token, '(')) depth++;
+				else if (tokenIsChar(token, ')')) depth--;
+			}
+			/* Already consumed the matching ')'; tag this
+			 * selector with the function-name keyword so the
+			 * matcher can recognise it and short-circuit. */
+			qname.name = c->strings[
+					fun_type == IS_FN ? IS_FN :
+					fun_type == WHERE_FN ? WHERE_FN : HAS_FN];
+			return css__stylesheet_selector_detail_init(c->sheet,
+					CSS_SELECTOR_PSEUDO_CLASS, &qname,
+					detail_value, value_type,
+					false, specific);
 		} else if (fun_type == NOT) {
 			/* type_selector | specific */
 			token = parserutils_vector_peek(vector, *ctx);
