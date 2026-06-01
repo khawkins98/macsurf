@@ -588,6 +588,34 @@ uint8_t css_computed_pointer_events(
 	return get_pointer_events(style);
 }
 
+uint8_t css_computed_accent_color(const css_computed_style *style,
+		css_color *color)
+{
+	int32_t s = style->i.accent_color_status;
+	css_color c = style->i.accent_color;
+	if (color != NULL) {
+		*color = (s == CSS_ACCENT_COLOR_COLOR) ? c : 0;
+	}
+	if (s < 0 || s > CSS_ACCENT_COLOR_COLOR) {
+		return CSS_ACCENT_COLOR_AUTO;
+	}
+	return (uint8_t)s;
+}
+
+uint8_t css_computed_caret_color(const css_computed_style *style,
+		css_color *color)
+{
+	int32_t s = style->i.caret_color_status;
+	css_color c = style->i.caret_color;
+	if (color != NULL) {
+		*color = (s == CSS_CARET_COLOR_COLOR) ? c : 0;
+	}
+	if (s < 0 || s > CSS_CARET_COLOR_COLOR) {
+		return CSS_CARET_COLOR_AUTO;
+	}
+	return (uint8_t)s;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

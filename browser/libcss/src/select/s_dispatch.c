@@ -598,5 +598,13 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 	        PROPERTY_FUNCS(macsurf_grid_flow),
 	        0,
+	},
+	{
+	        PROPERTY_FUNCS(accent_color),
+	        1,
+	},
+	{
+	        PROPERTY_FUNCS(caret_color),
+	        1,
 	}
 	};

@@ -903,4 +903,18 @@ enum op_z_index {
 	Z_INDEX_AUTO			= 0x0000
 };
 
+/* fixes353 (#73): accent-color OPV values. */
+enum op_accent_color {
+	ACCENT_COLOR_AUTO		= 0x0000,
+	ACCENT_COLOR_CURRENT_COLOR	= 0x0001,
+	ACCENT_COLOR_SET		= 0x0080
+};
+
+/* fixes353 (#73): caret-color OPV values. */
+enum op_caret_color {
+	CARET_COLOR_AUTO		= 0x0000,
+	CARET_COLOR_CURRENT_COLOR	= 0x0001,
+	CARET_COLOR_SET			= 0x0080
+};
+
 #endif

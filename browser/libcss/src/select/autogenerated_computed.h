@@ -388,6 +388,16 @@ struct css_computed_style_i {
 	 * Field appended at struct end so existing field offsets in stale CW8
 	 * .o files don't shift (per project_libcss_struct_mid_insert_crash). */
 	int32_t macsurf_grid_flow;
+	/* fixes353 (#73): accent-color status (CSS_ACCENT_COLOR_*) and
+	 * resolved css_color. Status carries INHERIT/AUTO/CURRENTCOLOR/
+	 * COLOR; the colour word is meaningful only when status == COLOR.
+	 * Both fields are int32-wide and self-aligning, appended at end
+	 * of _i per the fixes151b padding/mid-insert discipline. */
+	int32_t accent_color_status;
+	css_color accent_color;
+	/* fixes353 (#73): caret-color status + resolved css_color. */
+	int32_t caret_color_status;
+	css_color caret_color;
 };
 
 struct css_computed_style {

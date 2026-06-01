@@ -180,7 +180,9 @@ const css_prop_handler property_handlers[LAST_PROP + 1 - FIRST_PROP] =
 	css__parse_aspect_ratio,
 	css__parse_background_size,
 	css__parse_pointer_events,
-	css__parse_macsurf_grid_flow
+	css__parse_macsurf_grid_flow,
+	css__parse_accent_color,
+	css__parse_caret_color
 };
 
 /** Mapping from property bytecode index to bytecode unit class mask. */
@@ -305,6 +307,9 @@ const uint32_t property_unit_mask[CSS_N_PROPERTIES] = {
 	[CSS_PROP_ASPECT_RATIO]          = 0,
 	[CSS_PROP_BACKGROUND_SIZE]	 = 0,
 	[CSS_PROP_POINTER_EVENTS]	 = 0,
+	[CSS_PROP_MACSURF_GRID_FLOW]     = 0,
+	[CSS_PROP_ACCENT_COLOR]          = 0,
+	[CSS_PROP_CARET_COLOR]           = 0,
 	[CSS_PROP_BREAK_AFTER]		 = UNIT_MASK_BREAK_AFTER,	[CSS_PROP_BREAK_BEFORE]          = UNIT_MASK_BREAK_BEFORE,
 	[CSS_PROP_BREAK_INSIDE]          = UNIT_MASK_BREAK_INSIDE,
 	[CSS_PROP_COLUMN_COUNT]          = UNIT_MASK_COLUMN_COUNT,

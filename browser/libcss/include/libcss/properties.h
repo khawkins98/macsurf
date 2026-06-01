@@ -159,6 +159,8 @@ enum css_properties_e {
 	CSS_PROP_BACKGROUND_SIZE                = 0x08e,
 	CSS_PROP_POINTER_EVENTS                 = 0x08f,
 	CSS_PROP_MACSURF_GRID_FLOW              = 0x090,
+	CSS_PROP_ACCENT_COLOR                   = 0x091,
+	CSS_PROP_CARET_COLOR                    = 0x092,
 	CSS_N_PROPERTIES
 };
 
@@ -177,6 +179,22 @@ enum css_pointer_events_e {
 	CSS_POINTER_EVENTS_INHERIT              = 0x0,
 	CSS_POINTER_EVENTS_AUTO                 = 0x1,
 	CSS_POINTER_EVENTS_NONE                 = 0x2
+};
+
+/* fixes353 (#73): accent-color. Inherited; initial = auto. */
+enum css_accent_color_e {
+	CSS_ACCENT_COLOR_INHERIT                = 0x0,
+	CSS_ACCENT_COLOR_AUTO                   = 0x1,
+	CSS_ACCENT_COLOR_CURRENT_COLOR          = 0x2,
+	CSS_ACCENT_COLOR_COLOR                  = 0x3
+};
+
+/* fixes353 (#73): caret-color. Inherited; initial = auto. */
+enum css_caret_color_e {
+	CSS_CARET_COLOR_INHERIT                 = 0x0,
+	CSS_CARET_COLOR_AUTO                    = 0x1,
+	CSS_CARET_COLOR_CURRENT_COLOR           = 0x2,
+	CSS_CARET_COLOR_COLOR                   = 0x3
 };
 
 /* fixes275 (#65) — -macsurf-grid-flow: encodes grid-auto-flow.

@@ -77,6 +77,8 @@ css_error css__compose_pointer_events(const css_computed_style *parent, const cs
 uint32_t destroy_pointer_events(void *bytecode);
 
 PROPERTY_FUNCS(macsurf_grid_flow);
+PROPERTY_FUNCS(accent_color);
+PROPERTY_FUNCS(caret_color);
 
 PROPERTY_FUNCS(bottom);
 PROPERTY_FUNCS(box_sizing);
