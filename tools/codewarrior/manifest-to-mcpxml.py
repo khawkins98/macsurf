@@ -184,9 +184,16 @@ def parse_access_paths_xml(path):
     unlike the stale manifest UserSearchPath/SystemSearchPath entries."""
     root = ET.parse(path).getroot()
     out = {"UserSearchPaths": [], "SystemSearchPaths": []}
+    # Panel-level flags. AlwaysSearchUserPaths=true is REQUIRED or angle-bracket
+    # includes (<stat.h>, <parserutils/errors.h>) never search the user paths —
+    # which cascades into thousands of "file cannot be opened" errors.
+    flags = {}
     for sl in root.iter("SETTINGLIST"):
         for s in sl.findall("SETTING"):
             nm = s.findtext("NAME")
+            if nm in ("AlwaysSearchUserPaths", "InterpretDOSAndUnixPaths",
+                      "RequireFrameworkStyleIncludes") and s.findtext("VALUE") is not None:
+                flags[nm] = s.findtext("VALUE")
             if nm not in out:
                 continue
             for wrap in s.findall("SETTING"):
@@ -207,7 +214,7 @@ def parse_access_paths_xml(path):
                     elif n == "PathRoot": r = v
                 if p is not None:
                     out[nm].append((p, f or "MacOS", r or "Absolute", recursive == "true"))
-    return out["UserSearchPaths"], out["SystemSearchPaths"]
+    return out["UserSearchPaths"], out["SystemSearchPaths"], flags
 
 
 def convert_file_path(raw_path, prefix):
@@ -269,7 +276,7 @@ def main():
         if name in ("UserSearchPath", "SystemSearchPath"):
             continue  # stale; replaced below
         scalars.append((name, s.findtext("VALUE")))
-    user_paths, system_paths = parse_access_paths_xml(args.access_paths)
+    user_paths, system_paths, ap_flags = parse_access_paths_xml(args.access_paths)
 
     # files
     files_xml, linkorder_xml = [], []
@@ -335,6 +342,10 @@ def main():
     settings = []
     for name, value in scalars:
         settings.append(settings_scalar(name, value))
+    # access-path panel flags (AlwaysSearchUserPaths=true is the critical one)
+    for fname in ("AlwaysSearchUserPaths", "InterpretDOSAndUnixPaths", "RequireFrameworkStyleIncludes"):
+        settings.append(settings_scalar(fname, ap_flags.get(
+            fname, "true" if fname == "AlwaysSearchUserPaths" else "false")))
     # genuine nested access-path structures, straight from the real export
     up_blocks = [search_path_block(p, f, r, rec) for (p, f, r, rec) in user_paths]
     sp_blocks = [search_path_block(p, f, r, rec) for (p, f, r, rec) in system_paths]
