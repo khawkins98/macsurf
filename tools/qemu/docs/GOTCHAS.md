@@ -100,6 +100,29 @@ compiler; these cover the emulation harness).
   app quit, so it's one-time per disk image.
 - **Source files must be type TEXT for CW to compile them**, and the project's
   Mac CR line-ending convention applies (stage-on-bootvol.sh handles both).
+- **The 8.x updaters are strictly sequential: 8.0 -> 8.1 -> 8.2 -> 8.3.** The 8.3
+  updater refuses to run on 8.0 ("must install the Version 8.2 Update first"); 8.2
+  needs 8.1. Each is a VISE installer that searches the disk and patches in place
+  (so a nested CW folder is fine). When 8.3 offers to "rebuild your libraries," Skip
+  it (updated prebuilt MSL libs suffice). The project targets 8.3, so build on 8.3.
+- **CW 8.3 prompts "Convert Project" for projects made on an older CW** (e.g. an
+  import done before the update). It's a one-time per-project conversion; or
+  re-import fresh on 8.3. Useful as a version check: if it says your project is
+  "older", the IDE is genuinely the newer (8.3) version.
+- **`AlwaysSearchUserPaths=true` is mandatory** in the Access Paths panel, or
+  angle-bracket includes (`<stat.h>`, `<parserutils/errors.h>`) never search the
+  user paths and you get thousands of "file cannot be opened" cascade errors. The
+  converter now emits it (from Access Paths.xml); if hand-building, check the box.
+
+## Snapshots and disk backups
+
+- **`guest-cp.sh` / `stage-on-bootvol.sh` FLATTEN qcow2 internal snapshots.** They
+  round-trip the disk through raw (`qemu-img convert`), which drops all `savevm`
+  snapshots. So a `vm.py snapshot` does NOT survive a subsequent file injection.
+  For state that's expensive to recreate (e.g. the CodeWarrior 8.3 install), make a
+  **durable host-side copy of the qcow2** while the VM is OFF (`cp os9-cw.qcow2
+  os9-cw83-clean.qcow2`) rather than relying on a snapshot. Snapshots are fine for
+  short-lived "revert within this session" points when no injection happens between.
 
 ## Process / workflow
 

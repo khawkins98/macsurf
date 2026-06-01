@@ -38,8 +38,12 @@ The project is calibrated to **CodeWarrior Pro 8.3**. The base 8.0 release can
 behave differently (MSL versions, compiler fixes, headers), so build errors on
 plain 8.0 may be version artifacts rather than real issues.
 
-- Install CodeWarrior Pro 8, then apply the **8.3 updater** (the 8.1/8.2/8.3
-  updaters exist; 8.3 is the target — apply whatever sequence the updater requires).
+- Install CodeWarrior Pro 8 (base 8.0), then apply the updaters **in sequence:
+  8.1, then 8.2, then 8.3**. They are strictly incremental: the 8.3 updater refuses
+  to run on 8.0 ("you must install the Version 8.2 Update first"), and 8.2 needs 8.1.
+  Each updater searches the disk and patches the existing install in place, so the
+  CodeWarrior folder's exact location doesn't matter. When 8.3 asks to "rebuild your
+  libraries," you can Skip it (the updated prebuilt MSL libs are sufficient).
 - Required components: **MacOS PowerPC C/C++ Compiler**, **MacOS PowerPC Linker**,
   **MSL C Libraries**, **Universal Headers**. Skip Java/Windows/Palm tools.
 - Confirm `…:MacOS Support:Universal:Interfaces:CIncludes:` exists (the Toolbox
