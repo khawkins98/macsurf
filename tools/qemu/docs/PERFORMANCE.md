@@ -2,6 +2,8 @@
 
 How fast the off-hardware build loop runs, what we changed, and what's left to try.
 Companion to the "Performance / CPU utilization" section in [GOTCHAS.md](GOTCHAS.md).
+Research backing the levers and dead ends below (citations, alternatives
+assessed): [EMULATION-FRONTIER.md](EMULATION-FRONTIER.md).
 
 ## The ceiling (read this first)
 
@@ -40,6 +42,23 @@ Which instrument sees which lever:
 
 ## Chosen levers (doing now)
 
+### 0. Host-side precheck gate before any guest build — `tools/precheck.sh`
+Run the native C89 gate **before** spending a guest build cycle:
+```
+./tools/precheck.sh        # ~15 s, all 528 manifest files, parallel on host cores
+```
+Apple clang in CW8-approximating C89 mode (designated initializers, `//`
+comments, for-scope declarations, mid-block declarations, VLAs all gate as
+errors; constructs CW8 accepts are suppressed and documented in the script).
+Most historical fix rounds died on errors this catches in seconds. It also
+cross-checks the `MacSurf.mcp` manifest against the repo (stale entries,
+missing files) and surfaces Mac–Linux source drift. It does NOT replace the
+real CW8 build (CW8 has its own miscompiles and MSL quirks) — it eliminates
+the cheap failures. Frontend Toolbox files need Universal Interfaces headers
+(`UNIV_HDRS=...`) and are skipped without them; ~30 files with host-SDK header
+collisions are skipped (documented in the script) and remain covered by the
+maintainer's Linux-side `scripts/verify_macsurf.sh`.
+
 ### A. Launch the VM from a Terminal so it gets P-cores
 An agent/harness-launched `qemu` inherits **nice +5** and macOS demotes it to the
 slow E-cores under P-core contention (~1.5–2.5× slower). A Terminal-launched
@@ -74,20 +93,42 @@ cpubench, "M int-iters/s" (and FP / mem if useful). One change per row.
 
 | Condition | int M/s | FP M/s | mem MB/s | notes |
 |---|---|---|---|---|
-| Baseline (agent-launched, niced +5, VM on, full extensions) | _TBD_ | | | likely on E-cores |
-| + P-core (Terminal launch, nice 0) | _TBD_ | | | expect 1.5–2.5× int |
+| nice 0 (P-core), Debug target (-O0) | 21.60 | 0.11 | 566 | unoptimized; run via debugger |
+| nice 0 (P-core), Final target (-O2) | **91.46** | 0.13 | 652 | optimized; 4.2x int vs -O0. 50M iters in 0.55s |
+| + E-core (renice +5) | _TBD_ | | | raise nice (no sudo); expect ~0.4–0.7x int |
 | + Virtual Memory off / lean extensions | _TBD_ | | | expect ~flat on cpubench |
+
+**Reading the int number:** 91.46 M iters/s, ~4-5 ops/iter ≈ ~410 M integer ops/s on the
+emulator (M5 P-core, TCG). Rough feel: comparable to a ~250-400 MHz G3 for *integer*
+work. **Float is the killer:** 0.13 M transcendental-iters/s (sqrt+sin+cos per iter) is
+orders of magnitude below real-G3 hardware FPU — TCG translating PPC FP is the worst case.
+True "comparative MHz" still needs the SAME binary run on a real G3/G4, then divide.
+(All runs were launched via Cmd-R under the debugger; for a compute loop the debugger's
+run-to-completion overhead is minor vs the -O0/-O2 gap, which dominates.)
 
 Build wall-clock:
 
 | Build | time | notes |
 |---|---|---|
-| Cold full rebuild (530 files), prefix-fix validation | _~TBD_ | first 8.3 clean build |
+| Cold full rebuild (530 files), prefix-fix validation | _~TBD_ | compiles clean (0 err thru 256 files); stopped for benchmark |
 | Incremental Make after touching 1 file | _TBD_ | the lever-C win |
+
+### Speedometer 4.02 (do NOT trust under emulation)
+
+Ran Performance Rating on the QEMU guest. Results are **unreliable** and should not be
+used for a G3/G4 comparison: Speedometer misdetected the CPU as **MC68020** (it's
+emulated PPC), so it appears to have run the **68K** test code path; Graphics scored
+**0.00** (QuickDraw test failed under TCG); and the overall **PR = 0.00** (a zero
+sub-score zeroes the geometric mean). Raw scores vs Quadra 605 = 1.0: CPU 66.4, Math
+2207, Disk 4.55, Graphics 0, PR 0. The low CPU (a real G3 would be many hundreds x a
+Quadra 605) confirms it's not measuring native PPC. **Use cpubench, not Speedometer,
+for emulator-vs-hardware.** Speedometer would only be meaningful run on the real G3.
 
 ## Deferred — possible optimizations to try later
 
 Parked, in rough payoff order. Each needs its own before/after measurement.
+(Items 5–9 added 2026-06-01 from the [EMULATION-FRONTIER.md](EMULATION-FRONTIER.md)
+research round.)
 
 1. **`-cpu g3` / `750` instead of `g4`** — a C compiler emits no AltiVec, so
    emulating the G4 vector unit is wasted translation work. Speculative 5–20% on
@@ -107,15 +148,54 @@ Parked, in rough payoff order. Each needs its own before/after measurement.
    `screendump` still drives the GUI. Lower res/depth (800x600x16) is a smaller
    variant if you keep a visible window. Refresh runs off the vCPU thread, so the
    win is second-order.
+5. **Warm snapshots for the build loop** — `vm.py snapshot cw_warm` with CW8
+   open + project loaded; restore in seconds instead of the ~2 min boot.
+   Requires moving file injection from the raw-image round-trip (which flattens
+   snapshots, see GOTCHAS.md) to the network path (SLIRP hostfwd). ~100 s saved
+   per iteration.
+6. **2-VM build/test pipeline** — clone the qcow2; one VM builds round N+1
+   while the other tests round N's binary. Pure latency hiding; needs two
+   P-cores (Terminal-launched, both nice 0).
+7. **`howvec` TCG-plugin run during one build** — settles whether the FP
+   softfloat ceiling matters for compile workloads (almost certainly not —
+   compilers are integer-bound — but it's a one-run check).
+   `-plugin contrib/plugins/libhowvec.so -d plugin`.
+8. **Sharded compilation across 4 cloned VMs** (the big lever, ~3–3.5x on cold
+   full builds) — split into CW8 **Library targets** (libcss / libdom+hubbub /
+   parserutils+duktape / core+frontend), one VM per shard via AppleEvents
+   automation, link once in a fifth project. **Gated on the first
+   single-target build working.** Details in
+   [EMULATION-FRONTIER.md §4](EMULATION-FRONTIER.md).
+9. **SheepShaver arm64-JIT spike** — potentially ~5x (see corrected entry under
+   "Confirmed non-levers" below); unverified for CW8 builds.
 
 ## Confirmed non-levers (do not chase)
 
 - `tb-size` — live `info jit` showed **TB flush count 0**, only 294 MB of 512 MB
   used. Not thrashing. Raising it does nothing here.
 - `-smp >1`, MTTCG, HVF/KVM, iothreads — uniprocessor guest, no parallelism path.
+  **Now research-backed** (2026-06-01): speculative cross-core execution of a
+  serial guest tops out at ~1.09x in the published limit studies, and
+  background-translation systems (HQEMU) are dead projects. Citations in
+  [EMULATION-FRONTIER.md §1](EMULATION-FRONTIER.md). Closed permanently.
+- PPC FP speed under TCG — softfloat **by upstream design** (PPC FI-bit
+  semantics disqualify QEMU's hardfloat path permanently). No fix coming;
+  likely irrelevant for compile workloads (lever 7 confirms). Details in
+  EMULATION-FRONTIER.md §3.
 - More guest RAM (>512 MB) — doesn't help a CPU-bound compile and destabilizes
   OS 9 on this mac99 config.
 - In-guest RAM disk — redundant with host write caching; wastes scarce guest RAM.
 - UTM — it's the same TCG engine under a GUI.
-- SheepShaver migration — faster JIT per-instruction but likely interpreter-only
-  on arm64, CW debugger trap-crashes, fragile networking. Spike at most.
+- ~~SheepShaver migration — faster JIT per-instruction but likely interpreter-only
+  on arm64, CW debugger trap-crashes, fragile networking. Spike at most.~~
+  **Corrected 2026-06-01 — moved to deferred lever 9.** The original entry
+  overstated what we know: (a) a native **arm64 JIT exists** for SheepShaver
+  (kanjitalk755/macemu line) benchmarking ~470% of a G3/300 vs ~96% for the
+  interpreter — roughly **5x our TCG setup** — though it's flaky and not in
+  stock builds; (b) the "CW debugger trap-crashes" claim was our own note, not
+  the upstream maintainer's experience — **the maintainer has never compiled in
+  SheepShaver** (they use it strictly for runtime smoke tests), and nobody has
+  tested whether CW8 IDE *builds* (no debugger involved) work there. Known real
+  limitation: no MMU emulation → MacsBug/debuggers unavailable. Still a spike,
+  but a more promising one than this entry previously suggested. See
+  EMULATION-FRONTIER.md §2.
