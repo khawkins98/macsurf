@@ -606,5 +606,9 @@ struct prop_table prop_dispatch[CSS_N_PROPERTIES] = {
 	{
 		PROPERTY_FUNCS(caret_color),
 		1,
+	},
+	{
+		PROPERTY_FUNCS(box_decoration_break),
+		0,
 	}
 	};

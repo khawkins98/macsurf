@@ -161,6 +161,7 @@ enum css_properties_e {
 	CSS_PROP_MACSURF_GRID_FLOW              = 0x090,
 	CSS_PROP_ACCENT_COLOR                   = 0x091,
 	CSS_PROP_CARET_COLOR                    = 0x092,
+	CSS_PROP_BOX_DECORATION_BREAK           = 0x093,
 	CSS_N_PROPERTIES
 };
 
@@ -195,6 +196,13 @@ enum css_caret_color_e {
 	CSS_CARET_COLOR_AUTO                    = 0x1,
 	CSS_CARET_COLOR_CURRENT_COLOR           = 0x2,
 	CSS_CARET_COLOR_COLOR                   = 0x3
+};
+
+/* fixes354 (#82): box-decoration-break. Not inherited; initial = slice. */
+enum css_box_decoration_break_e {
+	CSS_BOX_DECORATION_BREAK_INHERIT        = 0x0,
+	CSS_BOX_DECORATION_BREAK_SLICE          = 0x1,
+	CSS_BOX_DECORATION_BREAK_CLONE          = 0x2
 };
 
 /* fixes275 (#65) — -macsurf-grid-flow: encodes grid-auto-flow.

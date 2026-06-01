@@ -616,6 +616,16 @@ uint8_t css_computed_caret_color(const css_computed_style *style,
 	return (uint8_t)s;
 }
 
+uint8_t css_computed_box_decoration_break(
+		const css_computed_style *style)
+{
+	int32_t v = style->i.box_decoration_break;
+	if (v != CSS_BOX_DECORATION_BREAK_CLONE) {
+		return CSS_BOX_DECORATION_BREAK_SLICE;
+	}
+	return CSS_BOX_DECORATION_BREAK_CLONE;
+}
+
 uint8_t css_computed_macsurf_animation_opacity(
 		const css_computed_style *style, int32_t *packed)
 {

@@ -917,4 +917,10 @@ enum op_caret_color {
 	CARET_COLOR_SET			= 0x0080
 };
 
+/* fixes354 (#82): box-decoration-break OPV values. */
+enum op_box_decoration_break {
+	BOX_DECORATION_BREAK_SLICE	= 0x0000,
+	BOX_DECORATION_BREAK_CLONE	= 0x0001
+};
+
 #endif

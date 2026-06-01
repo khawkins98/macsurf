@@ -530,6 +530,8 @@ const stringmap_entry stringmap[LAST_KNOWN] = {
 	SMAP("keep-all"),
 	SMAP("break-word"),
 	SMAP("anywhere"),
+	SMAP("slice"),
+	SMAP("clone"),
 
 	/* Named colours */
 	SMAP("aliceblue"),

@@ -398,6 +398,10 @@ struct css_computed_style_i {
 	/* fixes353 (#73): caret-color status + resolved css_color. */
 	int32_t caret_color_status;
 	css_color caret_color;
+	/* fixes354 (#82): box-decoration-break (CSS_BOX_DECORATION_BREAK_*).
+	 * Not inherited; initial = SLICE. int32_t for self-alignment per
+	 * the fixes151b discipline. */
+	int32_t box_decoration_break;
 };
 
 struct css_computed_style {
