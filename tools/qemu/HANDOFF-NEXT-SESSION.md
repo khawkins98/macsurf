@@ -47,38 +47,41 @@ was wrong: classic CW tolerates missing/unresolvable files (shows them in red),
 so a hard import error is a format problem. Ignore the save-location playbook in
 older commits of this file.
 
-## The plan: make CW tell us its own schema, then convert
+## The plan (converter is BUILT — this is now a short job)
 
-**Step 1 — get a genuine CW8 project export (ground truth).** In the guest:
-1. Boot, launch CodeWarrior (Finder type-select: `Metrowerks` ⌘O → `Metrowerks
-   CodeWarrior` ⌘O → `CodeWarrior IDE` ⌘O).
-2. **File → New Project** (press-drag the File menu) → pick any Mac OS C stationery
-   → save it somewhere simple (Desktop is fine).
-3. Add one or two source files to it (Project menu → Add Files), set one access
-   path (Edit → Target Settings → Access Paths) — enough to see every structure.
-4. **File → Export Project** → save the XML.
-5. Quit CW + VM; mount the disk host-side (`stage-on-bootvol.sh` shows the
-   hdiutil pattern); copy the exported XML back to the host.
+**`tools/qemu/manifest-to-mcpxml.py` already exists and works.** It converts the
+manifest into a genuine CW8-importable project XML using the schema captured from
+real CW exports (`tools/qemu/reference/python-cw7-reference.xml` + a research
+sweep). Key properties of its output (`MacSurf-import.xml`, gitignored/regenerable):
+- correct prologue (`<?codewarrior exportversion="1.0.1" ideversion="5.0" ?>`) + real DOCTYPE
+- 530 files as **PATHTYPE Absolute** MacOS colon paths under the staged
+  `Back40:…` layout (3 CW libraries as PATHTYPE Name); valid empty FILEFLAGS
+- ALL access paths absolute too → **the imported .mcp can be saved ANYWHERE**
+  (no deep save-dialog navigation — save on the Desktop, type a name, Return)
+- a rename map for 25 stale manifest references (repo files renamed after the
+  manifest was written); 1 deleted diagnostic dropped
+- validates every reference against the repo tree (build fails loudly if stale)
 
-**Step 2 — write the converter** (`tools/qemu/manifest-to-mcpxml.py`): transform the
-hand-maintained manifest (531 FILE entries + 622 FILEREFs + 17 access paths +
-target settings, all meaningful content) into the genuine schema captured in
-Step 1. Prefer **PATHTYPE Name** references (the classic portable form — files
-resolve via access paths, missing files don't block opening) and express the
-access paths in the real `SearchPath`/`PathRoot` structure ({Project}-rooted).
-A background research agent's findings on the documented schema may already be
-in the conversation/docs — check before starting.
+**Steps:**
+1. `python3 tools/qemu/manifest-to-mcpxml.py` → regenerates
+   `browser/netsurf/frontends/macos9/MacSurf-import.xml`
+2. Stage it into the guest: mount the disk (see `stage-on-bootvol.sh` for the
+   hdiutil pattern), `ditto` the XML somewhere easy (e.g. the volume root or
+   Desktop Folder), `SetFile -t TEXT -c CWIE` it, detach, repackage to qcow2.
+3. Boot headless, launch CodeWarrior (Finder type-select), then
+   **File → Import Project** via `vm.py pressdrag 48 7 108 302` (640×480 coords).
+4. In the OPEN dialog: navigate to the XML (type-select works), Return.
+5. In the SAVE dialog: just type a name (e.g. `MacSurfP`) — typing goes straight
+   to the Name field — and press Return. Location doesn't matter (absolute paths).
+6. Project window should open with 530 files. **Make** (⌘M). 30–60+ min under TCG;
+   poll by screen motion. Screenshot the Errors window when it stops and report
+   the error list to the user — do NOT fix browser code unilaterally.
 
-**Step 3 — stage + import the converted XML** (host-mount the disk, copy it next
-to the source, repackage). Then in CW: File → Import Project (press-drag) →
-select it → save the generated `.mcp` (location should now barely matter with
-Name refs, but macos9 next to the source is still the tidy choice).
-
-**Step 4 — Make** (⌘M / `vm.py key meta_l-m`). The first build runs 30–60+ min
-under TCG. Poll with periodic screenshots (screen motion = still compiling).
-When it stops, screenshot the Errors & Warnings window and **report the error
-list to the user for triage — do not fix browser code unilaterally** (CLAUDE.md
-has strict rules; the user is the maintainer).
+**Known issue to mention when reporting build results:** the repo contains
+stale-twin files (e.g. `font_family.c` AND `p_font_family.c` — same class as
+CLAUDE.md's dispatch.c/s_dispatch.c gotcha). The manifest references one of each
+pair; if it references the stale twin, that's a maintainer call to fix in the
+manifest, not in the converter.
 
 ## Quick reference
 

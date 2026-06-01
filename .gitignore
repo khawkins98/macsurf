@@ -64,3 +64,4 @@ forgem/
 
 # macSSL is its own git repo at macSSL/ — manage separately (submodule or merge later)
 macSSL/
+browser/netsurf/frontends/macos9/MacSurf-import.xml
