@@ -61,6 +61,9 @@ and `config.sh` defaults to this combination. Full story: [docs/INPUT.md](docs/I
 The repo's `MacSurf.mcp` is a hand-maintained manifest that CW8 cannot open or
 import directly (see `docs/GOTCHAS.md`). The working flow:
 
+0. **Before any guest build, run the host-side precheck gate** (catches C89 /
+   manifest errors in ~15 s instead of 30–60 min into a guest build):
+   `./tools/precheck.sh` — see [docs/PERFORMANCE.md](docs/PERFORMANCE.md) lever 0.
 1. Source is staged on the boot volume at
    `Back40:Desktop Folder:patrick:macsurf-source Folder:browser:…`
    (`stage-on-bootvol.sh`; boot volume renamed "Back40").
